@@ -128,6 +128,7 @@ type productVariables struct {
 	Eng                        *bool `json:",omitempty"`
 	EnableCFI                  *bool `json:",omitempty"`
 	Treble                     *bool `json:",omitempty"`
+	Libart_img_base            *string `json:",omitempty"`
 
 	VendorPath *string `json:",omitempty"`
 
