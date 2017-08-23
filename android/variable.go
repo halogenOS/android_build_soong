@@ -20,6 +20,8 @@ import (
 	"runtime"
 	"strings"
 
+	"xos/soong/android"
+
 	"github.com/google/blueprint/proptools"
 )
 
@@ -85,6 +87,9 @@ type variableProperties struct {
 			Cflags   []string
 			Cppflags []string
 		}
+		// include XOS variables
+		*android.Product_variables
+
 	} `android:"arch_variant"`
 }
 
@@ -151,6 +156,9 @@ type productVariables struct {
 	BtConfigIncludeDir *string `json:",omitempty"`
 
 	Override_rs_driver *string `json:",omitempty"`
+
+	// include XOS variables
+	*android.ProductVariables
 }
 
 func boolPtr(v bool) *bool {

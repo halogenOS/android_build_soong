@@ -6,6 +6,7 @@ build = [
 
 subdirs = [
     "build/soong",
+    "external/xos/soong",
 ]
 
 optional_subdirs = [
