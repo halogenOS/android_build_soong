@@ -54,6 +54,7 @@ bootstrap_go_package {
         "android/defs.go",
         "android/expand.go",
         "android/hooks.go",
+        "android/makevar_adapter.go",
         "android/makevars.go",
         "android/module.go",
         "android/mutator.go",
