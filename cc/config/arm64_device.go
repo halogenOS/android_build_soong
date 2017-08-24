@@ -53,6 +53,14 @@ var (
 		"-frename-registers",
 	}
 
+	arm64NewToolchainsCflags = []string{
+		"-D__ANDROID__",
+		"-Wno-nonnull",
+		"-Wno-nonnull-compare",
+		"-Wno-misleading-indentation",
+		"-Wno-unknown-warning-option",
+	}
+
 	arm64Ldflags = []string{
 		"-Wl,-z,noexecstack",
 		"-Wl,-z,relro",
@@ -70,6 +78,11 @@ var (
 
 	arm64Cppflags = []string{
 		"-fvisibility-inlines-hidden",
+	}
+
+	arm64NewToolchainsCppflags = []string{
+		"-Wno-misleading-indentation",
+		"-Wno-unknown-warning-option",
 	}
 
 	arm64CpuVariantCflags = map[string][]string{
@@ -110,10 +123,24 @@ func init() {
 	// Clang supports specific Kryo targeting
 	replaceFirst(arm64ClangCpuVariantCflags["kryo"], "-mcpu=cortex-a57", "-mcpu=kryo")
 
-	pctx.StaticVariable("arm64GccVersion", arm64GccVersion)
+	actualArm64GccVersion := android.GetMakeVar("TARGET_GCC_VERSION", arm64GccVersion)
+	pctx.StaticVariable("arm64GccVersion", actualArm64GccVersion)
+	if actualArm64GccVersion != arm64GccVersion {
+		for i := 0; i < len(arm64NewToolchainsCflags); i++ {
+			arm64Cflags = append(arm64Cflags, arm64NewToolchainsCflags[i])
+		}
+		for i := 0; i < len(arm64NewToolchainsCppflags); i++ {
+			arm64Cppflags = append(arm64Cppflags, arm64NewToolchainsCppflags[i])
+		}
+	}
 
-	pctx.SourcePathVariable("Arm64GccRoot",
-		"prebuilts/gcc/${HostPrebuiltTag}/aarch64/aarch64-linux-android-${arm64GccVersion}")
+	defaultTc := "prebuilts/gcc/${HostPrebuiltTag}/aarch64/aarch64-linux-android-${arm64GccVersion}"
+	customTc := android.GetMakeVar("TARGET_TOOLCHAIN_ROOT", defaultTc)
+	if customTc != defaultTc {
+		fmt.Println("Custom toolchain defined as", customTc)
+	}
+
+	pctx.SourcePathVariable("Arm64GccRoot", customTc)
 
 	pctx.StaticVariable("Arm64Cflags", strings.Join(arm64Cflags, " "))
 	pctx.StaticVariable("Arm64Ldflags", strings.Join(arm64Ldflags, " "))
