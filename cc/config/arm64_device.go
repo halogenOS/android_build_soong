@@ -94,6 +94,7 @@ func init() {
 	android.RegisterArchVariants(android.Arm64,
 		"armv8_a",
 		"cortex-a53",
+		"cortex-a53.a57",
 		"cortex-a73",
 		"kryo",
 		"denver64")
