@@ -15,7 +15,7 @@
 # limitations under the License.
 
 # To track how long we took to startup. %N isn't supported on Darwin, but
-# that's detected in the Go code, and skip calculating the startup time.
+# that's detected in the Go code, which skips calculating the startup time.
 export TRACE_BEGIN_SOONG=$(date +%s%N)
 
 # Function to find top of the source tree (if $TOP isn't set) by walking up the
@@ -97,14 +97,7 @@ function run_go
 }
 
 export TOP=$(gettop)
-case $(uname) in
-    Linux)
-        export GOROOT="${TOP}/prebuilts/go/linux-x86/"
-        ;;
-    Darwin)
-        export GOROOT="${TOP}/prebuilts/go/darwin-x86/"
-        ;;
-    *) echo "unknown OS:" $(uname) >&2 && exit 1;;
-esac
+source build/soong/cmd/microfactory/microfactory.bash
 
-run_go "$@"
+build_go soong_ui android/soong/cmd/soong_ui
+exec "$(getoutdir)/soong_ui" "$@"

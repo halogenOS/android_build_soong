@@ -122,6 +122,7 @@ var (
 		},
 		"cortex-a7": []string{
 			"-mcpu=cortex-a7",
+			"-mfpu=neon-vfpv4",
 			// Fake an ARM compiler flag as these processors support LPAE which GCC/clang
 			// don't advertise.
 			// TODO This is a hack and we need to add it for each processor that supports LPAE until some
@@ -142,6 +143,7 @@ var (
 		},
 		"cortex-a53": []string{
 			"-mcpu=cortex-a7",
+			"-mcpu=cortex-a53",
 			"-mfpu=neon-fp-armv8",
 			// Fake an ARM compiler flag as these processors support LPAE which GCC/clang
 			// don't advertise.
