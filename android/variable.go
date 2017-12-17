@@ -147,6 +147,8 @@ type productVariables struct {
 	Libart_img_base            *string `json:",omitempty"`
 	Pdk                        *bool `json:",omitempty"`
 
+	IntegerOverflowExcludePaths *[]string `json:",omitempty"`
+
 	VendorPath *string `json:",omitempty"`
 
 	ClangTidy  *bool   `json:",omitempty"`
@@ -161,6 +163,7 @@ type productVariables struct {
 
 	SanitizeHost       []string `json:",omitempty"`
 	SanitizeDevice     []string `json:",omitempty"`
+	SanitizeDeviceDiag []string `json:",omitempty"`
 	SanitizeDeviceArch []string `json:",omitempty"`
 
 	ArtUseReadBarrier *bool `json:",omitempty"`
@@ -169,6 +172,8 @@ type productVariables struct {
 
 	Override_rs_driver *string `json:",omitempty"`
 	BoardUsesQTIHardware    *bool `json:",omitempty"`
+
+	DeviceKernelHeaders []string `json:",omitempty"`
 
 	// include XOS variables
 	Xos android.ProductVariables

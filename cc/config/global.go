@@ -124,7 +124,7 @@ func init() {
 	// This is used by non-NDK modules to get jni.h. export_include_dirs doesn't help
 	// with this, since there is no associated library.
 	pctx.PrefixedExistentPathsForSourcesVariable("CommonNativehelperInclude", "-I",
-		[]string{"libnativehelper/include/nativehelper"})
+		[]string{"libnativehelper/include_deprecated"})
 
 	pctx.SourcePathVariable("ClangDefaultBase", ClangDefaultBase)
 	pctx.VariableFunc("ClangBase", func(config interface{}) (string, error) {
@@ -183,17 +183,6 @@ func bionicHeaders(bionicArch, kernelArch string) string {
 		"-isystem bionic/libc/kernel/android/scsi",
 		"-isystem bionic/libc/kernel/android/uapi",
 	}, " ")
-}
-
-func VndkLibraries() []string {
-	return []string{}
-}
-
-// This needs to be kept up to date with the list in system/core/rootdir/etc/ld.config.txt:
-// [vendor]
-// namespace.default.link.system.shared_libs
-func LLndkLibraries() []string {
-	return []string{"libc", "libm", "libdl", "liblog", "libandroid_net", "ld-android", "libvndksupport", "libnativewindow"}
 }
 
 func replaceFirst(slice []string, from, to string) {
