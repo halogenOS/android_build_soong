@@ -53,21 +53,8 @@ var (
 		"-frename-registers",
 	}
 
-	armNewToolchainsCflags = []string{
-		"-D__ANDROID__",
-		"-Wno-nonnull",
-		"-Wno-nonnull-compare",
-		"-Wno-misleading-indentation",
-		"-Wno-unknown-warning-option",
-	}
-
 	armCppflags = []string{
 		"-fvisibility-inlines-hidden",
-	}
-
-	armNewToolchainsCppflags = []string{
-		"-Wno-misleading-indentation",
-		"-Wno-unknown-warning-option",
 	}
 
 	armLdflags = []string{
@@ -213,31 +200,10 @@ func init() {
 	replaceFirst(armClangCpuVariantCflags["krait"], "-mcpu=cortex-a15", "-mcpu=krait")
 	replaceFirst(armClangCpuVariantCflags["kryo"], "-mcpu=cortex-a15", "-mcpu=krait")
 
-	if android.GetMakeVar("TARGET_ARCH", "arm") == "arm" {
-		actualArmGccVersion := android.GetMakeVar("TARGET_GCC_VERSION", armGccVersion)
-		pctx.StaticVariable("armGccVersion", actualArmGccVersion)
-		if actualArmGccVersion != armGccVersion {
-			for i := 0; i < len(armNewToolchainsCflags); i++ {
-				armCflags = append(armCflags, armNewToolchainsCflags[i])
-			}
-			for i := 0; i < len(arm64NewToolchainsCppflags); i++ {
-				armCppflags = append(armCppflags, armNewToolchainsCppflags[i])
-			}
-		}
-	} else {
-		pctx.StaticVariable("armGccVersion", armGccVersion)
-	}
+	pctx.StaticVariable("armGccVersion", armGccVersion)
 
-	defaultTc := "prebuilts/gcc/${HostPrebuiltTag}/arm/arm-linux-androideabi-${armGccVersion}"
-	if android.GetMakeVar("TARGET_ARCH", "arm") == "arm" {
-		customTc := android.GetMakeVar("TARGET_TOOLCHAIN_ROOT", defaultTc)
-		if customTc != defaultTc {
-			fmt.Println("Custom toolchain defined as", customTc)
-		}
-		pctx.SourcePathVariable("ArmGccRoot", customTc)
-	} else {
-		pctx.SourcePathVariable("ArmGccRoot", defaultTc)
-	}
+	pctx.SourcePathVariable("ArmGccRoot",
+		"prebuilts/gcc/${HostPrebuiltTag}/arm/arm-linux-androideabi-${armGccVersion}")
 
 	pctx.StaticVariable("ArmToolchainCflags", strings.Join(armToolchainCflags, " "))
 	pctx.StaticVariable("ArmCflags", strings.Join(armCflags, " "))
