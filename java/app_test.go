@@ -1231,12 +1231,9 @@ func TestAndroidAppImport_Presigned(t *testing.T) {
 		t.Errorf("unexpected, non-skipping strip command: %q", stripRule.RuleParams.Command)
 	}
 
-	// Make sure signing was skipped and aligning was done instead.
+	// Make sure signing was skipped
 	if variant.MaybeOutput("signed/foo.apk").Rule != nil {
 		t.Errorf("signing rule shouldn't be included.")
-	}
-	if variant.MaybeOutput("zip-aligned/foo.apk").Rule == nil {
-		t.Errorf("can't find aligning rule")
 	}
 }
 

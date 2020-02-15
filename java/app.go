@@ -17,12 +17,13 @@ package java
 // This file contains the module types for compiling Android apps.
 
 import (
-	"github.com/google/blueprint"
-	"github.com/google/blueprint/proptools"
 	"path/filepath"
 	"reflect"
 	"sort"
 	"strings"
+
+	"github.com/google/blueprint"
+	"github.com/google/blueprint/proptools"
 
 	"android/soong/android"
 	"android/soong/cc"
@@ -776,12 +777,9 @@ func (a *AndroidAppImport) uncompressEmbeddedJniLibs(
 	ctx android.ModuleContext, inputPath android.Path, outputPath android.OutputPath) {
 	rule := android.NewRuleBuilder()
 	rule.Command().
-		Textf(`if (zipinfo %s 'lib/*.so' 2>/dev/null | grep -v ' stor ' >/dev/null) ; then`, inputPath).
-		Tool(ctx.Config().HostToolPath(ctx, "zip2zip")).
-		FlagWithInput("-i ", inputPath).
-		FlagWithOutput("-o ", outputPath).
-		FlagWithArg("-0 ", "'lib/**/*.so'").
-		Textf(`; else cp -f %s %s; fi`, inputPath, outputPath)
+		Textf("cp").
+		FlagWithInput("", inputPath).
+		FlagWithOutput("", outputPath)
 	rule.Build(pctx, ctx, "uncompress-embedded-jni-libs", "Uncompress embedded JIN libs")
 }
 
@@ -866,9 +864,7 @@ func (a *AndroidAppImport) GenerateAndroidBuildActions(ctx android.ModuleContext
 		SignAppPackage(ctx, signed, dexOutput, certificates)
 		a.outputFile = signed
 	} else {
-		alignedApk := android.PathForModuleOut(ctx, "zip-aligned", ctx.ModuleName()+".apk")
-		TransformZipAlign(ctx, alignedApk, dexOutput)
-		a.outputFile = alignedApk
+		a.outputFile = dexOutput
 	}
 
 	// TODO: Optionally compress the output apk.
