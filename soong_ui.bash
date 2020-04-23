@@ -15,6 +15,8 @@ set -eu
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+chrt -bp 0 $$
+
 source $(cd $(dirname $BASH_SOURCE) &> /dev/null && pwd)/../make/shell_utils.sh
 require_top
 
