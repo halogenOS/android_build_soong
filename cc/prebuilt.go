@@ -27,7 +27,7 @@ func RegisterPrebuiltBuildComponents(ctx android.RegistrationContext) {
 	ctx.RegisterModuleType("cc_prebuilt_library_shared", PrebuiltSharedLibraryFactory)
 	ctx.RegisterModuleType("cc_prebuilt_library_static", PrebuiltStaticLibraryFactory)
 	ctx.RegisterModuleType("cc_prebuilt_object", prebuiltObjectFactory)
-	ctx.RegisterModuleType("cc_prebuilt_binary", prebuiltBinaryFactory)
+	ctx.RegisterModuleType("cc_prebuilt_binary", PrebuiltBinaryFactory)
 }
 
 type prebuiltLinkerInterface interface {
@@ -316,7 +316,7 @@ func (p *prebuiltBinaryLinker) binary() bool {
 
 // cc_prebuilt_binary installs a precompiled executable in srcs property in the
 // device's directory.
-func prebuiltBinaryFactory() android.Module {
+func PrebuiltBinaryFactory() android.Module {
 	module, _ := NewPrebuiltBinary(android.HostAndDeviceSupported)
 	return module.Init()
 }
