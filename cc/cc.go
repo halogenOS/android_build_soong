@@ -2468,20 +2468,35 @@ func (c *Module) DepsMutator(actx android.BottomUpMutatorContext) {
 	variantNdkLibs := []string{}
 	variantLateNdkLibs := []string{}
 	if ctx.Os() == android.Android {
+		rewriteHeaderLibs := func(list []string) (newHeaderLibs []string) {
+			newHeaderLibs = []string{}
+			for _, entry := range list {
+				// Replace device_kernel_headers with generated_kernel_headers
+				// for inline kernel building
+				if entry == "device_kernel_headers" {
+					newHeaderLibs = append(newHeaderLibs, "generated_kernel_headers")
+					continue
+				}
+				newHeaderLibs = append(newHeaderLibs, entry)
+			}
+			return newHeaderLibs
+		}
+
+		deps.HeaderLibs = rewriteHeaderLibs(deps.HeaderLibs)
 		deps.SharedLibs, variantNdkLibs = FilterNdkLibs(c, ctx.Config(), deps.SharedLibs)
 		deps.LateSharedLibs, variantLateNdkLibs = FilterNdkLibs(c, ctx.Config(), deps.LateSharedLibs)
 		deps.ReexportSharedLibHeaders, _ = FilterNdkLibs(c, ctx.Config(), deps.ReexportSharedLibHeaders)
-	}
+    }
 
 	for _, lib := range deps.HeaderLibs {
 		depTag := libraryDependencyTag{Kind: headerLibraryDependency}
 		if inList(lib, deps.ReexportHeaderLibHeaders) {
-			depTag.reexportFlags = true
+				depTag.reexportFlags = true
 		}
 
 		// Check header lib replacement from API surface first, and then check again with VSDK
 		if c.shouldUseApiSurface() {
-			lib = GetReplaceModuleName(lib, apiImportInfo.HeaderLibs)
+				lib = GetReplaceModuleName(lib, apiImportInfo.HeaderLibs)
 		}
 
 		if c.isNDKStubLibrary() {
