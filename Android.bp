@@ -36,6 +36,7 @@ cc_defaults {
             enabled: true,
         },
     },
+    cflags: ["-O3"],
 }
 
 //
