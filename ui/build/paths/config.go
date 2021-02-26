@@ -118,6 +118,9 @@ var Configuration = map[string]PathConfig{
 	"pgrep": LinuxOnlyPrebuilt,
 	"pkill": LinuxOnlyPrebuilt,
 	"ps":    LinuxOnlyPrebuilt,
+
+	// Needed for certain kernel trees
+	"flock": Allowed,
 }
 
 func init() {
