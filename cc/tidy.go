@@ -65,7 +65,12 @@ func (tidy *tidyFeature) flags(ctx ModuleContext, flags Flags) Flags {
 		return flags
 	}
 
-	flags.Tidy = true
+	shouldEnableTidy := ctx.Config().Getenv("CLANG_TIDY_ENABLE")
+	if shouldEnableTidy == "true" {
+		flags.Tidy = true
+	} else {
+		return flags
+	}
 
 	// Add global WITH_TIDY_FLAGS and local tidy_flags.
 	withTidyFlags := ctx.Config().Getenv("WITH_TIDY_FLAGS")
