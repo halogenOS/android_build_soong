@@ -140,6 +140,7 @@ func init() {
 		"-Wno-gnu-folding-constant",
 		"-Wno-compound-token-split-by-macro",
 		"-Wno-void-pointer-to-int-cast",
+		"-Wno-void-pointer-to-enum-cast",
 
 		// Disable unknown warnings
 		"-Wno-unknown-warning-option",
@@ -191,6 +192,9 @@ func init() {
 		"-Wno-enum-enum-conversion",                 // http://b/154138986
 		"-Wno-enum-float-conversion",                // http://b/154255917
 		"-Wno-pessimizing-move",                     // http://b/154270751
+		// Clang 12
+		"-Wno-void-pointer-to-int-cast",
+		"-Wno-void-pointer-to-enum-cast",
 	}, " "))
 
 	// Extra cflags for external third-party projects to disable warnings that
