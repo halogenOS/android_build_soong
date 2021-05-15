@@ -139,6 +139,7 @@ func init() {
 		// Warnings from clang-12
 		"-Wno-gnu-folding-constant",
 		"-Wno-compound-token-split-by-macro",
+		"-Wno-void-pointer-to-int-cast",
 
 		// Disable unknown warnings
 		"-Wno-unknown-warning-option",
