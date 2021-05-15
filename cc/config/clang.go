@@ -141,6 +141,7 @@ func init() {
 		"-Wno-compound-token-split-by-macro",
 		"-Wno-void-pointer-to-int-cast",
 		"-Wno-void-pointer-to-enum-cast",
+		"-Wno-strict-prototypes",
 
 		// Disable unknown warnings
 		"-Wno-unknown-warning-option",
@@ -195,6 +196,7 @@ func init() {
 		// Clang 12
 		"-Wno-void-pointer-to-int-cast",
 		"-Wno-void-pointer-to-enum-cast",
+		"-Wno-strict-prototypes",
 	}, " "))
 
 	// Extra cflags for external third-party projects to disable warnings that
