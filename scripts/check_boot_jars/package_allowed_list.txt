@@ -260,3 +260,11 @@ com.qualcomm.wfd.service
 org.codeaurora.ims
 org.codeaurora.internal
 qcom.fmradio
+
+###################################################
+# LineageOS
+vendor.lineage.touch.*
+
+###################################################
+# LiveDisplay
+vendor.lineage.livedisplay.*
