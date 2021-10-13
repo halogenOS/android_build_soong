@@ -96,6 +96,8 @@ var Configuration = map[string]PathConfig{
 	"gcloud":         Allowed,
 	"git":            Allowed,
 	"hexdump":        Allowed,
+	"ld.lld":         Allowed,
+	"llvm-ar":        Allowed,
 	"jar":            Allowed,
 	"java":           Allowed,
 	"javap":          Allowed,
