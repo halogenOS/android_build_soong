@@ -59,8 +59,8 @@ var (
 )
 
 const (
-	JavaVmFlags  = `-XX:OnError="cat hs_err_pid%p.log" -XX:CICompilerCount=6 -XX:+UseDynamicNumberOfGCThreads`
-	JavacVmFlags = `-J-XX:OnError="cat hs_err_pid%p.log" -J-XX:CICompilerCount=6 -J-XX:+UseDynamicNumberOfGCThreads`
+	JavaVmFlags  = `-XX:OnError="cat hs_err_pid%p.log" -XX:CICompilerCount=2`
+	JavacVmFlags = `-J-XX:OnError="cat hs_err_pid%p.log" -J-XX:CICompilerCount=2`
 )
 
 func init() {
@@ -68,7 +68,7 @@ func init() {
 
 	pctx.StaticVariable("JavacHeapSize", "2048M")
 	pctx.StaticVariable("JavacHeapFlags", "-J-Xmx${JavacHeapSize}")
-	pctx.StaticVariable("DexFlags", "-JXX:OnError='cat hs_err_pid%p.log' -JXX:CICompilerCount=6 -JXX:+UseDynamicNumberOfGCThreads")
+	pctx.StaticVariable("DexFlags", "-JXX:OnError='cat hs_err_pid%p.log' -JXX:CICompilerCount=2")
 
 	pctx.StaticVariable("CommonJdkFlags", strings.Join([]string{
 		`-Xmaxerrs 9999999`,
