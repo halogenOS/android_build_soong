@@ -58,12 +58,12 @@ var (
 	JavacVmFlags    = strings.Join(javacVmFlagsList, " ")
 	javaVmFlagsList = []string{
 		`-XX:OnError="cat hs_err_pid%p.log"`,
-		"-XX:CICompilerCount=6",
+		"-XX:CICompilerCount=2",
 		"-XX:+UseDynamicNumberOfGCThreads",
 	}
 	javacVmFlagsList = []string{
 		`-J-XX:OnError="cat hs_err_pid%p.log"`,
-		"-J-XX:CICompilerCount=6",
+		"-J-XX:CICompilerCount=2",
 		"-J-XX:+UseDynamicNumberOfGCThreads",
 		"-J-XX:+TieredCompilation",
 		"-J-XX:TieredStopAtLevel=1",
@@ -83,7 +83,7 @@ func init() {
 
 	exportedVars.ExportStringListStaticVariable("DexFlags", []string{
 		`-JXX:OnError="cat hs_err_pid%p.log"`,
-		"-JXX:CICompilerCount=6",
+		"-JXX:CICompilerCount=2",
 		"-JXX:+UseDynamicNumberOfGCThreads",
 	})
 
