@@ -50,7 +50,7 @@ const Sha256HeaderID = 0x4967
 const Sha256HeaderSignature = 0x9514
 
 // Block size used during parallel compression of a single file.
-const parallelBlockSize = 1 * 1024 * 1024 // 1MB
+const parallelBlockSize = 4 * 1024 * 1024 // 1MB
 
 // Minimum file size to use parallel compression. It requires more
 // flate.Writer allocations, since we can't change the dictionary
