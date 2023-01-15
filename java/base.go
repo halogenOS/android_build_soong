@@ -1028,7 +1028,8 @@ func (j *Module) collectBuilderFlags(ctx android.ModuleContext, deps deps) javaB
 	// javaVersion flag.
 	flags.javaVersion = getJavaVersion(ctx, String(j.properties.Java_version), android.SdkContext(j))
 
-	epEnabled := j.properties.Errorprone.Enabled
+	enabled := false
+	epEnabled := &enabled
 	if (ctx.Config().RunErrorProne() && epEnabled == nil) || Bool(epEnabled) {
 		if config.ErrorProneClasspath == nil && !ctx.Config().RunningInsideUnitTest() {
 			ctx.ModuleErrorf("cannot build with Error Prone, missing external/error_prone?")
@@ -1438,11 +1439,7 @@ func (j *Module) compile(ctx android.ModuleContext, extraSrcJars, extraClasspath
 			}
 		}
 		var extraJarDeps android.Paths
-		if Bool(j.properties.Errorprone.Enabled) {
-			// If error-prone is enabled, enable errorprone flags on the regular
-			// build.
-			flags = enableErrorproneFlags(flags)
-		} else if hasErrorproneableFiles && ctx.Config().RunErrorProne() && j.properties.Errorprone.Enabled == nil {
+		if hasErrorproneableFiles && ctx.Config().RunErrorProne() && j.properties.Errorprone.Enabled == nil {
 			// Otherwise, if the RUN_ERROR_PRONE environment variable is set, create
 			// a new jar file just for compiling with the errorprone compiler to.
 			// This is because we don't want to cause the java files to get completely
