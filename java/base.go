@@ -1040,23 +1040,6 @@ func (j *Module) collectBuilderFlags(ctx android.ModuleContext, deps deps) javaB
 	// javaVersion flag.
 	flags.javaVersion = getJavaVersion(ctx, String(j.properties.Java_version), android.SdkContext(j))
 
-	epEnabled := j.properties.Errorprone.Enabled
-	if (ctx.Config().RunErrorProne() && epEnabled == nil) || Bool(epEnabled) {
-		if config.ErrorProneClasspath == nil && !ctx.Config().RunningInsideUnitTest() {
-			ctx.ModuleErrorf("cannot build with Error Prone, missing external/error_prone?")
-		}
-
-		errorProneFlags := []string{
-			"-Xplugin:ErrorProne",
-			"${config.ErrorProneChecks}",
-		}
-		errorProneFlags = append(errorProneFlags, j.properties.Errorprone.Javacflags...)
-
-		flags.errorProneExtraJavacFlags = "${config.ErrorProneHeapFlags} ${config.ErrorProneFlags} " +
-			"'" + strings.Join(errorProneFlags, " ") + "'"
-		flags.errorProneProcessorPath = classpath(android.PathsForSource(ctx, config.ErrorProneClasspath))
-	}
-
 	// classpath
 	flags.bootClasspath = append(flags.bootClasspath, deps.bootClasspath...)
 	flags.classpath = append(flags.classpath, deps.classpath...)
@@ -1465,34 +1448,6 @@ func (j *Module) compile(ctx android.ModuleContext, extraSrcJars, extraClasspath
 			}
 		}
 		var extraJarDeps android.Paths
-		if Bool(j.properties.Errorprone.Enabled) {
-			// If error-prone is enabled, enable errorprone flags on the regular
-			// build.
-			flags = enableErrorproneFlags(flags)
-		} else if hasErrorproneableFiles && ctx.Config().RunErrorProne() && j.properties.Errorprone.Enabled == nil {
-			if ctx.Config().RunErrorProneInline() {
-				// On CI, we're not going to toggle back/forth between errorprone and non-errorprone
-				// builds, so it's faster if we don't compile the module twice and instead always
-				// compile the module with errorprone.
-				flags = enableErrorproneFlags(flags)
-			} else {
-				// Otherwise, if the RUN_ERROR_PRONE environment variable is set, create
-				// a new jar file just for compiling with the errorprone compiler to.
-				// This is because we don't want to cause the java files to get completely
-				// rebuilt every time the state of the RUN_ERROR_PRONE variable changes.
-				// We also don't want to run this if errorprone is enabled by default for
-				// this module, or else we could have duplicated errorprone messages.
-				errorproneFlags := enableErrorproneFlags(flags)
-				errorprone := android.PathForModuleOut(ctx, "errorprone", jarName)
-				errorproneAnnoSrcJar := android.PathForModuleOut(ctx, "errorprone", "anno.srcjar")
-
-				transformJavaToClasses(ctx, errorprone, -1, uniqueJavaFiles, srcJars, errorproneAnnoSrcJar, errorproneFlags, nil,
-					"errorprone", "errorprone")
-
-				extraJarDeps = append(extraJarDeps, errorprone)
-			}
-		}
-
 		if enableSharding {
 			if len(shardingHeaderJars) > 0 {
 				flags.classpath = append(classpath(slices.Clone(shardingHeaderJars)), flags.classpath...)
