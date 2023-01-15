@@ -62,10 +62,11 @@ func (tidy *tidyFeature) props() []interface{} {
 }
 
 func (tidy *tidyFeature) flags(ctx ModuleContext, flags Flags) Flags {
-	CheckBadTidyFlags(ctx, "tidy_flags", tidy.Properties.Tidy_flags)
-	CheckBadTidyChecks(ctx, "tidy_checks", tidy.Properties.Tidy_checks)
-
 	flags.Tidy = false
+	if (flags.Tidy) {
+		CheckBadTidyFlags(ctx, "tidy_flags", tidy.Properties.Tidy_flags)
+		CheckBadTidyChecks(ctx, "tidy_checks", tidy.Properties.Tidy_checks)
+	}
 
 	return flags
 }
