@@ -695,6 +695,9 @@ func buildBootImageVariant(ctx android.ModuleContext, image *bootImageVariant, p
 
 	cmd := rule.Command()
 
+	// try the command multiple times. it might crash (probably will) at least once.
+	cmd.Text("success=false; for i in {1..5}; do echo \"Try $i\";");
+
 	extraFlags := ctx.Config().Getenv("ART_BOOT_IMAGE_EXTRA_ARGS")
 	if extraFlags == "" {
 		// Use ANDROID_LOG_TAGS to suppress most logging by default...
@@ -828,7 +831,8 @@ func buildBootImageVariant(ctx android.ModuleContext, image *bootImageVariant, p
 		cmd.Flag(extraFlags)
 	}
 
-	cmd.Textf(`|| ( echo %s ; false )`, proptools.ShellEscape(failureMessage))
+	cmd.Text(" && success=true && break ; done;")
+	cmd.Textf(`( $success && echo 'Success' ) || ( echo %s ; false )`, proptools.ShellEscape(failureMessage))
 
 	installDir := filepath.Dir(image.imagePathOnDevice)
 
