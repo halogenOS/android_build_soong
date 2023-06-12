@@ -41,6 +41,7 @@ func init() {
 		ctx.BottomUp("rust_begin", BeginMutator).Parallel()
 	})
 	android.PostDepsMutators(func(ctx android.RegisterMutatorsContext) {
+		ctx.BottomUp("rust_lto", ltoMutator).Parallel()
 		ctx.BottomUp("rust_sanitizers", rustSanitizerRuntimeMutator).Parallel()
 	})
 	pctx.Import("android/soong/rust/config")
@@ -1575,18 +1576,24 @@ func (mod *Module) DepsMutator(actx android.BottomUpMutatorContext) {
 		depTag := cc.StaticDepTag(true)
 		lib = cc.GetReplaceModuleName(lib, cc.GetSnapshot(mod, &snapshotInfo, actx).StaticLibs)
 
-		actx.AddVariationDependencies([]blueprint.Variation{
+		mod := actx.AddVariationDependencies([]blueprint.Variation{
 			{Mutator: "link", Variation: "static"},
-		}, depTag, lib)
+		}, depTag, lib)[0]
+		if mod, ok := mod.(*cc.Module); ok {
+			mod.SetLtoIsRustDep(true)
+		}
 	}
 
 	for _, lib := range deps.StaticLibs {
 		depTag := cc.StaticDepTag(false)
 		lib = cc.GetReplaceModuleName(lib, cc.GetSnapshot(mod, &snapshotInfo, actx).StaticLibs)
 
-		actx.AddVariationDependencies([]blueprint.Variation{
+		mod := actx.AddVariationDependencies([]blueprint.Variation{
 			{Mutator: "link", Variation: "static"},
-		}, depTag, lib)
+		}, depTag, lib)[0]
+		if mod, ok := mod.(*cc.Module); ok {
+			mod.SetLtoIsRustDep(true)
+		}
 	}
 
 	actx.AddVariationDependencies(nil, cc.HeaderDepTag(), deps.HeaderLibs...)

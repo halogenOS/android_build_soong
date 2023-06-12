@@ -27,6 +27,7 @@ bootstrap_go_package {
         "fuzz.go",
         "image.go",
         "library.go",
+        "lto.go",
         "prebuilt.go",
         "proc_macro.go",
         "project_json.go",

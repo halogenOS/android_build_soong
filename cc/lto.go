@@ -55,6 +55,7 @@ type LTOProperties struct {
 	FullDep      bool `blueprint:"mutated"`
 	ThinDep      bool `blueprint:"mutated"`
 	NoLtoDep     bool `blueprint:"mutated"`
+	RustDep      bool `blueprint:"mutated"`
 
 	// Use clang lld instead of gnu ld.
 	Use_clang_lld *bool
@@ -233,7 +234,7 @@ func ltoMutator(mctx android.BottomUpMutatorContext) {
 		if !globalThinLTO && m.lto.Properties.ThinDep && !m.lto.ThinLTO() {
 			variationNames = append(variationNames, "lto-thin")
 		}
-		if globalThinLTO && m.lto.Properties.NoLtoDep && !m.lto.Never() {
+		if globalThinLTO && (m.lto.Properties.NoLtoDep || m.lto.Properties.RustDep) && !m.lto.Never() {
 			variationNames = append(variationNames, "lto-none")
 		}
 
@@ -276,6 +277,7 @@ func ltoMutator(mctx android.BottomUpMutatorContext) {
 				variation.lto.Properties.FullDep = false
 				variation.lto.Properties.ThinDep = false
 				variation.lto.Properties.NoLtoDep = false
+				variation.lto.Properties.RustDep = false
 			}
 		}
 	}
