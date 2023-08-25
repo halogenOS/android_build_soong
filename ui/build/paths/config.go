@@ -102,6 +102,7 @@ var Configuration = map[string]PathConfig{
 	"ld.lld":  Allowed,
 	"llvm-ar": Allowed,
 	"openssl": Allowed,
+	"pigz":    Allowed,
 	"pstree":  Allowed,
 	"rsync":   Allowed,
 	"sh":      Allowed,
