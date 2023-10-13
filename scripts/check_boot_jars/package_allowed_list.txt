@@ -263,3 +263,7 @@ com.qualcomm.wfd.service
 org.codeaurora.ims
 org.codeaurora.internal
 qcom.fmradio
+
+# Lineage HW
+vendor\.lineage\..*
+
