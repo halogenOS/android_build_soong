@@ -164,6 +164,7 @@ func main() {
 	cpuProfile := flags.String("cpuprofile", "", "write cpu profile to file")
 	traceFile := flags.String("trace", "", "write trace to file")
 	sha256Checksum := flags.Bool("sha256", false, "add a zip header to each file containing its SHA256 digest")
+	verbose := flags.Bool("verbose", false, "print additional output for debugging purposes")
 
 	flags.Var(&rootPrefix{}, "P", "path prefix within the zip at which to place files")
 	flags.Var(&listFiles{}, "l", "file containing list of files to zip")
@@ -182,17 +183,26 @@ func main() {
 	}
 
 	if *cpuProfile != "" {
+		if *verbose {
+			fmt.Fprintln(os.Stderr, "CPU profile enabled:", *cpuProfile)
+		}
 		f, err := os.Create(*cpuProfile)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
 			os.Exit(1)
 		}
 		defer f.Close()
+		if *verbose {
+			fmt.Fprintln(os.Stderr, "Starting CPU profile")
+		}
 		pprof.StartCPUProfile(f)
 		defer pprof.StopCPUProfile()
 	}
 
 	if *traceFile != "" {
+		if *verbose {
+			fmt.Fprintln(os.Stderr, "Trace file enabled:", *traceFile)
+		}
 		f, err := os.Create(*traceFile)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, err.Error())
@@ -212,6 +222,9 @@ func main() {
 		os.Exit(1)
 	}
 
+	if *verbose {
+		fmt.Fprintln(os.Stderr, "Starting zip now")
+	}
 	err := zip.Zip(zip.ZipArgs{
 		FileArgs:                 fileArgsBuilder.FileArgs(),
 		OutputFilePath:           *out,
@@ -226,6 +239,7 @@ func main() {
 		StoreSymlinks:            *symlinks,
 		IgnoreMissingFiles:       *ignoreMissingFiles,
 		Sha256Checksum:           *sha256Checksum,
+		Verbose:                  *verbose,
 	})
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "error:", err.Error())

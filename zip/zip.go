@@ -244,6 +244,7 @@ type ZipWriter struct {
 	fs     pathtools.FileSystem
 
 	sha256Checksum bool
+	verbose        bool
 }
 
 type zipEntry struct {
@@ -271,18 +272,25 @@ type ZipArgs struct {
 	StoreSymlinks            bool
 	IgnoreMissingFiles       bool
 	Sha256Checksum           bool
+	Verbose					 bool
 
 	Stderr     io.Writer
 	Filesystem pathtools.FileSystem
 }
 
 func zipTo(args ZipArgs, w io.Writer) error {
+	if args.Verbose {
+		fmt.Fprintln(os.Stderr, "Zipping started")
+	}
 	if args.EmulateJar {
 		args.AddDirectoryEntriesToZip = true
 	}
 
 	// Have Glob follow symlinks if they are not being stored as symlinks in the zip file.
 	followSymlinks := pathtools.ShouldFollowSymlinks(!args.StoreSymlinks)
+	if args.Verbose {
+		fmt.Fprintln(os.Stderr, "Follow symlinks:", followSymlinks)
+	}
 
 	z := &ZipWriter{
 		time:               jar.DefaultTime,
@@ -295,6 +303,7 @@ func zipTo(args ZipArgs, w io.Writer) error {
 		stderr:             args.Stderr,
 		fs:                 args.Filesystem,
 		sha256Checksum:     args.Sha256Checksum,
+		verbose:            args.Verbose,
 	}
 
 	if z.fs == nil {
@@ -308,6 +317,13 @@ func zipTo(args ZipArgs, w io.Writer) error {
 	pathMappings := []pathMapping{}
 
 	noCompression := args.CompressionLevel == 0
+	if args.Verbose {
+		fmt.Fprintln(os.Stderr, "Compression level:", args.CompressionLevel)
+		if noCompression {
+			fmt.Fprintln(os.Stderr, "Compression is disabled.")
+		}
+		fmt.Fprintln(os.Stderr, "Starting now.")
+	}
 
 	for _, fa := range args.FileArgs {
 		var srcs []string
@@ -332,6 +348,10 @@ func zipTo(args ZipArgs, w io.Writer) error {
 				} else {
 					return err
 				}
+			}
+
+			if args.Verbose {
+				fmt.Fprintln(os.Stderr, "Adding source file:", s, ", matches: ", result.Matches)
 			}
 			srcs = append(srcs, result.Matches...)
 		}
@@ -365,9 +385,16 @@ func zipTo(args ZipArgs, w io.Writer) error {
 			if err != nil {
 				return err
 			}
+
+			if args.Verbose {
+				fmt.Fprintln(os.Stderr, "Adding glob dir matches:", result.Matches)
+			}
 			srcs = append(srcs, result.Matches...)
 		}
 		for _, src := range srcs {
+			if args.Verbose {
+				fmt.Fprintln(os.Stderr, "Filling path pairs:", src)
+			}
 			err := fillPathPairs(fa, src, &pathMappings, args.NonDeflatedFiles, noCompression)
 			if err != nil {
 				return err
@@ -380,8 +407,14 @@ func zipTo(args ZipArgs, w io.Writer) error {
 
 // Zip creates an output zip archive from given sources.
 func Zip(args ZipArgs) error {
+	if args.Verbose {
+		fmt.Fprintln(os.Stderr, "Starting zip now")
+	}
 	if args.OutputFilePath == "" {
 		return fmt.Errorf("output file path must be nonempty")
+	}
+	if args.Verbose {
+		fmt.Fprintln(os.Stderr, "Output:", args.OutputFilePath)
 	}
 
 	buf := &bytes.Buffer{}
@@ -600,6 +633,9 @@ func (z *ZipWriter) write(f io.Writer, pathMappings []pathMapping, manifest stri
 
 // imports (possibly with compression) <src> into the zip at sub-path <dest>
 func (z *ZipWriter) addFile(dest, src string, method uint16, emulateJar, srcJar bool) error {
+	if z.verbose {
+		fmt.Fprintln(os.Stderr, "File:", src, "->", dest)
+	}
 	var fileSize int64
 	var executable bool
 
@@ -723,6 +759,9 @@ func (z *ZipWriter) addFile(dest, src string, method uint16, emulateJar, srcJar 
 }
 
 func (z *ZipWriter) addManifest(dest string, src string, _ uint16) error {
+	if z.verbose {
+		fmt.Fprintln(os.Stderr, "Manifest:", src, "->", dest)
+	}
 	if prev, exists := z.createdDirs[dest]; exists {
 		return fmt.Errorf("destination %q is both a directory %q and a file %q", dest, prev, src)
 	}
@@ -766,7 +805,9 @@ func (z *ZipWriter) addManifest(dest string, src string, _ uint16) error {
 }
 
 func (z *ZipWriter) writeFileContents(header *zip.FileHeader, r pathtools.ReaderAtSeekerCloser) (err error) {
-
+	if z.verbose {
+		fmt.Fprintln(os.Stderr, "Writing file contents:", header.Name)
+	}
 	header.SetModTime(z.time)
 
 	compressChan := make(chan *zipEntry, 1)
@@ -941,6 +982,9 @@ func (z *ZipWriter) compressBlock(r io.Reader, dict []byte, last bool) (*bytes.B
 }
 
 func (z *ZipWriter) compressWholeFile(ze *zipEntry, r io.ReadSeeker, compressChan chan *zipEntry) {
+	if z.verbose {
+		fmt.Fprintln(os.Stderr, "Compressing whole file:", ze.fh.Name)
+	}
 	z.checksumFile(r, ze)
 
 	_, err := r.Seek(0, 0)
@@ -1006,6 +1050,9 @@ func (z *ZipWriter) compressWholeFile(ze *zipEntry, r io.ReadSeeker, compressCha
 // writeDirectory annotates that dir is a directory created for the src file or directory, and adds
 // the directory entry to the zip file if directories are enabled.
 func (z *ZipWriter) writeDirectory(dir string, src string, emulateJar bool) error {
+	if z.verbose {
+		fmt.Fprintln(os.Stderr, "Directory:", src, "->", dir)
+	}
 	// clean the input
 	dir = filepath.Clean(dir)
 
@@ -1056,6 +1103,9 @@ func (z *ZipWriter) writeDirectory(dir string, src string, emulateJar bool) erro
 }
 
 func (z *ZipWriter) writeSymlink(rel, file string) error {
+	if z.verbose {
+		fmt.Fprintln(os.Stderr, "Symlink:", rel, "->", file)
+	}
 	fileHeader := &zip.FileHeader{
 		Name: rel,
 	}
