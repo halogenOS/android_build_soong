@@ -121,6 +121,12 @@ var Configuration = map[string]PathConfig{
 
 	// Needed for certain kernel trees
 	"flock": Allowed,
+	"pahole": Allowed,
+	"rustc": Allowed,
+	"cargo": Allowed,
+	"bindgen": Allowed,
+	"rustfmt": Allowed,
+	"aarch64-linux-gnu-ld": Allowed,
 }
 
 func init() {
