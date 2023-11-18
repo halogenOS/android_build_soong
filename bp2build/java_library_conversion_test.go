@@ -196,11 +196,8 @@ func TestJavaLibraryErrorproneJavacflagsEnabledManually(t *testing.T) {
 }`,
 		ExpectedBazelTargets: []string{
 			MakeBazelTarget("java_library", "java-lib-1", AttrNameToString{
-				"javacopts": `[
-        "-Xsuper-fast",
-        "-Xep:SpeedLimit:OFF",
-    ]`,
-				"srcs": `["a.java"]`,
+				"javacopts": `["-Xsuper-fast"]`,
+				"srcs":      `["a.java"]`,
 			}),
 			MakeNeverlinkDuplicateTarget("java_library", "java-lib-1"),
 		},
