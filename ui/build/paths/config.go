@@ -130,6 +130,9 @@ var Configuration = map[string]PathConfig{
 	"pgrep": LinuxOnlyPrebuilt,
 	"pkill": LinuxOnlyPrebuilt,
 	"ps":    LinuxOnlyPrebuilt,
+
+	// Necessary for kernel build and tooling
+	"rustc": Allowed,
 }
 
 func init() {
