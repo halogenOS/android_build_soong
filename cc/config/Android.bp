@@ -34,6 +34,5 @@ bootstrap_go_package {
         "arm64_linux_host.go",
     ],
     testSrcs: [
-        "tidy_test.go",
     ],
 }
