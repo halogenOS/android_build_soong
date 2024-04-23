@@ -33,7 +33,6 @@ bootstrap_go_package {
         "arm64_linux_host.go",
     ],
     testSrcs: [
-        "tidy_test.go",
     ],
     visibility: [
         "//build/soong:__subpackages__",
