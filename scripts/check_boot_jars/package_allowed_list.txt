@@ -267,3 +267,6 @@ qcom.fmradio
 # Lineage HW
 vendor\.lineage\..*
 
+# Nothing
+com\.nothing
+
