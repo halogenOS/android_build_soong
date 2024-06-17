@@ -442,6 +442,8 @@ var (
 		"external/rust/crates/rustc-demangle-capi":/* recursive = */ false,
 
 		"vendor/lineage-priv/keys":/* recursive = */ false,
+		"vendor/custom-priv/keys":/* recursive = */ false,
+		"vendor/halogenOS/private/keys":/* recursive = */ false,
 	}
 
 	Bp2buildModuleAlwaysConvertList = []string{
