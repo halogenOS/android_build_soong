@@ -265,6 +265,9 @@ org\.chromium\.arc\..*
 com\.nvidia
 com\.nvidia\..*
 
+# OPLUS adds
+com\.oplus\..*
+
 # QC adds
 com.qualcomm.qti
 com.quicinc.tcmiface
