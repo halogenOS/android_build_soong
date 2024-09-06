@@ -125,6 +125,11 @@ func (p *pluginSingleton) GenerateBuildActions(ctx SingletonContext) {
 				return
 			}
 
+			// allow product dirs
+			if strings.HasPrefix(dir, "product/") {
+				return
+			}
+
 			// allow third party users outside of external to create new plugins, i.e. non-google paths
 			// under vendor or hardware
 			if !strings.HasPrefix(dir, "external/") && IsThirdPartyPath(dir) {
