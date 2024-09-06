@@ -123,6 +123,11 @@ func (p *pluginSingleton) GenerateBuildActions(ctx SingletonContext) {
 				return
 			}
 
+			// allow the build glue in build/custom
+			if strings.HasPrefix(dir, "build/custom/") {
+				return
+			}
+
 			// allow third party users outside of external to create new plugins, i.e. non-google paths
 			// under vendor or hardware
 			if !strings.HasPrefix(dir, "external/") && IsThirdPartyPath(dir) {
