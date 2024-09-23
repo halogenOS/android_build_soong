@@ -110,7 +110,7 @@ func runNinjaForBuild(ctx Context, config Config) {
 		cmd.Args = append(cmd.Args, strings.Fields(extra)...)
 	}
 
-	ninjaHeartbeatDuration := time.Minute * 5
+	ninjaHeartbeatDuration := time.Minute * 7
 	// Get the ninja heartbeat interval from the environment before it's filtered away later.
 	if overrideText, ok := cmd.Environment.Get("NINJA_HEARTBEAT_INTERVAL"); ok {
 		// For example, "1m"
