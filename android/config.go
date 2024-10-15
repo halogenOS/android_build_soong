@@ -1026,6 +1026,8 @@ func (c *config) BuildKeys() string {
 	defaultCert := String(c.productVariables.DefaultAppCertificate)
 	if defaultCert == "" || defaultCert == filepath.Join(testKeyDir, "testkey") {
 		return "test-keys"
+	} else if defaultCert == filepath.Join(testKeyDir, "releasekey") {
+		return "release-keys"
 	}
 	return "dev-keys"
 }
