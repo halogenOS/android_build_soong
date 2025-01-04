@@ -17,6 +17,7 @@ package android
 import (
 	"fmt"
 	"path/filepath"
+	"os"
 	"reflect"
 	"regexp"
 	"strconv"
@@ -286,12 +287,16 @@ func createLimitNdkExportRule() []Rule {
 }
 
 func createKotlinPluginRule() []Rule {
+	customProductDir, ok := os.LookupEnv("CUSTOM_PRODUCT_DIR")
+	if !ok {
+		customProductDir = "product/halogenOS"
+	}
 	kotlinPluginProjectsAllowedList := []string{
 		// TODO: Migrate compose plugin to the bundled compiler plugin
 		// Actual path prebuilts/sdk/current/androidx/m2repository/androidx/compose/compiler/compiler-hosted
 		"prebuilts/sdk/current/androidx",
 		"external/kotlinc",
-		"vendor/lineage/kotlin",
+		customProductDir,
 	}
 
 	return []Rule{
