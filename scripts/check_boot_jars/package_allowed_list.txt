@@ -265,9 +265,6 @@ org\.chromium\.arc\..*
 com\.nvidia
 com\.nvidia\..*
 
-# NT adds
-com\.nothing
-
 # OPLUS adds
 com\.oplus\..*
 
