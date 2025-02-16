@@ -288,11 +288,12 @@ var (
 		"-Wno-error=deprecated",          // in external/googletest/googletest
 		// Disabling until the warning is fixed in libc++abi header files b/366180429
 		"-Wno-deprecated-dynamic-exception-spec",
-		// New warnings to be fixed after clang-r475365
-		"-Wno-error=enum-constexpr-conversion", // http://b/243964282
 		// New warnings to be fixed after clang-r522817
 		"-Wno-error=invalid-offsetof",
 		"-Wno-error=thread-safety-reference-return",
+		// New warnings after clang-13072264
+		"-Wno-error=cast-function-type-mismatch",
+		"-Wno-error=main",
 
 		// Allow using VLA CXX extension.
 		"-Wno-vla-cxx-extension",
@@ -384,8 +385,8 @@ var (
 
 	// prebuilts/clang default settings.
 	ClangDefaultBase         = "prebuilts/clang/host"
-	ClangDefaultVersion      = "clang-r530567"
-	ClangDefaultShortVersion = "19"
+	ClangDefaultVersion      = "clang-13072264"
+	ClangDefaultShortVersion = "20"
 
 	// Directories with warnings from Android.bp files.
 	WarningAllowedProjects = []string{
