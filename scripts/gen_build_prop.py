@@ -45,6 +45,8 @@ def get_build_keys(product_config):
     return "test-keys"
   if default_cert.startswith("vendor/lineage-priv/"):
     return "release-keys"
+  if default_cert.startswith("vendor/halogenOS/private/"):
+    return "release-keys"
   return "dev-keys"
 
 def override_config(config):

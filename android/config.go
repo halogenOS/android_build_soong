@@ -1443,6 +1443,9 @@ func (c *config) BuildKeys() string {
 	if strings.HasPrefix(defaultCert, "vendor/lineage-priv/") {
 		return "release-keys"
 	}
+	if strings.HasPrefix(defaultCert, "vendor/halogenOS/private/") {
+		return "release-keys"
+	}
 	return "dev-keys"
 }
 
