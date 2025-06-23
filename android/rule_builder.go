@@ -582,18 +582,37 @@ func (r *RuleBuilder) build(name string, desc string) {
 		nsjailCmd.WriteString(" && ")
 		nsjailCmd.WriteString(nsjailPath.String())
 		nsjailCmd.WriteRune(' ')
-		nsjailCmd.WriteString("-B $PWD/")
-		nsjailCmd.WriteString(r.nsjailBasePath.String())
+
+		// Fix: Handle absolute paths correctly
+		basePathStr := r.nsjailBasePath.String()
+		if filepath.IsAbs(basePathStr) {
+			nsjailCmd.WriteString("-B ")
+			nsjailCmd.WriteString(basePathStr)
+		} else {
+			nsjailCmd.WriteString("-B $PWD/")
+			nsjailCmd.WriteString(basePathStr)
+		}
 		nsjailCmd.WriteString(":nsjail_build_sandbox")
 
 		// out is mounted to $(genDir).
-		nsjailCmd.WriteString(" -B $PWD/")
-		nsjailCmd.WriteString(r.outDir.String())
+		outDirStr := r.outDir.String()
+		if filepath.IsAbs(outDirStr) {
+			nsjailCmd.WriteString(" -B ")
+			nsjailCmd.WriteString(outDirStr)
+		} else {
+			nsjailCmd.WriteString(" -B $PWD/")
+			nsjailCmd.WriteString(outDirStr)
+		}
 		nsjailCmd.WriteString(":nsjail_build_sandbox/out")
 
 		addBindMount := func(src, dst string) {
-			nsjailCmd.WriteString(" -R $PWD/")
-			nsjailCmd.WriteString(src)
+			if filepath.IsAbs(src) {
+				nsjailCmd.WriteString(" -R ")
+				nsjailCmd.WriteString(src)
+			} else {
+				nsjailCmd.WriteString(" -R $PWD/")
+				nsjailCmd.WriteString(src)
+			}
 			nsjailCmd.WriteString(":nsjail_build_sandbox/")
 			nsjailCmd.WriteString(dst)
 		}
