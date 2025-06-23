@@ -116,7 +116,7 @@ func (c *Cmd) sandboxSupported() bool {
 		sandboxArgs = append(sandboxArgs,
 			"--disable_clone_newcgroup",
 			"--",
-			"/bin/bash", "-c", `if [ $(hostname) == "android-build" ]; then echo "Android" "Success"; else echo Failure; fi`)
+			"/usr/bin/env", "bash", "-c", `if [ $(hostname) == "android-build" ]; then echo "Android" "Success"; else echo Failure; fi`)
 
 		cmd := exec.CommandContext(c.ctx.Context, nsjailPath, sandboxArgs...)
 

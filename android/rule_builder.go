@@ -649,7 +649,7 @@ func (r *RuleBuilder) build(name string, desc string) {
 		nsjailCmd.WriteString(" --skip_setsid") // ABFS relies on process-groups to track file operations
 		nsjailCmd.WriteString(" -q")
 		nsjailCmd.WriteString(" -- ")
-		nsjailCmd.WriteString("/bin/bash -c ")
+		nsjailCmd.WriteString("/usr/bin/env bash -c ")
 		nsjailCmd.WriteString(proptools.ShellEscape(commandString))
 
 		commandString = nsjailCmd.String()
