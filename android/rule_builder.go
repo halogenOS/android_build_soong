@@ -17,6 +17,7 @@ package android
 import (
 	"crypto/sha256"
 	"fmt"
+	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -636,12 +637,23 @@ func (r *RuleBuilder) build(name string, desc string) {
 			}
 		}
 
-		// These five directories are necessary to run native host tools like /bin/bash and py3-cmd.
+		// These directories are necessary to run native host tools like /bin/bash and py3-cmd.
 		nsjailCmd.WriteString(" -R /bin")
 		nsjailCmd.WriteString(" -R /lib")
 		nsjailCmd.WriteString(" -R /lib64")
 		nsjailCmd.WriteString(" -R /dev")
 		nsjailCmd.WriteString(" -R /usr")
+		nsjailCmd.WriteString(" -R /nix/store")
+		// Set LD_LIBRARY_PATH explicitly for NixOS compatibility
+		if ldLibraryPath := os.Getenv("LD_LIBRARY_PATH"); ldLibraryPath != "" {
+			nsjailCmd.WriteString(" -E LD_LIBRARY_PATH=")
+			nsjailCmd.WriteString(proptools.ShellEscape(ldLibraryPath))
+		} else {
+			// Fallback for NixOS if /nix/store exists
+			if _, err := os.Stat("/nix/store"); err == nil {
+				nsjailCmd.WriteString(" -E LD_LIBRARY_PATH=/usr/lib64:/usr/lib")
+			}
+		}
 
 		nsjailCmd.WriteString(" -m none:/tmp:tmpfs:size=1073741824") // 1GB, should be enough
 		nsjailCmd.WriteString(" -D nsjail_build_sandbox")
