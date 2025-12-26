@@ -301,6 +301,10 @@ func extendBuilderCommand(ctx android.ModuleContext, m android.ModuleProxy, buil
 		if strings.HasPrefix(f, "out") {
 			continue
 		}
+		// Skip paths from out-of-tree OUT_DIR that weren't trimmed
+		if strings.HasPrefix(f, ctx.Config().OutDir()) {
+			continue
+		}
 		if strings.HasPrefix(f, "system/") {
 			f = strings.Replace(f, "system/", "DATA/", 1)
 		}
