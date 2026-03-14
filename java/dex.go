@@ -30,6 +30,8 @@ import (
 
 //go:generate go run ../../blueprint/gobtools/codegen
 
+var highmemPool = blueprint.NewBuiltinPool("highmem_pool")
+
 func init() {
 	pctx.HostBinToolVariable("symbols_map", "symbols_map")
 }
@@ -369,6 +371,7 @@ var d8IncR8Clean = pctx.AndroidStaticRule("d8Incr8-partialcompileclean",
 
 var d8IncR8, d8IncR8RE = pctx.MultiCommandRemoteStaticRules("d8Incr8",
 	blueprint.RuleParams{
+		Pool: highmemPool,
 		Command: `mkdir -p "$outDir" "$outDir/packages" && ` +
 			`rm -rf "$outDict" "$outConfig" "${outUsageDir}" "${outDepfile}" && ` +
 			`mkdir -p $$(dirname ${outUsage}) && ` +
@@ -483,6 +486,7 @@ var d8r8Clean = pctx.AndroidStaticRule("d8r8-partialcompileclean",
 
 var d8r8, d8r8RE = pctx.MultiCommandRemoteStaticRules("d8r8",
 	blueprint.RuleParams{
+		Pool: highmemPool,
 		Command: `rm -rf "$outDir" && mkdir -p "$outDir" && ` +
 			`rm -f "$outDict" && rm -f "$outConfig" && rm -rf "${outUsageDir}" && ` +
 			`mkdir -p $$(dirname ${outUsage}) && ` +
@@ -547,6 +551,7 @@ var d8r8, d8r8RE = pctx.MultiCommandRemoteStaticRules("d8r8",
 
 var r8, r8RE = pctx.MultiCommandRemoteStaticRules("r8",
 	blueprint.RuleParams{
+		Pool: highmemPool,
 		Command: `rm -rf "$outDir" && mkdir -p "$outDir" && ` +
 			`rm -f "$outDict" && rm -f "$outConfig" && rm -rf "${outUsageDir}" && ` +
 			`mkdir -p $$(dirname ${outUsage}) && ` +
