@@ -310,8 +310,7 @@ func newConfig(ctx Context, isDumpVar bool, args ...string) Config {
 		ret.skipSoongTests = true
 	}
 
-	// Default matching ninja
-	ret.parallel = runtime.NumCPU() + 2
+	ret.parallel = runtime.NumCPU()
 	ret.keepGoing = 1
 
 	ret.totalRAM = detectTotalRAM(ctx)
