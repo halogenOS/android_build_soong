@@ -182,6 +182,27 @@ def init(ctx):
     return main.generate(ctx, vars, imports)
 `))
 
+// sisoRelConfigDir makes an absolute siso config dir relative to the current
+// working directory (the top of the source tree). Siso fails to load
+// @config//main.star when --config_repo_dir is an absolute path, which happens
+// whenever OUT_DIR is absolute, e.g. pointing outside the source tree.
+func sisoRelConfigDir(ctx Context, dir string) string {
+	if !filepath.IsAbs(dir) {
+		return dir
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		ctx.Verbosef("Failed to get working directory to relativize siso config dir: %v", err)
+		return dir
+	}
+	rel, err := filepath.Rel(cwd, dir)
+	if err != nil {
+		ctx.Verbosef("Failed to relativize siso config dir %q: %v", dir, err)
+		return dir
+	}
+	return rel
+}
+
 func createSisoConfigDir(ctx Context, config Config, value string) string {
 	// We need to fabricate a working directory.
 	confDir := filepath.Join(config.OutDir(), "siso_config")
@@ -190,7 +211,7 @@ func createSisoConfigDir(ctx Context, config Config, value string) string {
 		if err != nil {
 			ctx.Fatalf("${SISO_CONFIG_DIR}/main.star is missing: %w", err)
 		}
-		return value
+		return sisoRelConfigDir(ctx, value)
 	}
 	templateConfig := struct {
 		Config       *Config
@@ -210,7 +231,7 @@ func createSisoConfigDir(ctx Context, config Config, value string) string {
 	if err := os.WriteFile(confFile, sb.Bytes(), 0666); err != nil {
 		ctx.Fatalf("Failed to write siso config to %q: %w", confFile, err)
 	}
-	return confDir
+	return sisoRelConfigDir(ctx, confDir)
 }
 
 // Create a script for siso to get credentials.
