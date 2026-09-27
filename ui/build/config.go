@@ -36,6 +36,7 @@ import (
 
 	"android/soong/finder/fs"
 	"android/soong/shared"
+	"android/soong/ui/logger"
 	"android/soong/ui/metrics"
 
 	"github.com/google/blueprint"
@@ -196,6 +197,13 @@ type configImpl struct {
 	// cached value to avoid process spawning
 	useABFSMu sync.Mutex
 	useABFS   *bool
+
+	// Reports a siso on PATH that SisoBin() skips.
+	logger logger.Logger
+
+	// The siso that the first call to SisoBin() chose.
+	sisoBinOnce sync.Once
+	sisoBin     string
 }
 
 type NinjaWeightListSource uint
@@ -294,6 +302,7 @@ func newConfig(ctx Context, isDumpVar bool, args ...string) Config {
 		sandboxConfig:         &SandboxConfig{},
 		ninjaWeightListSource: DEFAULT,
 		isDumpVar:             isDumpVar,
+		logger:                ctx.Logger,
 	}
 	wd, err := os.Getwd()
 	if err != nil {
@@ -2057,7 +2066,46 @@ func (c *configImpl) N2Bin() string {
 	return strings.ReplaceAll(path, "/linux-x86/", "/linux_musl-x86/")
 }
 
+// sisoVersionSuffix ends the first line of the version answer of a siso that
+// supports build outputs outside the exec root.
+const sisoVersionSuffix = "+absolute-outputs"
+
+// SisoBin returns the siso on PATH when its version answer names support for
+// build outputs outside the exec root, and the prebuilt otherwise. The first
+// call chooses, and every later call returns the same path.
 func (c *configImpl) SisoBin() string {
+	c.sisoBinOnce.Do(func() {
+		c.sisoBin = c.chooseSisoBin()
+	})
+	return c.sisoBin
+}
+
+func (c *configImpl) chooseSisoBin() string {
+	prebuilt := c.prebuiltSisoBin()
+	path, err := exec.LookPath("siso")
+	if err != nil && !errors.Is(err, exec.ErrDot) {
+		return prebuilt
+	}
+	if err == nil && sisoSupportsAbsoluteOutputs(path) {
+		return path
+	}
+	c.logger.Printf("Skipping siso at %s, running the prebuilt %s instead", path, prebuilt)
+	return prebuilt
+}
+
+// sisoSupportsAbsoluteOutputs reports whether the first line of the version
+// answer of the siso at path has the form "siso v...+absolute-outputs".
+// -online=false keeps a siso installed from CIPD off the network.
+func sisoSupportsAbsoluteOutputs(path string) bool {
+	out, err := exec.Command(path, "version", "-online=false").Output()
+	if err != nil {
+		return false
+	}
+	first, _, _ := strings.Cut(string(out), "\n")
+	return strings.HasPrefix(first, "siso v") && strings.HasSuffix(first, sisoVersionSuffix)
+}
+
+func (c *configImpl) prebuiltSisoBin() string {
 	// TODO(b/374176257): remove this once Siso is built from source.
 	return filepath.Join("prebuilts/siso", c.HostPrebuiltTag(), "siso")
 

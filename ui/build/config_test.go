@@ -1135,3 +1135,147 @@ func TestGetMetricsUploaderApp(t *testing.T) {
 		})
 	}
 }
+
+// writeSisoScript writes an executable shell script named siso into a new
+// temporary directory and returns that directory. Each run of the script
+// appends its arguments to a file named runs in the same directory, prints
+// versionLine and a second line, and exits with exitCode.
+func writeSisoScript(t *testing.T, versionLine string, exitCode int) string {
+	dir := t.TempDir()
+	script := fmt.Sprintf("#!/bin/sh\necho \"$@\" >> '%s'\necho '%s'\necho 'second line'\nexit %d\n",
+		filepath.Join(dir, "runs"), versionLine, exitCode)
+	if err := os.WriteFile(filepath.Join(dir, "siso"), []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// sisoRuns returns the lines the script in dir recorded, one per run.
+func sisoRuns(t *testing.T, dir string) []string {
+	data, err := os.ReadFile(filepath.Join(dir, "runs"))
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		t.Fatal(err)
+	}
+	return strings.Split(strings.TrimSuffix(string(data), "\n"), "\n")
+}
+
+func TestSisoBin(t *testing.T) {
+	cwd, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	testCases := []struct {
+		name string
+		// setup returns the PATH to use, the directory of the script, and
+		// the path of the siso that PATH finds.
+		setup func(t *testing.T) (path, scriptDir, sisoPath string)
+		// Whether SisoBin() returns the siso on PATH.
+		usesPath bool
+		// Whether the siso on PATH gets its version queried.
+		queried bool
+	}{
+		{
+			name: "expected answer",
+			setup: func(t *testing.T) (string, string, string) {
+				dir := writeSisoScript(t, "siso v1.5.8+absolute-outputs", 0)
+				return dir, dir, filepath.Join(dir, "siso")
+			},
+			usesPath: true,
+			queried:  true,
+		},
+		{
+			name: "no executable siso on PATH",
+			setup: func(t *testing.T) (string, string, string) {
+				empty := t.TempDir()
+				dir := t.TempDir()
+				if err := os.WriteFile(filepath.Join(dir, "siso"), []byte("#!/bin/sh\n"), 0644); err != nil {
+					t.Fatal(err)
+				}
+				return empty + string(filepath.ListSeparator) + dir, dir, ""
+			},
+		},
+		{
+			name: "siso found relative to the current directory",
+			setup: func(t *testing.T) (string, string, string) {
+				dir := writeSisoScript(t, "siso v1.5.8+absolute-outputs", 0)
+				rel, err := filepath.Rel(cwd, dir)
+				if err != nil {
+					t.Fatal(err)
+				}
+				return rel, dir, filepath.Join(rel, "siso")
+			},
+		},
+		{
+			name: "version query exits non-zero",
+			setup: func(t *testing.T) (string, string, string) {
+				dir := writeSisoScript(t, "siso v1.5.8+absolute-outputs", 1)
+				return dir, dir, filepath.Join(dir, "siso")
+			},
+			queried: true,
+		},
+		{
+			name: "answer without the suffix",
+			setup: func(t *testing.T) (string, string, string) {
+				dir := writeSisoScript(t, "siso v1.5.8", 0)
+				return dir, dir, filepath.Join(dir, "siso")
+			},
+			queried: true,
+		},
+		{
+			name: "answer without the siso prefix",
+			setup: func(t *testing.T) (string, string, string) {
+				dir := writeSisoScript(t, "other v1.5.8+absolute-outputs", 0)
+				return dir, dir, filepath.Join(dir, "siso")
+			},
+			queried: true,
+		},
+	}
+
+	for _, tt := range testCases {
+		t.Run(tt.name, func(t *testing.T) {
+			path, scriptDir, sisoPath := tt.setup(t)
+			t.Setenv("PATH", path)
+
+			var out bytes.Buffer
+			c := &configImpl{logger: logger.New(&out)}
+			prebuilt := filepath.Join("prebuilts/siso", c.HostPrebuiltTag(), "siso")
+
+			want := prebuilt
+			if tt.usesPath {
+				want = sisoPath
+			}
+			for i := 0; i < 2; i++ {
+				if got := c.SisoBin(); got != want {
+					t.Errorf("call %d: SisoBin() = %q, want %q", i+1, got, want)
+				}
+			}
+
+			runs := sisoRuns(t, scriptDir)
+			if tt.queried {
+				if len(runs) != 1 || runs[0] != "version -online=false" {
+					t.Errorf("siso runs = %q, want one run with arguments \"version -online=false\"", runs)
+				}
+			} else if len(runs) != 0 {
+				t.Errorf("siso runs = %q, want none", runs)
+			}
+
+			printed := out.String()
+			if tt.usesPath || sisoPath == "" {
+				if printed != "" {
+					t.Errorf("printed %q, want nothing", printed)
+				}
+				return
+			}
+			if strings.Count(printed, "\n") != 1 {
+				t.Errorf("printed %q, want one line", printed)
+			}
+			if !strings.Contains(printed, sisoPath) || !strings.Contains(printed, prebuilt) {
+				t.Errorf("printed %q, want a line naming %q and %q", printed, sisoPath, prebuilt)
+			}
+		})
+	}
+}
