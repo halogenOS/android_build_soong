@@ -1298,3 +1298,97 @@ cc_binary {
 		exists,
 	)
 }
+
+// testKernelBuild stands for the module that BOARD_KERNEL_BUILD_MODULE names. It offers the files
+// its properties name as the tagged outputs .kernel, .dtb and .dtbo.
+type testKernelBuild struct {
+	android.ModuleBase
+	properties struct {
+		Kernel *string `android:"path"`
+		Dtb    *string `android:"path"`
+		Dtbo   *string `android:"path"`
+	}
+}
+
+func testKernelBuildFactory() android.Module {
+	module := &testKernelBuild{}
+	module.AddProperties(&module.properties)
+	android.InitAndroidArchModule(module, android.DeviceSupported, android.MultilibCommon)
+	return module
+}
+
+func (m *testKernelBuild) GenerateAndroidBuildActions(ctx android.ModuleContext) {
+	ctx.SetOutputFiles(android.PathsForModuleSrc(ctx, []string{proptools.String(m.properties.Kernel)}), ".kernel")
+	ctx.SetOutputFiles(android.PathsForModuleSrc(ctx, []string{proptools.String(m.properties.Dtb)}), ".dtb")
+	ctx.SetOutputFiles(android.PathsForModuleSrc(ctx, []string{proptools.String(m.properties.Dtbo)}), ".dtbo")
+}
+
+func TestBootImagesFromBoardKernelBuildModule(t *testing.T) {
+	for _, withPrebuiltDtbDir := range []bool{false, true} {
+		result := android.GroupFixturePreparers(
+			android.PrepareForIntegrationTestWithAndroid,
+			android.PrepareForTestWithAndroidBuildComponents,
+			android.PrepareForTestWithAllowMissingDependencies,
+			prepareForTestWithFsgenBuildComponents,
+			cc.PrepareForTestWithCcBuildComponents,
+			java.PrepareForTestWithJavaBuildComponents,
+			prepareMockRamdiksNodeList,
+			filesystem.PrepareForTestWithFilesystemBuildComponents,
+			android.SetBuildDateFileEnvVarForTests(),
+			android.FixtureRegisterWithContext(func(ctx android.RegistrationContext) {
+				ctx.RegisterModuleType("test_kernel_build", testKernelBuildFactory)
+			}),
+			android.FixtureMergeMockFs(android.MockFS{
+				"external/avb/test/data/testkey_rsa4096.pem": nil,
+				"kernel/test/Image":                          nil,
+				"kernel/test/dtb.img":                        nil,
+				"kernel/test/dtbo.img":                       nil,
+				"kernel/test/Android.bp": []byte(`
+				test_kernel_build {
+					name: "test_kernel",
+					kernel: "Image",
+					dtb: "dtb.img",
+					dtbo: "dtbo.img",
+				}
+			`),
+				"device/test/dtbs/prebuilt.dtb": nil,
+				"build/soong/fsgen/Android.bp": []byte(`
+				soong_filesystem_creator {
+					name: "foo",
+				}
+			`),
+			}),
+			android.FixtureModifyConfig(func(config android.Config) {
+				config.TestProductVariables.BoardKernelBuildModule = proptools.StringPtr(":test_kernel")
+				partitionVars := &config.TestProductVariables.PartitionVarsForSoongMigrationOnlyDoNotUse
+				partitionVars.BoardBootimagePartitionSize = "67108864"
+				partitionVars.BoardBootHeaderVersion = "4"
+				partitionVars.BoardIncludeDtbInBootimg = true
+				partitionVars.BoardDtboPartitionSize = "25165824"
+				partitionVars.BuildingVbmetaImage = true
+				partitionVars.BoardAvbEnable = true
+				if withPrebuiltDtbDir {
+					partitionVars.BoardPrebuiltDtbDir = "device/test/dtbs"
+				}
+			}),
+		).RunTest(t)
+
+		ruleCommand := func(module, output string) string {
+			t.Helper()
+			return result.ModuleForTests(t, module, "android_arm64_armv8-a").Output(output).RuleParams.Command
+		}
+
+		android.AssertStringDoesContain(t, "boot image takes the kernel of the named module",
+			ruleCommand("test_product_generated_boot_image", "unsigned/boot.img"), "--kernel kernel/test/Image")
+		android.AssertStringDoesContain(t, "vendor_boot image takes dtb.img of the named module",
+			ruleCommand("test_product_generated_vendor_boot_image", "unsigned/vendor_boot.img"), "--dtb kernel/test/dtb.img")
+
+		dtbo := result.ModuleForTests(t, "test_product_generated_dtbo_image", "android_arm64_armv8-a")
+		android.AssertStringDoesContain(t, "dtbo image takes dtbo.img of the named module",
+			dtbo.Output("dtbo.img").RuleParams.Command, "cp kernel/test/dtbo.img")
+
+		vbmetaCommand := result.ModuleForTests(t, "test_product_generated_vbmeta_image", "android_common").Output("vbmeta.img").RuleParams.Command
+		android.AssertStringDoesContain(t, "vbmeta image includes the generated dtbo image",
+			vbmetaCommand, "test_product_generated_dtbo_image")
+	}
+}

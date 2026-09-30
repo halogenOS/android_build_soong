@@ -14,7 +14,7 @@ import (
 )
 
 // helper function to create boot.img and boot_16k.img
-func createBootImageCommon(ctx android.LoadHookContext, kernelPath string, prebuiltBootImagePath string, dtbImg dtbImg, stem *string) bool {
+func createBootImageCommon(ctx android.LoadHookContext, kernelPath string, kernelModuleOutput string, prebuiltBootImagePath string, dtbImg dtbImg, stem *string) bool {
 	getPartitionSize := func(partitionVariables android.PartitionVariables) proptools.Configurable[int64] {
 		return getPartitionSizeFromString(ctx, partitionVariables.BoardBootimagePartitionSize, "BOARD_BOOTIMAGE_PARTITION_SIZE")
 	}
@@ -64,33 +64,40 @@ func createBootImageCommon(ctx android.LoadHookContext, kernelPath string, prebu
 		return true
 	}
 
-	if kernelPath == "" {
-		// There are potentially code paths that don't use `PRODUCT_COPY_FILES` to copy the kernel to
-		// ANDROID_PRODUCT_OUT
-		return false
+	var kernelPrebuilt string
+	if kernelModuleOutput != "" {
+		// The module that BOARD_KERNEL_BUILD_MODULE names builds the kernel.
+		kernelPrebuilt = kernelModuleOutput
+	} else {
+		if kernelPath == "" {
+			// There are potentially code paths that don't use `PRODUCT_COPY_FILES` to copy the kernel to
+			// ANDROID_PRODUCT_OUT
+			return false
+		}
+
+		kernelDir := filepath.Dir(kernelPath)
+		kernelBase := filepath.Base(kernelPath)
+		kernelFilegroupName := generatedModuleName(ctx.Config(), "kernel"+*stem) // to prevent name collisions.
+
+		ctx.CreateModuleInDirectory(
+			android.FileGroupFactory,
+			kernelDir,
+			&struct {
+				Name       *string
+				Srcs       []string
+				Visibility []string
+			}{
+				Name:       proptools.StringPtr(kernelFilegroupName),
+				Srcs:       []string{kernelBase},
+				Visibility: []string{"//visibility:public"},
+			},
+		)
+		kernelPrebuilt = ":" + kernelFilegroupName
 	}
-
-	kernelDir := filepath.Dir(kernelPath)
-	kernelBase := filepath.Base(kernelPath)
-	kernelFilegroupName := generatedModuleName(ctx.Config(), "kernel"+*stem) // to prevent name collisions.
-
-	ctx.CreateModuleInDirectory(
-		android.FileGroupFactory,
-		kernelDir,
-		&struct {
-			Name       *string
-			Srcs       []string
-			Visibility []string
-		}{
-			Name:       proptools.StringPtr(kernelFilegroupName),
-			Srcs:       []string{kernelBase},
-			Visibility: []string{"//visibility:public"},
-		},
-	)
 
 	var dtbPrebuilt *string
 	if dtbImg.include && dtbImg.imgType == "boot" {
-		dtbPrebuilt = proptools.StringPtr(":" + dtbImg.name)
+		dtbPrebuilt = dtbImg.prebuilt()
 	}
 
 	var cmdline []string
@@ -101,7 +108,7 @@ func createBootImageCommon(ctx android.LoadHookContext, kernelPath string, prebu
 	ctx.CreateModule(
 		filesystem.BootimgFactory,
 		&filesystem.BootimgProperties{
-			Kernel_prebuilt: proptools.NewSimpleConfigurable(":" + kernelFilegroupName),
+			Kernel_prebuilt: proptools.NewSimpleConfigurable(kernelPrebuilt),
 			Dtb_prebuilt:    dtbPrebuilt,
 			Cmdline:         cmdline,
 			Stem:            stem,
@@ -132,13 +139,22 @@ func createBootImageCommon(ctx android.LoadHookContext, kernelPath string, prebu
 
 func createBootImage(ctx android.LoadHookContext, dtbImg dtbImg) bool {
 	partitionVariables := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
-	return createBootImageCommon(ctx, getPrebuiltKernelPath(ctx), partitionVariables.BoardPrebuiltBootImage, dtbImg, proptools.StringPtr("boot.img"))
+	return createBootImageCommon(ctx, getPrebuiltKernelPath(ctx), kernelModuleOutput(ctx, "kernel"), partitionVariables.BoardPrebuiltBootImage, dtbImg, proptools.StringPtr("boot.img"))
 }
 
 func createBootImage16k(ctx android.LoadHookContext) bool {
 	partitionVariables := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
 	// TODO: prebuilt boot_16k.img and dtb is currently not supported in fsgen.
-	return createBootImageCommon(ctx, partitionVariables.BoardKernelPath16k, "", dtbImg{include: false}, proptools.StringPtr("boot_16k.img"))
+	return createBootImageCommon(ctx, partitionVariables.BoardKernelPath16k, "", "", dtbImg{include: false}, proptools.StringPtr("boot_16k.img"))
+}
+
+// kernelModuleOutput returns the reference to the output with the given tag of the module that
+// BOARD_KERNEL_BUILD_MODULE names, or an empty string when the board names no module.
+func kernelModuleOutput(ctx android.EarlyModuleContext, tag string) string {
+	if module := ctx.Config().BoardKernelBuildModule(); module != "" {
+		return module + "{." + tag + "}"
+	}
+	return ""
 }
 
 func getPartitionSizeFromString(ctx android.LoadHookContext, s string, name string) proptools.Configurable[int64] {
@@ -164,7 +180,7 @@ func createVendorBootImage(ctx android.LoadHookContext, dtbImg dtbImg) (bool, []
 
 	var dtbPrebuilt *string
 	if dtbImg.include && dtbImg.imgType == "vendor_boot" {
-		dtbPrebuilt = proptools.StringPtr(":" + dtbImg.name)
+		dtbPrebuilt = dtbImg.prebuilt()
 	}
 
 	cmdline := partitionVariables.InternalKernelCmdline
@@ -227,7 +243,7 @@ func createVendorBootDebugImage(ctx android.LoadHookContext, dtbImg dtbImg, ramd
 
 	var dtbPrebuilt *string
 	if dtbImg.include && dtbImg.imgType == "vendor_boot" {
-		dtbPrebuilt = proptools.StringPtr(":" + dtbImg.name)
+		dtbPrebuilt = dtbImg.prebuilt()
 	}
 
 	cmdline := partitionVariables.InternalKernelCmdline
@@ -282,7 +298,7 @@ func createVendorBootTestHarnessImage(ctx android.LoadHookContext, dtbImg dtbImg
 
 	var dtbPrebuilt *string
 	if dtbImg.include && dtbImg.imgType == "vendor_boot" {
-		dtbPrebuilt = proptools.StringPtr(":" + dtbImg.name)
+		dtbPrebuilt = dtbImg.prebuilt()
 	}
 
 	cmdline := partitionVariables.InternalKernelCmdline
@@ -339,7 +355,7 @@ func createVendorKernelBootImage(ctx android.LoadHookContext, dtbImg dtbImg) boo
 
 	var dtbPrebuilt *string
 	if dtbImg.include && dtbImg.imgType == "vendor_kernel_boot" {
-		dtbPrebuilt = proptools.StringPtr(":" + dtbImg.name)
+		dtbPrebuilt = dtbImg.prebuilt()
 	}
 
 	partitionSize := getPartitionSizeFromString(ctx, vendorKernelBootVariables.BoardPartitionSize, "BOARD_VENDOR_KERNEL_BOOTIMAGE_PARTITION_SIZE")
@@ -513,6 +529,18 @@ type dtbImg struct {
 
 	// type of the boot image that the dtb image argument should be specified
 	imgType string
+
+	// reference to the dtb image output of the module that BOARD_KERNEL_BUILD_MODULE names, used
+	// in place of the generated module when set
+	kernelModuleOutput string
+}
+
+// prebuilt returns the value of the dtb_prebuilt property of the boot images that include dtbImg.
+func (d dtbImg) prebuilt() *string {
+	if d.kernelModuleOutput != "" {
+		return proptools.StringPtr(d.kernelModuleOutput)
+	}
+	return proptools.StringPtr(":" + d.name)
 }
 
 func createDtbImgFilegroup(ctx android.LoadHookContext) dtbImg {
@@ -530,6 +558,12 @@ func createDtbImgFilegroup(ctx android.LoadHookContext) dtbImg {
 		// If we have vendor_kernel_boot partition, we migrate dtb image to that image
 		// and allow dtb in vendor_boot to be empty.
 		imgType = "vendor_kernel_boot"
+	}
+	if dtb := kernelModuleOutput(ctx, "dtb"); dtb != "" {
+		// The module that BOARD_KERNEL_BUILD_MODULE names makes dtb.img, and it is the one source
+		// of the kernel and its device tree images. The boot images take its output directly: a
+		// filegroup, which has no variants, cannot depend on that device module.
+		return dtbImg{include: true, imgType: imgType, kernelModuleOutput: dtb}
 	}
 	if partitionVars.BoardPrebuiltDtbDir != "" {
 		// https://cs.android.com/android/platform/superproject/main/+/main:build/make/core/Makefile;l=1019-1022?q=BOARD_PREBUILT_DTBIMAGE_DIR&ss=android%2Fplatform%2Fsuperproject%2Fmaini
@@ -625,7 +659,7 @@ func createPrebuiltDtboImages(ctx android.LoadHookContext) (string, string) {
 				Partition_size *int64
 			}{
 				Name:           proptools.StringPtr(dtboModuleName),
-				Src:            proptools.StringPtr(partitionVars.BoardPrebuiltDtboImage),
+				Src:            proptools.StringPtr(getDtboSource(ctx)),
 				Partition_size: proptools.Int64Ptr(size),
 			},
 		)
@@ -654,11 +688,24 @@ func createPrebuiltDtboImages(ctx android.LoadHookContext) (string, string) {
 }
 
 func getDtboModuleName(ctx android.LoadHookContext) string {
+	if getDtboSource(ctx) != "" {
+		return generatedModuleNameForPartition(ctx.Config(), "dtbo")
+	}
+	return ""
+}
+
+// getDtboSource returns the source of the generated dtbo module: the dtbo output of the module
+// that BOARD_KERNEL_BUILD_MODULE names when the board sets BOARD_DTBOIMG_PARTITION_SIZE, otherwise
+// BOARD_PREBUILT_DTBOIMAGE when that file exists, otherwise an empty string.
+func getDtboSource(ctx android.LoadHookContext) string {
 	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	if ctx.Config().BoardKernelBuildModule() != "" && partitionVars.BoardDtboPartitionSize != "" {
+		return kernelModuleOutput(ctx, "dtbo")
+	}
 	if partitionVars.BoardPrebuiltDtboImage != "" {
 		file := android.ExistentPathForSource(ctx, partitionVars.BoardPrebuiltDtboImage)
 		if file.Valid() {
-			return generatedModuleNameForPartition(ctx.Config(), "dtbo")
+			return partitionVars.BoardPrebuiltDtboImage
 		}
 	}
 	return ""
