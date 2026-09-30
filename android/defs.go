@@ -71,6 +71,18 @@ var (
 		},
 		"cpFlags", "extraCmds")
 
+	// A copy rule wrapped with bash for an install that replaces its directory: $zipSyncCmd
+	// replaces the directory with the files of a zip, and the input is then copied into place
+	// through a temporary file, so the output exists only once the directory is complete.
+	CpReplacingDirWithBash = pctx.AndroidStaticRule("CpReplacingDirWithBash",
+		blueprint.RuleParams{
+			Command2: blueprint.NewCommand(
+				"/bin/bash -c \"$zipSyncCmd && cp $cpFlags $cpPreserveSymlinks $in $out.tmp && mv -f $out.tmp $out\""),
+			Description:     "cp $out",
+			SandboxDisabled: true,
+		},
+		"cpFlags", "zipSyncCmd")
+
 	// A copy rule that doesn't preserve symlinks.
 	CpNoPreserveSymlink = pctx.AndroidStaticRule("CpNoPreserveSymlink",
 		blueprint.RuleParams{

@@ -2996,6 +2996,9 @@ type katiInstall struct {
 type extraFilesZip struct {
 	zip Path
 	dir InstallPath
+	// replaceDir marks an install that empties dir before it extracts zip there and copies the
+	// primary file into place last.
+	replaceDir bool
 }
 
 type katiInstalls []katiInstall

@@ -87,6 +87,10 @@ type PackagingSpec struct {
 
 	// Extra files zip to be installed with this packaging spec.
 	extraZip OptionalPath
+
+	// Whether the install replaces the directory that extraZip is extracted into as a whole
+	// (InstallFileWithExtraFilesZipReplacingDir).
+	replaceDir bool
 }
 
 func (p *PackagingSpec) Owner() string {
@@ -190,6 +194,12 @@ func (p *PackagingSpec) SymlinkTarget() string {
 // The extra zip file to be installed with this packaging spec.
 func (p *PackagingSpec) ExtraZip() OptionalPath {
 	return p.extraZip
+}
+
+// ReplacesInstallDir reports whether the install replaces the directory that ExtraZip is
+// extracted into as a whole, so that no other install may put a file there.
+func (p *PackagingSpec) ReplacesInstallDir() bool {
+	return p.replaceDir
 }
 
 type PackageModule interface {

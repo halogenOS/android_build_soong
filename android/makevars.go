@@ -507,13 +507,29 @@ EXTRA_INSTALL_ZIPS :=
 		}
 		fmt.Fprintln(buf)
 		fmt.Fprintln(buf, "\t@echo \"Install: $@\"")
-		fmt.Fprintf(buf, "\trm -f $@ && cp -f %s $< $@\n", preserveSymlinksFlag)
-		if install.executable {
-			fmt.Fprintf(buf, "\tchmod +x $@\n")
+		extraFiles := install.extraFiles
+		replaceDir := extraFiles != nil && extraFiles.replaceDir
+		if replaceDir {
+			// The install replaces the directory the zip is extracted into: the directory is
+			// emptied, the zip is extracted into it, and the primary file is copied into place
+			// last, so it exists only once the directory is complete.
+			fmt.Fprintf(buf, "\trm -rf '%s' && mkdir -p '%s'\n", extraFiles.dir.String(), extraFiles.dir.String())
+		} else {
+			fmt.Fprintf(buf, "\trm -f $@ && cp -f %s $< $@\n", preserveSymlinksFlag)
+			if install.executable {
+				fmt.Fprintf(buf, "\tchmod +x $@\n")
+			}
 		}
-		if extraFiles := install.extraFiles; extraFiles != nil {
+		if extraFiles != nil {
 			fmt.Fprintf(buf, "\t( unzip -qDD -d '%s' '%s' 2>&1 | grep -v \"zipfile is empty\"; exit $${PIPESTATUS[0]} ) || \\\n", extraFiles.dir.String(), extraFiles.zip.String())
 			fmt.Fprintf(buf, "\t  ( code=$$?; if [ $$code -ne 0 -a $$code -ne 1 ]; then exit $$code; fi )\n")
+			if replaceDir {
+				fmt.Fprintf(buf, "\tcp -f %s $< $@.tmp", preserveSymlinksFlag)
+				if install.executable {
+					fmt.Fprintf(buf, " && chmod +x $@.tmp")
+				}
+				fmt.Fprintf(buf, " && mv -f $@.tmp $@\n")
+			}
 			fmt.Fprintf(buf, "EXTRA_INSTALL_ZIPS += %s:%s:%s\n", install.to.String(), extraFiles.dir.String(), extraFiles.zip.String())
 		}
 

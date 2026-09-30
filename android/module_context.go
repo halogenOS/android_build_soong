@@ -133,6 +133,19 @@ type ModuleContext interface {
 	// dependency tags for which IsInstallDepNeeded returns true.
 	InstallFileWithExtraFilesZip(installPath InstallPath, name string, srcPath Path, extraZip Path, deps ...InstallPath) InstallPath
 
+	// InstallFileWithExtraFilesZipReplacingDir works as InstallFileWithExtraFilesZip, and the
+	// install replaces the directory the zip is extracted into: the rule deletes the directory,
+	// extracts the zip into it and copies the primary file into place last, so the directory holds
+	// only the files of this install and the primary file exists only once the directory is
+	// complete. Like InstallFileWithoutCheckbuild, it adds the installed file's source to no
+	// checkbuild target, so the checkbuild target does not build what the zip is made from.
+	InstallFileWithExtraFilesZipReplacingDir(installPath InstallPath, name string, srcPath Path, extraZip Path, deps ...InstallPath) InstallPath
+
+	// RequiresFullInstall reports whether an install of this module is a full install, one
+	// whose install rule is written: the module is not marked to skip installs, its namespace is
+	// exported to Make, and it is neither hidden from Make nor marked no_full_install.
+	RequiresFullInstall() bool
+
 	// InstallSymlink creates a rule to create a symlink from src srcPath to name in the installPath
 	// directory.
 	//
@@ -632,6 +645,10 @@ func (m *moduleContext) requiresFullInstall() bool {
 	return true
 }
 
+func (m *moduleContext) RequiresFullInstall() bool {
+	return m.requiresFullInstall()
+}
+
 func (m *moduleContext) InstallFile(installPath InstallPath, name string, srcPath Path,
 	deps ...InstallPath) InstallPath {
 	return m.installFile(installPath, name, srcPath, deps, false, true, true, nil)
@@ -652,6 +669,15 @@ func (m *moduleContext) InstallFileWithExtraFilesZip(installPath InstallPath, na
 	return m.installFile(installPath, name, srcPath, deps, false, true, true, &extraFilesZip{
 		zip: extraZip,
 		dir: installPath,
+	})
+}
+
+func (m *moduleContext) InstallFileWithExtraFilesZipReplacingDir(installPath InstallPath, name string, srcPath Path,
+	extraZip Path, deps ...InstallPath) InstallPath {
+	return m.installFile(installPath, name, srcPath, deps, false, true, false, &extraFilesZip{
+		zip:        extraZip,
+		dir:        installPath,
+		replaceDir: true,
 	})
 }
 
@@ -691,8 +717,10 @@ func (m *moduleContext) packageFile(fullInstallPath InstallPath, srcPath Path, e
 	licenseFiles := m.Module().EffectiveLicenseFiles()
 	owner, overrides := m.getOwnerAndOverrides()
 	zip := OptionalPath{}
+	replaceDir := false
 	if extraZip != nil {
 		zip = OptionalPathForPath(extraZip.zip)
+		replaceDir = extraZip.replaceDir
 	}
 	spec := PackagingSpec{
 		relPathInPackage:      Rel(m, fullInstallPath.PartitionDir(), fullInstallPath.String()),
@@ -712,6 +740,7 @@ func (m *moduleContext) packageFile(fullInstallPath InstallPath, srcPath Path, e
 		variation:             m.ModuleSubDir(),
 		prebuilt:              IsModulePrebuilt(m, m.Module()),
 		extraZip:              zip,
+		replaceDir:            replaceDir,
 	}
 	m.packagingSpecs = append(m.packagingSpecs, spec)
 	return spec
@@ -765,11 +794,18 @@ func (m *moduleContext) installFile(installPath InstallPath, name string, srcPat
 				rule = CpExecutableWithBash
 			}
 
-			extraCmds := ""
+			extraArg, extraCmds := "extraCmds", ""
 			if extraZip != nil {
 				zipSync := m.Config().HostToolPath(m, "zipsync")
-				extraCmds += fmt.Sprintf(" && %s --keep-existing-files -d '%s' '%s'",
-					zipSync, extraZip.dir.String(), extraZip.zip.String())
+				if extraZip.replaceDir {
+					// Without --keep-existing-files zipsync deletes the directory before it extracts
+					// the zip. The primary file is copied after it.
+					rule, extraArg = CpReplacingDirWithBash, "zipSyncCmd"
+					extraCmds = fmt.Sprintf("%s -d '%s' '%s'", zipSync, extraZip.dir.String(), extraZip.zip.String())
+				} else {
+					extraCmds += fmt.Sprintf(" && %s --keep-existing-files -d '%s' '%s'",
+						zipSync, extraZip.dir.String(), extraZip.zip.String())
+				}
 				implicitDeps = append(implicitDeps, extraZip.zip, zipSync)
 			}
 
@@ -792,8 +828,8 @@ func (m *moduleContext) installFile(installPath InstallPath, name string, srcPat
 				Implicits:   implicitDeps,
 				OrderOnly:   orderOnlyDeps,
 				Args: map[string]string{
-					"extraCmds": extraCmds,
-					"cpFlags":   cpFlags,
+					extraArg:  extraCmds,
+					"cpFlags": cpFlags,
 				},
 			})
 		}

@@ -9196,12 +9196,16 @@ func (r extraFilesZip) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error 
 	if err = r.dir.Encode(ctx, buf); err != nil {
 		return err
 	}
+
+	if err = gobtools.EncodeBool(buf, r.replaceDir); err != nil {
+		return err
+	}
 	return err
 }
 
 func (r extraFilesZip) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":android.extraFilesZip")
-	hasher.WriteInt(2)
+	hasher.WriteInt(3)
 	hasher.WriteString(":android.Path")
 	val1 := r.zip == nil
 	if val1 {
@@ -9228,6 +9232,12 @@ func (r extraFilesZip) CustomHash(hasher *proptools.Hasher) error {
 	if err := r.dir.CustomHash(hasher); err != nil {
 		return err
 	}
+	hasher.WriteString(":.bool")
+	if r.replaceDir {
+		hasher.WriteByte(1)
+	} else {
+		hasher.WriteByte(0)
+	}
 	return nil
 }
 
@@ -9243,6 +9253,11 @@ func (r *extraFilesZip) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error
 	}
 
 	if err = r.dir.Decode(ctx, buf); err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeBool(buf, &r.replaceDir)
+	if err != nil {
 		return err
 	}
 
@@ -12488,12 +12503,16 @@ func (r PackagingSpec) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error 
 	if err = r.extraZip.Encode(ctx, buf); err != nil {
 		return err
 	}
+
+	if err = gobtools.EncodeBool(buf, r.replaceDir); err != nil {
+		return err
+	}
 	return err
 }
 
 func (r PackagingSpec) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":android.PackagingSpec")
-	hasher.WriteInt(17)
+	hasher.WriteInt(18)
 	hasher.WriteString(":.string")
 	hasher.WriteString(r.relPathInPackage)
 	hasher.WriteString(":android.Path")
@@ -12634,6 +12653,12 @@ func (r PackagingSpec) CustomHash(hasher *proptools.Hasher) error {
 	}
 	if err := r.extraZip.CustomHash(hasher); err != nil {
 		return err
+	}
+	hasher.WriteString(":.bool")
+	if r.replaceDir {
+		hasher.WriteByte(1)
+	} else {
+		hasher.WriteByte(0)
 	}
 	return nil
 }
@@ -12804,6 +12829,11 @@ func (r *PackagingSpec) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error
 	}
 
 	if err = r.extraZip.Decode(ctx, buf); err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeBool(buf, &r.replaceDir)
+	if err != nil {
 		return err
 	}
 
