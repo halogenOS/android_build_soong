@@ -1994,6 +1994,13 @@ func (c *configImpl) SoongMakeVarsMk() string {
 	return filepath.Join(c.SoongOutDir(), "make_vars-"+c.TargetProduct()+c.CoverageSuffix()+".mk")
 }
 
+// SoongReplacedInstallDirs returns the file that soong_build writes when a module of the build
+// replaces an install directory as a whole: a JSON array with one object {"primary": <primary
+// file>, "dir": <directory>} per such directory, both paths relative to the product out directory.
+func (c *configImpl) SoongReplacedInstallDirs() string {
+	return filepath.Join(c.SoongOutDir(), "replaced_install_dirs-"+c.TargetProduct()+c.CoverageSuffix()+".json")
+}
+
 func (c *configImpl) SoongBuildMetrics() string {
 	return filepath.Join(c.LogsDir(), "soong_build_metrics.pb")
 }

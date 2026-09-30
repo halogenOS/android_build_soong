@@ -341,6 +341,8 @@ func cleanOldInstalledFiles(ctx Context, config Config) {
 		}
 	}
 
+	cleanReplacedInstallDirs(ctx, config.ProductOut(), ".installable_files"+suffix,
+		".replaced_install_dirs"+suffix+".json", config.SoongReplacedInstallDirs())
 	cleanOldFiles(ctx, config.ProductOut(), ".installable_files"+suffix)
 
 	cleanOldFiles(ctx, config.HostOut(), ".installable_test_files")
