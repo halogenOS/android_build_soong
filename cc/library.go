@@ -310,6 +310,7 @@ type flagExporter struct {
 	deps         android.Paths
 	headers      android.Paths
 	rustRlibDeps []RustRlibDep
+	triggerDeps  android.Paths
 }
 
 // exportedIncludes returns the effective include paths for this module and
@@ -374,6 +375,10 @@ func (f *flagExporter) reexportDeps(deps ...android.Path) {
 	f.deps = append(f.deps, deps...)
 }
 
+func (f *flagExporter) reexportTriggerDeps(deps ...android.Path) {
+	f.triggerDeps = append(f.triggerDeps, deps...)
+}
+
 func (f *flagExporter) reexportRustStaticDeps(deps ...RustRlibDep) {
 	f.rustRlibDeps = append(f.rustRlibDeps, deps...)
 }
@@ -400,6 +405,9 @@ func (f *flagExporter) setProvider(ctx android.ModuleContext) {
 		// For exported generated headers, such as exported aidl headers, proto headers, or
 		// sysprop headers.
 		GeneratedHeaders: f.headers,
+		// Files of generators whose headers are not all declared outputs, which compile rules
+		// of the users of these flags take as implicit inputs.
+		TriggerDeps: f.triggerDeps,
 	})
 }
 
@@ -1805,6 +1813,7 @@ func (library *libraryDecorator) link(ctx ModuleContext,
 	library.reexportSystemDirs(deps.ReexportedSystemDirs...)
 	library.reexportFlags(deps.ReexportedFlags...)
 	library.reexportDeps(deps.ReexportedDeps...)
+	library.reexportTriggerDeps(deps.ReexportedTriggerDeps...)
 	library.addExportedGeneratedHeaders(deps.ReexportedGeneratedHeaders...)
 
 	for _, lfiDep := range ctx.GetDirectDepsProxyWithTag(LFIDepTag) {

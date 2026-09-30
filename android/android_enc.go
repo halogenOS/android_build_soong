@@ -8763,12 +8763,27 @@ func (r GeneratedSourceInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) 
 			}
 		}
 	}
+
+	if r.GeneratedTriggerDeps == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r.GeneratedTriggerDeps)); err != nil {
+			return err
+		}
+		for val4 := 0; val4 < len(r.GeneratedTriggerDeps); val4++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.GeneratedTriggerDeps[val4]); err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
 func (r GeneratedSourceInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":android.GeneratedSourceInfo")
-	hasher.WriteInt(3)
+	hasher.WriteInt(4)
 	hasher.WriteString(":android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.GeneratedSourceFiles))
@@ -8859,6 +8874,36 @@ func (r GeneratedSourceInfo) CustomHash(hasher *proptools.Hasher) error {
 			}
 		}
 	}
+	hasher.WriteString(":android.Paths")
+	hasher.WriteString(":.[]Path")
+	hasher.WriteInt(len(r.GeneratedTriggerDeps))
+	for val13 := 0; val13 < len(r.GeneratedTriggerDeps); val13++ {
+		hasher.WriteString(":android.Path")
+		val14 := r.GeneratedTriggerDeps[val13] == nil
+		if val14 {
+			hasher.WriteByte(0)
+		} else {
+			if v := reflect.ValueOf(r.GeneratedTriggerDeps[val13]); v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					panic(fmt.Errorf("nil pointer is not supported in interface"))
+				} else {
+					val15 := r.GeneratedTriggerDeps[val13] == nil
+					if val15 {
+						hasher.WriteByte(0)
+					} else {
+						val16 := func(hasher *proptools.Hasher) error {
+							return r.GeneratedTriggerDeps[val13].(proptools.CustomHash).CustomHash(hasher)
+						}
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val16); err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				r.GeneratedTriggerDeps[val13].(proptools.CustomHash).CustomHash(hasher)
+			}
+		}
+	}
 	return nil
 }
 
@@ -8915,6 +8960,24 @@ func (r *GeneratedSourceInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader)
 				r.GeneratedDeps[val16] = nil
 			} else {
 				r.GeneratedDeps[val16] = val18.(Path)
+			}
+		}
+	}
+
+	var val21 int
+	err = gobtools.DecodeInt(buf, &val21)
+	if err != nil {
+		return err
+	}
+	if val21 != -1 {
+		r.GeneratedTriggerDeps = make([]Path, val21)
+		for val22 := 0; val22 < int(val21); val22++ {
+			if val24, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+				return err
+			} else if val24 == nil {
+				r.GeneratedTriggerDeps[val22] = nil
+			} else {
+				r.GeneratedTriggerDeps[val22] = val24.(Path)
 			}
 		}
 	}

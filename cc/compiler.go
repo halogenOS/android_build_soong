@@ -838,7 +838,10 @@ func (compiler *baseCompiler) compile(ctx ModuleContext, flags Flags, deps PathD
 
 	compiler.pathDeps = pathDeps
 	compiler.generatedSourceInfo = info
-	compiler.cFlagsDeps = flags.CFlagsDeps
+	// The trigger dependencies of generated headers are implicit inputs, unlike pathDeps, which
+	// are order-only: a header they stand for is not a declared output that the build tool
+	// records, so only their new modification time makes a source compile again.
+	compiler.cFlagsDeps = append(slices.Clone(flags.CFlagsDeps), deps.TriggerDeps...)
 
 	// Save src, buildFlags and context
 	compiler.srcs = srcs

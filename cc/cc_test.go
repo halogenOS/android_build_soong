@@ -3296,3 +3296,107 @@ func TestDeviceDataDepOfHostTest(t *testing.T) {
 		}),
 	).RunTestWithBp(t, bp)
 }
+
+// testHeaderGenerator stands for a source generator whose headers are not all declared outputs.
+// Its one generated file is a stamp that GeneratedDeps returns.
+type testHeaderGenerator struct {
+	android.ModuleBase
+	stamp android.Path
+	dir   android.Path
+}
+
+func (g *testHeaderGenerator) GenerateAndroidBuildActions(ctx android.ModuleContext) {
+	stamp := android.PathForModuleOut(ctx, "headers.stamp")
+	android.WriteFileRule(ctx, stamp, "")
+	g.stamp = stamp
+	g.dir = android.PathForModuleOut(ctx, "include")
+}
+
+func (g *testHeaderGenerator) GeneratedSourceFiles() android.Paths { return nil }
+func (g *testHeaderGenerator) GeneratedHeaderDirs() android.Paths  { return android.Paths{g.dir} }
+func (g *testHeaderGenerator) GeneratedDeps() android.Paths        { return android.Paths{g.stamp} }
+
+func testHeaderGeneratorFactory() android.Module {
+	g := &testHeaderGenerator{}
+	android.InitAndroidModule(g)
+	return g
+}
+
+// testTriggeringHeaderGenerator also returns its stamp as a trigger dependency.
+type testTriggeringHeaderGenerator struct {
+	testHeaderGenerator
+}
+
+func (g *testTriggeringHeaderGenerator) GeneratedTriggerDeps() android.Paths {
+	return android.Paths{g.stamp}
+}
+
+func testTriggeringHeaderGeneratorFactory() android.Module {
+	g := &testTriggeringHeaderGenerator{}
+	android.InitAndroidModule(g)
+	return g
+}
+
+func TestGeneratedHeaderTriggerDeps(t *testing.T) {
+	t.Parallel()
+	result := android.GroupFixturePreparers(
+		prepareForCcTest,
+		android.FixtureRegisterWithContext(func(ctx android.RegistrationContext) {
+			ctx.RegisterModuleType("test_header_generator", testHeaderGeneratorFactory)
+			ctx.RegisterModuleType("test_triggering_header_generator", testTriggeringHeaderGeneratorFactory)
+		}),
+		android.FixtureMergeMockFs(android.MockFS{
+			"direct.c":  nil,
+			"through.c": nil,
+			"plain.c":   nil,
+		}),
+	).RunTestWithBp(t, `
+		test_triggering_header_generator {
+			name: "gen_triggering",
+		}
+
+		test_header_generator {
+			name: "gen_plain",
+		}
+
+		cc_library_static {
+			name: "libdirect",
+			srcs: ["direct.c"],
+			generated_headers: ["gen_triggering"],
+		}
+
+		cc_library_headers {
+			name: "libheaders",
+			generated_headers: ["gen_triggering"],
+			export_generated_headers: ["gen_triggering"],
+		}
+
+		cc_library_static {
+			name: "libthrough",
+			srcs: ["through.c"],
+			header_libs: ["libheaders"],
+		}
+
+		cc_library_static {
+			name: "libplain",
+			srcs: ["plain.c"],
+			generated_headers: ["gen_plain"],
+		}
+	`)
+
+	compileRule := func(module, source string) android.TestingBuildParams {
+		t.Helper()
+		return result.ModuleForTests(t, module, "android_arm64_armv8-a_static").Output("obj/" + source + ".o")
+	}
+	triggerStamp := "out/soong/.intermediates/gen_triggering/headers.stamp"
+	plainStamp := "out/soong/.intermediates/gen_plain/headers.stamp"
+
+	android.AssertStringListContains(t, "trigger dependency of a generated header module is an implicit input",
+		android.PathsRelativeToTop(compileRule("libdirect", "direct").Implicits), triggerStamp)
+	android.AssertStringListContains(t, "trigger dependency re-exported by a header library is an implicit input",
+		android.PathsRelativeToTop(compileRule("libthrough", "through").Implicits), triggerStamp)
+	android.AssertStringListDoesNotContain(t, "a generator without trigger dependencies adds no implicit input",
+		android.PathsRelativeToTop(compileRule("libplain", "plain").Implicits), plainStamp)
+	android.AssertStringListContains(t, "a generator without trigger dependencies keeps its order-only input",
+		android.PathsRelativeToTop(compileRule("libplain", "plain").OrderOnly), plainStamp)
+}

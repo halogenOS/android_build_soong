@@ -448,6 +448,9 @@ type PathDeps struct {
 	// Paths to generated source files
 	GeneratedSources android.Paths
 	GeneratedDeps    android.Paths
+	// Files of generators whose headers are not all declared outputs, which every compile rule
+	// takes as implicit inputs (see android.GeneratedTriggerDepsProducer)
+	TriggerDeps android.Paths
 
 	Flags                      []string
 	LdFlags                    []string
@@ -458,6 +461,7 @@ type PathDeps struct {
 	ReexportedFlags            []string
 	ReexportedGeneratedHeaders android.Paths
 	ReexportedDeps             android.Paths
+	ReexportedTriggerDeps      android.Paths
 	ReexportedRustRlibDeps     []RustRlibDep
 
 	// Paths to crt*.o files
@@ -3749,6 +3753,7 @@ func (c *Module) depsToPaths(ctx ModuleContext) PathDeps {
 		depPaths.ReexportedSystemDirs = append(depPaths.ReexportedSystemDirs, exporter.SystemIncludeDirs...)
 		depPaths.ReexportedFlags = append(depPaths.ReexportedFlags, exporter.Flags...)
 		depPaths.ReexportedDeps = append(depPaths.ReexportedDeps, exporter.Deps...)
+		depPaths.ReexportedTriggerDeps = append(depPaths.ReexportedTriggerDeps, exporter.TriggerDeps...)
 		depPaths.ReexportedGeneratedHeaders = append(depPaths.ReexportedGeneratedHeaders, exporter.GeneratedHeaders...)
 	}
 
@@ -3806,6 +3811,7 @@ func (c *Module) depsToPaths(ctx ModuleContext) PathDeps {
 				if genRule != nil {
 					depPaths.GeneratedDeps = append(depPaths.GeneratedDeps,
 						genRule.GeneratedDeps...)
+					depPaths.TriggerDeps = append(depPaths.TriggerDeps, genRule.GeneratedTriggerDeps...)
 					dirs := genRule.GeneratedHeaderDirs
 					depPaths.IncludeDirs = append(depPaths.IncludeDirs, dirs...)
 					if depTag == genHeaderExportDepTag {
@@ -3813,6 +3819,8 @@ func (c *Module) depsToPaths(ctx ModuleContext) PathDeps {
 						depPaths.ReexportedGeneratedHeaders = append(depPaths.ReexportedGeneratedHeaders,
 							genRule.GeneratedSourceFiles...)
 						depPaths.ReexportedDeps = append(depPaths.ReexportedDeps, genRule.GeneratedDeps...)
+						depPaths.ReexportedTriggerDeps = append(depPaths.ReexportedTriggerDeps,
+							genRule.GeneratedTriggerDeps...)
 						// Add these re-exported flags to help header-abi-dumper to infer the abi exported by a library.
 						c.sabi.Properties.ReexportedIncludes = append(c.sabi.Properties.ReexportedIncludes, dirs.Strings()...)
 					}
@@ -4092,6 +4100,7 @@ func (c *Module) depsToPaths(ctx ModuleContext) PathDeps {
 			depPaths.IncludeDirs = append(depPaths.IncludeDirs, depExporterInfo.IncludeDirs...)
 			depPaths.SystemIncludeDirs = append(depPaths.SystemIncludeDirs, depExporterInfo.SystemIncludeDirs...)
 			depPaths.GeneratedDeps = append(depPaths.GeneratedDeps, depExporterInfo.Deps...)
+			depPaths.TriggerDeps = append(depPaths.TriggerDeps, depExporterInfo.TriggerDeps...)
 			depPaths.Flags = append(depPaths.Flags, depExporterInfo.Flags...)
 			depPaths.RustRlibDeps = append(depPaths.RustRlibDeps, depExporterInfo.RustRlibDeps...)
 
@@ -4162,6 +4171,7 @@ func (c *Module) depsToPaths(ctx ModuleContext) PathDeps {
 	depPaths.IncludeDirs = android.FirstUniquePaths(depPaths.IncludeDirs)
 	depPaths.SystemIncludeDirs = android.FirstUniquePaths(depPaths.SystemIncludeDirs)
 	depPaths.GeneratedDeps = android.FirstUniquePaths(depPaths.GeneratedDeps)
+	depPaths.TriggerDeps = android.FirstUniquePaths(depPaths.TriggerDeps)
 	depPaths.RustRlibDeps = android.FirstUniqueFunc(depPaths.RustRlibDeps, EqRustRlibDeps)
 
 	depPaths.WholeStaticLibObjs = depPaths.WholeStaticLibObjs.Dedup()
@@ -4172,6 +4182,7 @@ func (c *Module) depsToPaths(ctx ModuleContext) PathDeps {
 	depPaths.ReexportedSystemDirs = android.FirstUniquePaths(depPaths.ReexportedSystemDirs)
 	depPaths.ReexportedFlags = android.FirstUniqueStrings(depPaths.ReexportedFlags)
 	depPaths.ReexportedDeps = android.FirstUniquePaths(depPaths.ReexportedDeps)
+	depPaths.ReexportedTriggerDeps = android.FirstUniquePaths(depPaths.ReexportedTriggerDeps)
 	depPaths.ReexportedGeneratedHeaders = android.FirstUniquePaths(depPaths.ReexportedGeneratedHeaders)
 	depPaths.ReexportedRustRlibDeps = android.FirstUniqueFunc(depPaths.ReexportedRustRlibDeps, EqRustRlibDeps)
 

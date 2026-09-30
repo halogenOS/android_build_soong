@@ -425,6 +425,7 @@ type FlagExporterInfo struct {
 	Deps              android.Paths
 	RustRlibDeps      []RustRlibDep
 	GeneratedHeaders  android.Paths
+	TriggerDeps       android.Paths // Implicit inputs of every compile rule of a user of the flags
 }
 
 var FlagExporterInfoProvider = blueprint.NewProvider[FlagExporterInfo]()

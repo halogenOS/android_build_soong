@@ -5750,12 +5750,27 @@ func (r FlagExporterInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) err
 			}
 		}
 	}
+
+	if r.TriggerDeps == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r.TriggerDeps)); err != nil {
+			return err
+		}
+		for val7 := 0; val7 < len(r.TriggerDeps); val7++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.TriggerDeps[val7]); err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
 func (r FlagExporterInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":cc.FlagExporterInfo")
-	hasher.WriteInt(6)
+	hasher.WriteInt(7)
 	hasher.WriteString(":cc.android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.IncludeDirs))
@@ -5887,6 +5902,36 @@ func (r FlagExporterInfo) CustomHash(hasher *proptools.Hasher) error {
 			}
 		}
 	}
+	hasher.WriteString(":cc.android.Paths")
+	hasher.WriteString(":.[]Path")
+	hasher.WriteInt(len(r.TriggerDeps))
+	for val19 := 0; val19 < len(r.TriggerDeps); val19++ {
+		hasher.WriteString("android/soong/android:android.Path")
+		val20 := r.TriggerDeps[val19] == nil
+		if val20 {
+			hasher.WriteByte(0)
+		} else {
+			if v := reflect.ValueOf(r.TriggerDeps[val19]); v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					panic(fmt.Errorf("nil pointer is not supported in interface"))
+				} else {
+					val21 := r.TriggerDeps[val19] == nil
+					if val21 {
+						hasher.WriteByte(0)
+					} else {
+						val22 := func(hasher *proptools.Hasher) error {
+							return r.TriggerDeps[val19].(proptools.CustomHash).CustomHash(hasher)
+						}
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val22); err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				r.TriggerDeps[val19].(proptools.CustomHash).CustomHash(hasher)
+			}
+		}
+	}
 	return nil
 }
 
@@ -5990,6 +6035,24 @@ func (r *FlagExporterInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) er
 				r.GeneratedHeaders[val30] = nil
 			} else {
 				r.GeneratedHeaders[val30] = val32.(android.Path)
+			}
+		}
+	}
+
+	var val35 int
+	err = gobtools.DecodeInt(buf, &val35)
+	if err != nil {
+		return err
+	}
+	if val35 != -1 {
+		r.TriggerDeps = make([]android.Path, val35)
+		for val36 := 0; val36 < int(val35); val36++ {
+			if val38, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+				return err
+			} else if val38 == nil {
+				r.TriggerDeps[val36] = nil
+			} else {
+				r.TriggerDeps[val36] = val38.(android.Path)
 			}
 		}
 	}

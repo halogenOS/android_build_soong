@@ -107,6 +107,7 @@ func (p *prebuiltLibraryLinker) link(ctx ModuleContext,
 	p.libraryDecorator.flagExporter.reexportSystemDirs(deps.ReexportedSystemDirs...)
 	p.libraryDecorator.flagExporter.reexportFlags(deps.ReexportedFlags...)
 	p.libraryDecorator.flagExporter.reexportDeps(deps.ReexportedDeps...)
+	p.libraryDecorator.flagExporter.reexportTriggerDeps(deps.ReexportedTriggerDeps...)
 	p.libraryDecorator.flagExporter.addExportedGeneratedHeaders(deps.ReexportedGeneratedHeaders...)
 
 	p.libraryDecorator.flagExporter.setProvider(ctx)

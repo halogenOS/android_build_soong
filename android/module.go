@@ -2186,6 +2186,14 @@ type SourceFileGenerator interface {
 	GeneratedDeps() Paths
 }
 
+// GeneratedTriggerDepsProducer is an optional interface of a SourceFileGenerator whose generated
+// headers are not all declared outputs. GeneratedTriggerDeps returns files that get a new
+// modification time whenever one of those headers changes; cc makes them implicit inputs of every
+// rule that compiles a source of a module that uses the headers.
+type GeneratedTriggerDepsProducer interface {
+	GeneratedTriggerDeps() Paths
+}
+
 type HostToolDepTagType struct {
 	blueprint.BaseDependencyTag
 }
@@ -2199,6 +2207,7 @@ type GeneratedSourceInfo struct {
 	GeneratedSourceFiles Paths
 	GeneratedHeaderDirs  Paths
 	GeneratedDeps        Paths
+	GeneratedTriggerDeps Paths
 }
 
 func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) {
@@ -2635,6 +2644,9 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 			GeneratedSourceFiles: s.GeneratedSourceFiles(),
 			GeneratedHeaderDirs:  s.GeneratedHeaderDirs(),
 			GeneratedDeps:        s.GeneratedDeps(),
+		}
+		if t, ok := m.module.(GeneratedTriggerDepsProducer); ok {
+			commonData.GeneratedSource.GeneratedTriggerDeps = t.GeneratedTriggerDeps()
 		}
 	}
 	if m.Enabled(ctx) {
