@@ -35,4 +35,8 @@ bootstrap_go_package {
         "prebuilt_kernel_modules_test.go",
     ],
     pluginFor: ["soong_build"],
+    visibility: [
+        "//build/soong:__subpackages__",
+        "//build/custom/kernel:__subpackages__",
+    ],
 }

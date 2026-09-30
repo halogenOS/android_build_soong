@@ -22,4 +22,8 @@ bootstrap_go_package {
     deps: ["androidmk-parser"],
     srcs: ["deps.go"],
     testSrcs: ["deps_test.go"],
+    visibility: [
+        "//build/soong:__subpackages__",
+        "//build/custom/kernel:__subpackages__",
+    ],
 }
