@@ -2708,6 +2708,12 @@ func (c *config) EnableUffdGc() string {
 	return String(c.productVariables.EnableUffdGc)
 }
 
+// BoardKernelBuildModule returns the module reference that BOARD_KERNEL_BUILD_MODULE gives, the
+// qualified name of the module that builds the device's kernel, or an empty string.
+func (c *config) BoardKernelBuildModule() string {
+	return String(c.productVariables.BoardKernelBuildModule)
+}
+
 func (c *config) DeviceFrameworkCompatibilityMatrixFile() []string {
 	return c.productVariables.DeviceFrameworkCompatibilityMatrixFile
 }
