@@ -164,6 +164,7 @@ bootstrap_go_package {
         "path_properties_test.go",
         "paths_test.go",
         "prebuilt_test.go",
+        "replaces_test.go",
         "rule_builder_test.go",
         "sdk_version_test.go",
         "sdk_test.go",

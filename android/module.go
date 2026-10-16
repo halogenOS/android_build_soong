@@ -282,8 +282,20 @@ func SortedUniqueNamedPaths(l NamedPaths) NamedPaths {
 }
 
 type nameProperties struct {
-	// The name of the module.  Must be unique across all modules.
+	// The name of the module.  Must be unique across all modules, unless one definition replaces
+	// the other through replaces.
 	Name *string
+
+	// Directories that contain another definition of this module with the same name and type.
+	// The directories are relative to the top of the source tree. That definition is left out of
+	// the build, while overrides only prevents other modules from being installed. A module
+	// created by another module never replaces a definition and is never replaced. A definition
+	// that creates other modules while it is read can neither replace another definition nor be
+	// replaced.
+	//
+	// Replaces is a name property because CreateModule copies only commonProperties into the
+	// modules it creates. Defaults never apply nameProperties to the modules that use them.
+	Replaces []string
 }
 
 // Properties common to all modules inheriting from ModuleBase. These properties are automatically
@@ -1253,6 +1265,12 @@ func (m *ModuleBase) String() string {
 func (m *ModuleBase) BaseModuleName() string {
 	return String(m.nameProperties.Name)
 }
+
+func (m *ModuleBase) ReplacedDirs() []string {
+	return m.nameProperties.Replaces
+}
+
+var _ blueprint.ReplacingModule = (*ModuleBase)(nil)
 
 func (m *ModuleBase) base() *ModuleBase {
 	return m
