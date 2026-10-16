@@ -888,16 +888,12 @@ func expandOneSrcPath(input sourcePathInput) (Paths, error) {
 			paths := GlobFiles(input.context, p.String(), input.expandedExcludes)
 			return PathsWithModuleSrcSubDir(input.context, paths, ""), nil
 		} else {
-			if exists, _, err := input.context.Config().fs.Exists(p.String()); err != nil {
+			if exists, isDir, err := input.context.Config().fs.Exists(p.String()); err != nil {
 				ReportPathErrorf(input.context, "%s: %s", p, err.Error())
 			} else if !exists && !input.context.Config().TestAllowNonExistentPaths {
 				ReportPathErrorf(input.context, "module source path %q does not exist", p)
-			} else if !input.includeDirs {
-				if isDir, err := input.context.Config().fs.IsDir(p.String()); exists && err != nil {
-					ReportPathErrorf(input.context, "%s: %s", p, err.Error())
-				} else if isDir {
-					ReportPathErrorf(input.context, "module source path %q is a directory", p)
-				}
+			} else if !input.includeDirs && isDir {
+				ReportPathErrorf(input.context, "module source path %q is a directory", p)
 			}
 
 			if InList(p.String(), input.expandedExcludes) {
