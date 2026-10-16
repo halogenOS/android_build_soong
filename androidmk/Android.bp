@@ -61,4 +61,8 @@ bootstrap_go_package {
         "parser/make_strings_test.go",
         "parser/parser_test.go",
     ],
+    visibility: [
+        "//build/soong:__subpackages__",
+        "//build/custom/kernel:__subpackages__",
+    ],
 }
