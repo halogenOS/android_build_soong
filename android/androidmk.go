@@ -614,6 +614,7 @@ func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPa
 
 		if ctx.IsPrimaryModule(mod) {
 			typeStats[ctx.ModuleType(mod)] += 1
+			writeReplacedNames(ctx, buf, mod)
 		}
 	}
 
@@ -634,6 +635,35 @@ func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPa
 	}
 
 	return writeModuleInfoJSON(ctx, moduleInfoJSONs, moduleInfoJSONPath)
+}
+
+// writeReplacedNames writes a phony Make module for each definition replaced by mod. Make then
+// finds the replaced name, for example in PRODUCT_PACKAGES, and installs mod in its place.
+func writeReplacedNames(ctx SingletonContext, w io.Writer, mod ModuleOrProxy) {
+	info := OtherModulePointerProviderOrDefault(ctx, mod, CommonModuleInfoProvider)
+	if info.SkipAndroidMkProcessing {
+		return
+	}
+	for _, name := range info.ReplacedMakeNames {
+		WritePhonyPackage(w, "# replaced by "+info.BaseModuleName, ctx.ModuleDir(mod), name,
+			[]string{info.BaseModuleName}, nil)
+	}
+}
+
+// WritePhonyPackage writes a phony Make module named name in the directory dir, which requires the
+// modules in required. The comment follows the line that starts the module. writeVariables, when
+// set, writes further variables of the module.
+func WritePhonyPackage(w io.Writer, comment, dir, name string, required []string, writeVariables func()) {
+	fmt.Fprintln(w, "\ninclude $(CLEAR_VARS)", comment)
+	fmt.Fprintln(w, "LOCAL_PATH :=", dir)
+	fmt.Fprintln(w, "LOCAL_MODULE :=", name)
+	if len(required) > 0 {
+		fmt.Fprintln(w, "LOCAL_REQUIRED_MODULES :=", strings.Join(required, " "))
+	}
+	if writeVariables != nil {
+		writeVariables()
+	}
+	fmt.Fprintln(w, "include $(BUILD_PHONY_PACKAGE)")
 }
 
 func translateAndroidMkModule(ctx SingletonContext, w io.Writer, moduleInfoJSONs *[]*ModuleInfoJSON, mod ModuleOrProxy) error {

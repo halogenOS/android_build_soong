@@ -73,33 +73,27 @@ func (p *phony) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 func (p *phony) AndroidMk() android.AndroidMkData {
 	return android.AndroidMkData{
 		Custom: func(w io.Writer, name, prefix, moduleDir string, data android.AndroidMkData) {
-			fmt.Fprintln(w, "\ninclude $(CLEAR_VARS)", " # phony.phony")
-			fmt.Fprintln(w, "LOCAL_PATH :=", moduleDir)
-			fmt.Fprintln(w, "LOCAL_MODULE :=", name)
-			if p.Host() {
-				fmt.Fprintln(w, "LOCAL_IS_HOST_MODULE := true")
-			}
-			if len(p.requiredModuleNames) > 0 {
-				fmt.Fprintln(w, "LOCAL_REQUIRED_MODULES :=",
-					strings.Join(p.requiredModuleNames, " "))
-			}
-			if len(p.hostRequiredModuleNames) > 0 {
-				fmt.Fprintln(w, "LOCAL_HOST_REQUIRED_MODULES :=",
-					strings.Join(p.hostRequiredModuleNames, " "))
-			}
-			if len(p.targetRequiredModuleNames) > 0 {
-				fmt.Fprintln(w, "LOCAL_TARGET_REQUIRED_MODULES :=",
-					strings.Join(p.targetRequiredModuleNames, " "))
-			}
-			if len(p.outputDeps) > 0 {
-				fmt.Fprintln(w, "LOCAL_ADDITIONAL_DEPENDENCIES :=",
-					strings.Join(p.outputDeps.Strings(), " "))
-			}
-			// AconfigUpdateAndroidMkData may have added elements to Extra.  Process them here.
-			for _, extra := range data.Extra {
-				extra(w, nil)
-			}
-			fmt.Fprintln(w, "include $(BUILD_PHONY_PACKAGE)")
+			android.WritePhonyPackage(w, " # phony.phony", moduleDir, name, p.requiredModuleNames, func() {
+				if p.Host() {
+					fmt.Fprintln(w, "LOCAL_IS_HOST_MODULE := true")
+				}
+				if len(p.hostRequiredModuleNames) > 0 {
+					fmt.Fprintln(w, "LOCAL_HOST_REQUIRED_MODULES :=",
+						strings.Join(p.hostRequiredModuleNames, " "))
+				}
+				if len(p.targetRequiredModuleNames) > 0 {
+					fmt.Fprintln(w, "LOCAL_TARGET_REQUIRED_MODULES :=",
+						strings.Join(p.targetRequiredModuleNames, " "))
+				}
+				if len(p.outputDeps) > 0 {
+					fmt.Fprintln(w, "LOCAL_ADDITIONAL_DEPENDENCIES :=",
+						strings.Join(p.outputDeps.Strings(), " "))
+				}
+				// AconfigUpdateAndroidMkData may have added elements to Extra.  Process them here.
+				for _, extra := range data.Extra {
+					extra(w, nil)
+				}
+			})
 		},
 	}
 }

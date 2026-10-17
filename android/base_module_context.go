@@ -58,6 +58,14 @@ type BaseModuleContext interface {
 	// passed to Context.SetNameInterface, or SimpleNameInterface if it was not called.
 	OtherModuleExists(name string) bool
 
+	// NameRefersToModule returns true if name, looked up in the namespace of this module, refers to
+	// this module, as it does for the name of a definition replaced by this module.
+	NameRefersToModule(name string) bool
+
+	// ModuleFromNameIn returns (module, true) if a module exists by the given name, looked up as a
+	// module in namespace would, or (nil, false) if it does not exist.
+	ModuleFromNameIn(name string, namespace blueprint.Namespace) (blueprint.Module, bool)
+
 	// OtherModuleDependencyVariantExists returns true if a module with the
 	// specified name and variant exists. The variant must match the given
 	// variations. It must also match all the non-local variations of the current
@@ -244,6 +252,12 @@ func (b *baseModuleContext) OtherModuleSubDir(m ModuleOrProxy) string {
 	return b.bp.OtherModuleSubDir(m)
 }
 func (b *baseModuleContext) OtherModuleExists(name string) bool { return b.bp.OtherModuleExists(name) }
+func (b *baseModuleContext) NameRefersToModule(name string) bool {
+	return b.bp.NameRefersToModule(name)
+}
+func (b *baseModuleContext) ModuleFromNameIn(name string, namespace blueprint.Namespace) (blueprint.Module, bool) {
+	return b.bp.ModuleFromNameIn(name, namespace)
+}
 func (b *baseModuleContext) OtherModuleDependencyVariantExists(variations []blueprint.Variation, name string) bool {
 	return b.bp.OtherModuleDependencyVariantExists(variations, name)
 }

@@ -438,13 +438,14 @@ type baseModuleName interface {
 }
 
 // PrebuiltRenameMutator ensures that there always is a module with an
-// undecorated name.
+// undecorated name. The undecorated name refers to the prebuilt itself when
+// the prebuilt replaces a definition of that name.
 func PrebuiltRenameMutator(ctx BottomUpMutatorContext) {
 	m := ctx.Module()
 	if p := GetEmbeddedPrebuilt(m); p != nil {
 		bmn, _ := m.(baseModuleName)
 		name := bmn.BaseModuleName()
-		if !ctx.OtherModuleExists(name) {
+		if ctx.ModuleName() != name && (!ctx.OtherModuleExists(name) || ctx.NameRefersToModule(name)) {
 			ctx.Rename(name)
 			p.properties.PrebuiltRenamedToSource = true
 		}

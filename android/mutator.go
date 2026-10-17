@@ -120,6 +120,12 @@ var prePartial = []RegisterMutatorFunc{
 	// a DefaultableHook.
 	RegisterDefaultsPreArchMutators,
 
+	// Compare each module with the definitions replaced by it.
+	//
+	// Must run after the defaults mutators, so that the properties supplied by defaults modules
+	// apply to both.
+	RegisterReplacesCheckMutator,
+
 	// Add dependencies on any components so that any component references can be
 	// resolved within the deps mutator.
 	//

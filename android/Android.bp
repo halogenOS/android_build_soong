@@ -108,6 +108,7 @@ bootstrap_go_package {
         "recovery_build_prop.go",
         "register.go",
         "removed_package.go",
+        "replaces.go",
         "rule_builder.go",
         "sandbox.go",
         "sbom.go",

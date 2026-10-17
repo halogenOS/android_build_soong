@@ -262,7 +262,7 @@ func (r *NameResolver) SkippedModuleFromName(moduleName string, namespace bluepr
 
 // parses a fully-qualified path (like "//namespace_path:module_name") into a namespace name and a
 // module name
-func (r *NameResolver) parseFullyQualifiedName(name string) (namespaceName string, moduleName string, ok bool) {
+func parseFullyQualifiedName(name string) (namespaceName string, moduleName string, ok bool) {
 	if !strings.HasPrefix(name, "//") {
 		return "", "", false
 	}
@@ -286,7 +286,7 @@ func (r *NameResolver) getNamespacesToSearchForModule(sourceNamespace blueprint.
 
 func (r *NameResolver) ModuleFromName(name string, namespace blueprint.Namespace) (group blueprint.ModuleGroup, found bool) {
 	// handle fully qualified references like "//namespace_path:module_name"
-	modulePath, moduleName, isAbs := r.parseFullyQualifiedName(name)
+	modulePath, moduleName, isAbs := parseFullyQualifiedName(name)
 	if isAbs {
 		// TODO(b/432305765): We should not use findNamespace here, as it allows for many different
 		// ways to refer to the same module. We should require that the path exactly points to
@@ -310,6 +310,36 @@ func (r *NameResolver) ModuleFromName(name string, namespace blueprint.Namespace
 
 func (r *NameResolver) Rename(oldName string, newName string, namespace blueprint.Namespace) []error {
 	return namespace.(*Namespace).moduleContainer.Rename(oldName, newName, namespace)
+}
+
+// ModulesForReplacement returns the definitions registered as name in the namespace that contains
+// the directory namespaceDir. It runs once every Android.bp is parsed. findNamespace then caches a
+// correct answer. A namespace that is not exported to Make is parsed for products that do not use
+// it. Its modules replace definitions in that namespace only.
+func (r *NameResolver) ModulesForReplacement(replacing blueprint.ModuleGroup, namespaceDir, name string) []blueprint.ModuleGroup {
+	ns := r.findNamespace(namespaceDir)
+	if ns == nil {
+		return nil
+	}
+	if from := replacing.Namespace().(*Namespace); from != ns && !from.exportToKati {
+		return nil
+	}
+	return ns.moduleContainer.ModulesForReplacement(replacing, namespaceDir, name)
+}
+
+// Replace points the names of a replaced definition, in the namespace where that definition sits,
+// to the replacing module.
+func (r *NameResolver) Replace(replaced, replacing blueprint.ModuleGroup, name string) {
+	replaced.Namespace().(*Namespace).moduleContainer.Replace(replaced, replacing, name)
+}
+
+// Duplicates returns the duplicates of every namespace.
+func (r *NameResolver) Duplicates() [][]blueprint.ModuleGroup {
+	var duplicates [][]blueprint.ModuleGroup
+	for _, namespace := range r.sortedNamespaces.sortedItems() {
+		duplicates = append(duplicates, namespace.moduleContainer.Duplicates()...)
+	}
+	return duplicates
 }
 
 // resolve each element of namespace.importedNamespaceNames and put the result in namespace.visibleNamespaces
@@ -357,7 +387,7 @@ func (r *NameResolver) chooseId(namespace *Namespace) {
 func (r *NameResolver) MissingDependencyError(depender string, dependerNamespace blueprint.Namespace, depName string, guess []string) (err error) {
 	text := fmt.Sprintf("%q depends on undefined module %q.", depender, depName)
 
-	_, _, isAbs := r.parseFullyQualifiedName(depName)
+	_, _, isAbs := parseFullyQualifiedName(depName)
 	if isAbs {
 		// if the user gave a fully-qualified name, we don't need to look for other
 		// modules that they might have been referring to

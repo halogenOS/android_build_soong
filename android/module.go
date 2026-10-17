@@ -286,12 +286,15 @@ type nameProperties struct {
 	// the other through replaces.
 	Name *string
 
-	// Directories that contain another definition of this module with the same name and type.
-	// The directories are relative to the top of the source tree. That definition is left out of
-	// the build, while overrides only prevents other modules from being installed. A module
-	// created by another module never replaces a definition and is never replaced. A definition
-	// that creates other modules while it is read can neither replace another definition nor be
-	// replaced.
+	// Definitions replaced by this module, each written as "//<directory>:<name>": the module
+	// named <name> in the Android.bp file in <directory>, relative to the top of the source
+	// tree. The directory selects the namespace, as in a dependency on "//<path>:<name>". The
+	// replaced definition is left out of the build, and its name refers to this module in that
+	// namespace and in Make. The two may differ in name and type. They must install into the same
+	// partition and support the host and the device alike, once defaults apply. A module in a
+	// namespace that is not exported to Make replaces definitions in that namespace only. A module
+	// created by another module, or a definition that creates other modules while it is read,
+	// never replaces a definition and is never replaced.
 	//
 	// Replaces is a name property because CreateModule copies only commonProperties into the
 	// modules it creates. Defaults never apply nameProperties to the modules that use them.
@@ -532,6 +535,9 @@ type commonProperties struct {
 	ForcedDisabled bool `blueprint:"mutated"`
 
 	NamespaceExportedToMake bool `blueprint:"mutated"`
+
+	// Names of replaced definitions that Make finds through a phony module requiring this one.
+	ReplacedMakeNames []string `blueprint:"mutated"`
 
 	MissingDeps        []string `blueprint:"mutated"`
 	CheckedMissingDeps bool     `blueprint:"mutated"`
@@ -932,6 +938,9 @@ type ModuleBase struct {
 
 	hooks hooks
 
+	// Definitions replaced by this module, compared with it by replacesCheckMutator.
+	replacedDefinitions []replacedDefinition
+
 	registerProps []interface{}
 
 	// For tests
@@ -1266,12 +1275,6 @@ func (m *ModuleBase) BaseModuleName() string {
 	return String(m.nameProperties.Name)
 }
 
-func (m *ModuleBase) ReplacedDirs() []string {
-	return m.nameProperties.Replaces
-}
-
-var _ blueprint.ReplacingModule = (*ModuleBase)(nil)
-
 func (m *ModuleBase) base() *ModuleBase {
 	return m
 }
@@ -1455,52 +1458,88 @@ func (m *ModuleBase) RequiresStableAPIs(ctx BaseModuleContext) bool {
 		(m.ProductSpecific() && ctx.Config().EnforceProductPartitionInterface())
 }
 
+// A partition is a partition of the device image, as selected by the properties of a module.
+// PartitionTag applies the device configuration, which can place one partition inside another.
+type partition string
+
+const (
+	partitionSystem             partition = "system"
+	partitionUserdata           partition = "userdata"
+	partitionVendor             partition = "vendor"
+	partitionOdm                partition = "odm"
+	partitionProduct            partition = "product"
+	partitionSystemExt          partition = "system_ext"
+	partitionRamdisk            partition = "ramdisk"
+	partitionVendorRamdisk      partition = "vendor_ramdisk"
+	partitionRecovery           partition = "recovery"
+	partitionVendorDlkm         partition = "vendor_dlkm"
+	partitionDebugRamdisk       partition = "debug_ramdisk"
+	partitionTestHarnessRamdisk partition = "test_harness_ramdisk"
+)
+
+// installPartition returns the partition selected by the properties of m, without the device
+// configuration.
+func (m *ModuleBase) installPartition() partition {
+	switch {
+	case m.module.InstallInData():
+		return partitionUserdata
+	case m.SocSpecific():
+		return partitionVendor
+	case m.DeviceSpecific():
+		return partitionOdm
+	case m.ProductSpecific():
+		return partitionProduct
+	case m.SystemExtSpecific():
+		return partitionSystemExt
+	case m.InstallInRamdisk():
+		return partitionRamdisk
+	case m.InstallInVendorRamdisk():
+		return partitionVendorRamdisk
+	case m.InstallInRecovery():
+		return partitionRecovery
+	case m.InstallInVendorDlkm():
+		return partitionVendorDlkm
+	case m.InstallInDebugRamdisk():
+		return partitionDebugRamdisk
+	case m.InstallInTestHarnessRamdisk():
+		return partitionTestHarnessRamdisk
+	}
+	return partitionSystem
+}
+
 func (m *ModuleBase) PartitionTag(config DeviceConfig) string {
-	partition := "system"
-	if m.module.InstallInData() {
-		partition = "userdata"
-	} else if m.SocSpecific() {
+	p := m.installPartition()
+	switch p {
+	case partitionVendor:
 		// A SoC-specific module could be on the vendor partition at
 		// "vendor" or the system partition at "system/vendor".
-		if config.VendorPath() == "vendor" {
-			partition = "vendor"
+		if config.VendorPath() != "vendor" {
+			p = partitionSystem
 		}
-	} else if m.DeviceSpecific() {
+	case partitionOdm:
 		// A device-specific module could be on the odm partition at
 		// "odm", the vendor partition at "vendor/odm", or the system
 		// partition at "system/vendor/odm".
-		if config.OdmPath() == "odm" {
-			partition = "odm"
-		} else if strings.HasPrefix(config.OdmPath(), "vendor/") {
-			partition = "vendor"
+		if strings.HasPrefix(config.OdmPath(), "vendor/") {
+			p = partitionVendor
+		} else if config.OdmPath() != "odm" {
+			p = partitionSystem
 		}
-	} else if m.ProductSpecific() {
+	case partitionProduct:
 		// A product-specific module could be on the product partition
 		// at "product" or the system partition at "system/product".
-		if config.ProductPath() == "product" {
-			partition = "product"
+		if config.ProductPath() != "product" {
+			p = partitionSystem
 		}
-	} else if m.SystemExtSpecific() {
+	case partitionSystemExt:
 		// A system_ext-specific module could be on the system_ext
 		// partition at "system_ext" or the system partition at
 		// "system/system_ext".
-		if config.SystemExtPath() == "system_ext" {
-			partition = "system_ext"
+		if config.SystemExtPath() != "system_ext" {
+			p = partitionSystem
 		}
-	} else if m.InstallInRamdisk() {
-		partition = "ramdisk"
-	} else if m.InstallInVendorRamdisk() {
-		partition = "vendor_ramdisk"
-	} else if m.InstallInRecovery() {
-		partition = "recovery"
-	} else if m.InstallInVendorDlkm() {
-		partition = "vendor_dlkm"
-	} else if m.InstallInDebugRamdisk() {
-		partition = "debug_ramdisk"
-	} else if m.InstallInTestHarnessRamdisk() {
-		partition = "test_harness_ramdisk"
 	}
-	return partition
+	return string(p)
 }
 
 func (m *ModuleBase) Enabled(ctx ConfigurableEvaluatorContext) bool {
@@ -2168,6 +2207,8 @@ type CommonModuleInfo struct {
 	InstallFiles                   *InstallFilesInfo
 	NinjaPhonies                   map[string]NinjaPhoniesGlobsInfo
 	RuntimeHostToolDeps            Paths
+	// Names of replaced definitions that Make finds through a phony module requiring this one.
+	ReplacedMakeNames []string
 }
 
 // NinjaPhoniesGlobsInfo is only necessary because the gob code doesn't support serializing
@@ -2569,6 +2610,7 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 		VintfFragmentModuleNames:                     m.module.VintfFragmentModuleNames(ctx),
 		Dists:                                        m.Dists(),
 		ExportedToMake:                               m.ExportedToMake(),
+		ReplacedMakeNames:                            SortedUniqueStrings(m.commonProperties.ReplacedMakeNames),
 		Team:                                         m.Team(),
 		PartitionTag:                                 m.PartitionTag(ctx.DeviceConfig()),
 		ImageVariation:                               m.module.ImageVariation(),

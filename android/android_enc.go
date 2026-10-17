@@ -7228,12 +7228,27 @@ func (r CommonModuleInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) err
 			}
 		}
 	}
+
+	if r.ReplacedMakeNames == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r.ReplacedMakeNames)); err != nil {
+			return err
+		}
+		for val35 := 0; val35 < len(r.ReplacedMakeNames); val35++ {
+			if err = gobtools.EncodeString(buf, r.ReplacedMakeNames[val35]); err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
 func (r CommonModuleInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":android.CommonModuleInfo")
-	hasher.WriteInt(65)
+	hasher.WriteInt(66)
 	hasher.WriteString(":.bool")
 	if r.Enabled {
 		hasher.WriteByte(1)
@@ -7836,6 +7851,12 @@ func (r CommonModuleInfo) CustomHash(hasher *proptools.Hasher) error {
 			}
 		}
 	}
+	hasher.WriteString(":.[]string")
+	hasher.WriteInt(len(r.ReplacedMakeNames))
+	for val62 := 0; val62 < len(r.ReplacedMakeNames); val62++ {
+		hasher.WriteString(":.string")
+		hasher.WriteString(r.ReplacedMakeNames[val62])
+	}
 	return nil
 }
 
@@ -8429,6 +8450,21 @@ func (r *CommonModuleInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) er
 				r.RuntimeHostToolDeps[val144] = nil
 			} else {
 				r.RuntimeHostToolDeps[val144] = val146.(Path)
+			}
+		}
+	}
+
+	var val148 int
+	err = gobtools.DecodeInt(buf, &val148)
+	if err != nil {
+		return err
+	}
+	if val148 != -1 {
+		r.ReplacedMakeNames = make([]string, val148)
+		for val149 := 0; val149 < int(val148); val149++ {
+			err = gobtools.DecodeString(buf, &r.ReplacedMakeNames[val149])
+			if err != nil {
+				return err
 			}
 		}
 	}
