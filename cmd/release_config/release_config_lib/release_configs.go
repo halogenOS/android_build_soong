@@ -404,9 +404,14 @@ type loadContext struct {
 	infoHandlerChan chan *fileInfo
 }
 
+// minFileReaders is the least number of goroutines that read the files of each kind. A read waits
+// on the file system far longer than its parsing takes, so the count does not follow the CPUs
+// available, which can be as few as two when Kati runs this tool.
+const minFileReaders = 32
+
 func createLoadContext(configs *ReleaseConfigs, declarationsOnly bool) (ctx *loadContext) {
 	startFileRecord()
-	numCPU := runtime.NumCPU()
+	numReaders := max(runtime.NumCPU(), minFileReaders)
 	ctx = &loadContext{
 		declarationsOnly:  declarationsOnly,
 		errorsChan:        make(chan error, 40),
@@ -418,7 +423,7 @@ func createLoadContext(configs *ReleaseConfigs, declarationsOnly bool) (ctx *loa
 	// dirReader funcs are added as we read directories.
 	// Create several threads to read flag_declarations, release_configs,
 	// and flag_values files.
-	for i := 0; i < numCPU; i++ {
+	for i := 0; i < numReaders; i++ {
 		ctx.declReaderWg.Add(1)
 		go ctx.declReader()
 		ctx.valueReaderWg.Add(1)
