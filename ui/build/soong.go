@@ -317,6 +317,11 @@ func bootstrapBlueprint(ctx Context, config Config) {
 	if config.incrementalBuildActions {
 		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, "--incremental-build-actions")
 	}
+	if totalRAM := config.TotalRAM(); totalRAM != 0 {
+		// Without a limit, the garbage collector lets the heap of soong_build
+		// grow to twice its live size, more than many machines can hold.
+		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, fmt.Sprintf("--memory_limit=%d", totalRAM/4*3))
+	}
 	if len(config.partialAnalysisTargets) > 0 {
 		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, fmt.Sprintf("%s=\"%s\"", "--partial-analysis-targets", config.partialAnalysisTargets))
 	}

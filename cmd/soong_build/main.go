@@ -76,6 +76,7 @@ func init() {
 	flag.StringVar(&cmdlineArgs.TraceFile, "trace", "", "write trace to file")
 	flag.StringVar(&cmdlineArgs.Memprofile, "memprofile", "", "write memory profile to file")
 	flag.BoolVar(&cmdlineArgs.NoGC, "nogc", false, "turn off GC for debugging")
+	flag.Int64Var(&cmdlineArgs.MemoryLimit, "memory_limit", 0, "soft memory limit of the Go runtime in bytes, unless GOMEMLIMIT is set")
 
 	// Flags representing various modes soong_build can run in
 	flag.StringVar(&cmdlineArgs.DocFile, "soong_docs", "", "build documentation file to output")
