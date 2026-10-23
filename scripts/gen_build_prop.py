@@ -74,6 +74,8 @@ def parse_args():
   parser.add_argument("--build-thumbprint-file", type=argparse.FileType("r"))
   parser.add_argument("--build-username", required=True)
   parser.add_argument("--date-file", required=True, type=argparse.FileType("r"))
+  parser.add_argument("--build-date", required=True)
+  parser.add_argument("--build-date-placeholder", required=True)
   parser.add_argument("--platform-preview-sdk-fingerprint-file", required=True, type=argparse.FileType("r"))
   parser.add_argument("--prop-files", action="append", type=argparse.FileType("r"), default=[])
   parser.add_argument("--product-config", required=True, type=argparse.FileType("r"))
@@ -630,7 +632,9 @@ def build_prop(args, gen_build_info, gen_common_build_props, variables):
 
   for variable in variables:
     if variable in config:
-      write_properties_from_variable(variable, config[variable], args.build_broken_dup_sysprop)
+      # A product property contains the placeholder where the date of the signing build belongs.
+      props = [prop.replace(args.build_date_placeholder, args.build_date) for prop in config[variable]]
+      write_properties_from_variable(variable, props, args.build_broken_dup_sysprop)
 
 def main():
   args = parse_args()

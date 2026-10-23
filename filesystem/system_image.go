@@ -49,7 +49,7 @@ func (s *systemImage) BuildLinkerConfigFile(
 	builder *android.RuleBuilder,
 	rebasedDir android.OutputPath,
 	fullInstallPaths *[]FullInstallPathInfo,
-	platformGeneratedFiles *[]string,
+	platformGeneratedFiles *android.Paths,
 ) {
 	if !proptools.Bool(s.filesystem.properties.Linker_config.Gen_linker_config) {
 		return
@@ -67,7 +67,7 @@ func (s *systemImage) BuildLinkerConfigFile(
 			FullInstallPath: installPath,
 			SourcePath:      intermediateOutput,
 		})
-		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 	} else {
 		// TODO: This branch is the logic that make uses for the linker config file, which is
 		// different than linkerconfig.BuildLinkerConfig used above. Keeping both branches for now
@@ -106,7 +106,7 @@ func (s *systemImage) BuildLinkerConfigFile(
 			FullInstallPath: installPath,
 			SourcePath:      output,
 		})
-		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 	}
 
 	s.appendToEntry(ctx, output)

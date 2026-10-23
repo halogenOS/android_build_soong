@@ -20,7 +20,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"slices"
-	"sort"
 	"strings"
 	"sync/atomic"
 
@@ -572,6 +571,10 @@ func (a *androidDevice) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		}
 	}
 	complianceMetadataInfo.SetProductCopyFiles(pcf)
+	if !ctx.Config().KatiEnabled() && proptools.Bool(a.deviceProps.Main_device) {
+		// Make writes the installed files of the product when Kati runs.
+		android.WriteProductComplianceRecords(ctx, &complianceMetadataInfo.ComplianceFilesInfo)
+	}
 
 	// Add the host tools as deps
 	if !ctx.Config().KatiEnabled() && proptools.Bool(a.deviceProps.Main_device) {
@@ -591,12 +594,12 @@ func (a *androidDevice) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 func buildComplianceMetadata(ctx android.ModuleContext, tags ...blueprint.DependencyTag) {
 	// Collect metadata from deps
-	filesContained := make([]string, 0)
-	prebuiltFilesCopied := make([]string, 0)
-	platformGeneratedFiles := make([]string, 0)
+	filesContained := make([]android.ComplianceFile, 0)
+	prebuiltFilesCopied := make([]android.CompliancePrebuiltCopy, 0)
+	platformGeneratedFiles := make(android.Paths, 0)
 	for _, tag := range tags {
 		ctx.VisitDirectDepsProxyWithTag(tag, func(m android.ModuleProxy) {
-			if complianceMetadataInfo := android.GetComplianceMetadata(ctx, m); complianceMetadataInfo != nil {
+			if complianceMetadataInfo := android.GetComplianceFiles(ctx, m); complianceMetadataInfo != nil {
 				filesContained = append(filesContained, complianceMetadataInfo.GetFilesContained()...)
 				prebuiltFilesCopied = append(prebuiltFilesCopied, complianceMetadataInfo.GetPrebuiltFilesCopied()...)
 				platformGeneratedFiles = append(platformGeneratedFiles, complianceMetadataInfo.GetPlatformGeneratedFiles()...)
@@ -606,16 +609,17 @@ func buildComplianceMetadata(ctx android.ModuleContext, tags ...blueprint.Depend
 	// Merge to module's ComplianceMetadataInfo
 	complianceMetadataInfo := ctx.ComplianceMetadataInfo()
 	filesContained = append(filesContained, complianceMetadataInfo.GetFilesContained()...)
-	sort.Strings(filesContained)
+	slices.SortFunc(filesContained, func(a, b android.ComplianceFile) int { return cmp.Compare(a.String(), b.String()) })
 	complianceMetadataInfo.SetFilesContained(filesContained)
 
 	prebuiltFilesCopied = append(prebuiltFilesCopied, complianceMetadataInfo.GetPrebuiltFilesCopied()...)
-	sort.Strings(prebuiltFilesCopied)
+	slices.SortFunc(prebuiltFilesCopied, func(a, b android.CompliancePrebuiltCopy) int {
+		return cmp.Or(cmp.Compare(a.Src.String(), b.Src.String()), cmp.Compare(a.Dest, b.Dest))
+	})
 	complianceMetadataInfo.SetPrebuiltFilesCopied(prebuiltFilesCopied)
 
 	platformGeneratedFiles = append(platformGeneratedFiles, complianceMetadataInfo.GetPlatformGeneratedFiles()...)
-	sort.Strings(platformGeneratedFiles)
-	complianceMetadataInfo.SetPlatformGeneratedFiles(platformGeneratedFiles)
+	complianceMetadataInfo.SetPlatformGeneratedFiles(android.SortedUniquePaths(platformGeneratedFiles))
 }
 
 type installedOwnerInfo struct {

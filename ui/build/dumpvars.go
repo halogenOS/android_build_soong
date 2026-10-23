@@ -65,10 +65,26 @@ func DumpMakeVars(ctx Context, config Config, goals, vars []string) (map[string]
 		"SOONG_NINJA": func() string { return config.ninjaCommand.String() },
 		"SOONG_ONLY":  func() string { return strconv.FormatBool(config.soongOnlyRequested) },
 	}
+	// derivedVars are the variables that soong_ui computes from the Make
+	// variables in needs.
+	derivedVars := map[string]derivedVar{
+		signedProductOutVar: {
+			needs: []string{"PRODUCT_OUT"},
+			value: func(makeVars map[string]string) (string, error) {
+				return config.signedProductOut(makeVars["PRODUCT_OUT"])
+			},
+		},
+	}
 
 	makeVars := make([]string, 0, len(vars))
 	for _, v := range vars {
-		if _, ok := soongUiVars[v]; !ok {
+		if derived, ok := derivedVars[v]; ok {
+			for _, need := range derived.needs {
+				if !slices.Contains(makeVars, need) {
+					makeVars = append(makeVars, need)
+				}
+			}
+		} else if _, ok := soongUiVars[v]; !ok {
 			makeVars = append(makeVars, v)
 		}
 	}
@@ -98,8 +114,24 @@ func DumpMakeVars(ctx Context, config Config, goals, vars []string) (map[string]
 			ret[v] = f()
 		}
 	}
+	for _, v := range vars {
+		if derived, ok := derivedVars[v]; ok {
+			value, err := derived.value(ret)
+			if err != nil {
+				return ret, err
+			}
+			ret[v] = value
+		}
+	}
 
 	return ret, nil
+}
+
+// derivedVar is a variable that soong_ui computes from the Make variables in
+// needs, with value.
+type derivedVar struct {
+	needs []string
+	value func(makeVars map[string]string) (string, error)
 }
 
 func dumpMakeVars(ctx Context, config Config, goals, vars []string, tmpDir string, which dumpvarsType) (map[string]string, error) {
@@ -350,18 +382,25 @@ func runMakeProductConfig(ctx Context, config Config) {
 		"SOONG_INCREMENTAL_ANALYSIS",
 	}, exportEnvVars, BannerVars, sisoStringVars, earlyReleaseConfigVars)
 
-	makeVars, err := dumpMakeVars(ctx, config, config.Arguments(), allVars, "", DUMPVARS_PRODUCT_CONFIG)
-	if err != nil {
-		ctx.Fatalln("Error dumping make vars:", err)
-	}
-
-	// Verify that none of the earlyVars changed values.
-	for _, name := range earlyReleaseConfigVars {
-		if config.earlyVars[name] != makeVars[name] {
-			ctx.Fatalf("Product config value for %q is not consistent: %q (early call) became %q (final call).\n",
-				name, config.earlyVars[name], makeVars[name])
-
+	var makeVars map[string]string
+	if config.SigningRun() {
+		makeVars = readRecordedProductConfig(ctx, config)
+	} else {
+		var err error
+		makeVars, err = dumpMakeVars(ctx, config, config.Arguments(), allVars, "", DUMPVARS_PRODUCT_CONFIG)
+		if err != nil {
+			ctx.Fatalln("Error dumping make vars:", err)
 		}
+
+		// Verify that none of the earlyVars changed values.
+		for _, name := range earlyReleaseConfigVars {
+			if config.earlyVars[name] != makeVars[name] {
+				ctx.Fatalf("Product config value for %q is not consistent: %q (early call) became %q (final call).\n",
+					name, config.earlyVars[name], makeVars[name])
+
+			}
+		}
+		recordProductConfig(ctx, config, makeVars)
 	}
 
 	// Populate the environment

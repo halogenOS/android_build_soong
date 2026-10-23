@@ -1430,7 +1430,7 @@ func (d *Droidstubs) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 		checkNullabilityWarningsPath := android.PathForModuleSrc(ctx, String(d.properties.Check_nullability_warnings))
 
-		d.checkNullabilityWarningsTimestamp = android.PathForModuleOut(ctx, Everything.String(), "check_nullability_warnings.timestamp")
+		d.checkNullabilityWarningsTimestamp = android.PathForModuleOut(ctx, "check_nullability_warnings.timestamp")
 
 		msg := fmt.Sprintf(`\n******************************\n`+
 			`The warnings encountered during nullability annotation validation did\n`+
@@ -1473,7 +1473,7 @@ func (d *Droidstubs) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 			ctx.PropertyErrorf("baseline_file", "current API check can't have a baseline file. (module %s)", ctx.ModuleName())
 		}
 
-		d.checkCurrentApiTimestamp = android.PathForModuleOut(ctx, Everything.String(), "check_current_api.timestamp")
+		d.checkCurrentApiTimestamp = android.PathForModuleOut(ctx, "check_current_api.timestamp")
 
 		rule := android.NewRuleBuilder(pctx, ctx).SandboxDisabled()
 

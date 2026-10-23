@@ -2182,7 +2182,7 @@ type CommonModuleInfo struct {
 	ApexAvailableFor           []string
 	ImageVariation             blueprint.Variation
 	IsNonPrimaryImageVariation bool
-	ComplianceMetadata         *ComplianceMetadataInfo
+	ComplianceFiles            *ComplianceFilesInfo
 	ModuleInfoJSON             *ModuleInfoJSONInfo
 	UnstableInfo               *unstableInfo
 	// LicenseMetadata is used to propagate license metadata paths between modules.
@@ -2419,6 +2419,7 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 		}
 
 		m.module.base().hooks.runPostGenerateAndroidBuildActionsHooks(ctx)
+		ctx.finishBuildActionsStates()
 
 		if x, ok := m.module.(IDEInfo); ok {
 			ideInfo = &IdeInfo{}
@@ -2584,6 +2585,11 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 	}
 
 	complianceMetadata := buildComplianceMetadataProvider(ctx, m)
+	if m.Enabled(ctx) {
+		writeModuleComplianceRecord(ctx, complianceMetadata)
+	}
+	// A copy, so that the columns of the row are freed with the context.
+	complianceFiles := complianceMetadata.ComplianceFilesInfo
 
 	commonData := CommonModuleInfo{
 		Enabled:                          m.Enabled(ctx),
@@ -2615,7 +2621,7 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 		PartitionTag:                                 m.PartitionTag(ctx.DeviceConfig()),
 		ImageVariation:                               m.module.ImageVariation(),
 		IsNonPrimaryImageVariation:                   m.commonProperties.IsNonPrimaryImageVariation,
-		ComplianceMetadata:                           complianceMetadata,
+		ComplianceFiles:                              &complianceFiles,
 		UnstableInfo:                                 unstableInfo,
 		LicenseMetadata:                              licenseMetadata,
 		Licenses:                                     licenses,
@@ -2767,7 +2773,7 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 			// in order to pick up things like shared libraries.
 			ctx.Build(pctx, BuildParams{
 				Rule:   blueprint.Phony,
-				Output: PathForPhony(ctx, "hostTool-"+ctx.ModuleName()+"-deps"),
+				Output: HostToolDeps(ctx, ctx.ModuleName()),
 				Inputs: append(InstallPaths(installFiles.TransitiveInstallFiles.ToList()).Paths(), ctx.runtimeHostToolDeps...),
 			})
 		}

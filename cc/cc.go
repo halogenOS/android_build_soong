@@ -2930,7 +2930,7 @@ func buildComplianceMetadataInfo(ctx ModuleContext, c *Module, deps PathDeps) {
 	// Dump metadata that can not be done in android/compliance-metadata.go
 	complianceMetadataInfo := ctx.ComplianceMetadataInfo()
 	complianceMetadataInfo.SetStringValue(android.ComplianceMetadataProp.IS_STATIC_LIB, strconv.FormatBool(ctx.static() || ctx.ModuleType() == "cc_object"))
-	complianceMetadataInfo.AddBuiltFiles(c.outputFile.String())
+	complianceMetadataInfo.AddBuiltFiles(c.outputFile.AsPaths()...)
 
 	// Static deps
 	staticDeps := ctx.GetDirectDepsProxyWithTag(StaticDepTag(false))
@@ -2950,18 +2950,8 @@ func buildComplianceMetadataInfo(ctx ModuleContext, c *Module, deps PathDeps) {
 		}
 	})
 
-	staticDepPaths := make([]string, 0, len(deps.StaticLibs)+len(deps.CrtBegin)+len(deps.CrtEnd))
-	for _, dep := range deps.StaticLibs {
-		staticDepPaths = append(staticDepPaths, dep.String())
-	}
-	for _, dep := range deps.CrtBegin {
-		staticDepPaths = append(staticDepPaths, dep.String())
-	}
-	for _, dep := range deps.CrtEnd {
-		staticDepPaths = append(staticDepPaths, dep.String())
-	}
 	complianceMetadataInfo.SetListValue(android.ComplianceMetadataProp.STATIC_DEPS, android.FirstUniqueStrings(staticDepNames))
-	complianceMetadataInfo.SetListValue(android.ComplianceMetadataProp.STATIC_DEP_FILES, android.FirstUniqueStrings(staticDepPaths))
+	complianceMetadataInfo.SetPaths(android.ComplianceMetadataProp.STATIC_DEP_FILES, slices.Concat(deps.StaticLibs, deps.CrtBegin, deps.CrtEnd))
 
 	// Whole static deps
 	wholeStaticDeps := ctx.GetDirectDepsProxyWithTag(StaticDepTag(true))
@@ -2970,12 +2960,8 @@ func buildComplianceMetadataInfo(ctx ModuleContext, c *Module, deps PathDeps) {
 		wholeStaticDepNames = append(wholeStaticDepNames, dep.Name())
 	}
 
-	wholeStaticDepPaths := make([]string, 0, len(deps.WholeStaticLibs))
-	for _, dep := range deps.WholeStaticLibs {
-		wholeStaticDepPaths = append(wholeStaticDepPaths, dep.String())
-	}
 	complianceMetadataInfo.SetListValue(android.ComplianceMetadataProp.WHOLE_STATIC_DEPS, android.FirstUniqueStrings(wholeStaticDepNames))
-	complianceMetadataInfo.SetListValue(android.ComplianceMetadataProp.WHOLE_STATIC_DEP_FILES, android.FirstUniqueStrings(wholeStaticDepPaths))
+	complianceMetadataInfo.SetPaths(android.ComplianceMetadataProp.WHOLE_STATIC_DEP_FILES, deps.WholeStaticLibs)
 
 	// Header libs
 	headerLibDeps := ctx.GetDirectDepsProxyWithTag(HeaderDepTag())

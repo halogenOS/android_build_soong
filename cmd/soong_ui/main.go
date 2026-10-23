@@ -218,7 +218,7 @@ func main() {
 	}
 
 	defer func() {
-		emet.Finish(build.ExecutionMetricsFinishAdaptor{buildCtx})
+		emet.Finish(build.ExecutionMetricsFinishAdaptor{Context: buildCtx})
 		stat.Finish()
 		for _, str := range buildCtx.FinalStdout {
 			fmt.Fprint(c.stdio().Stdout(), str)
@@ -293,7 +293,11 @@ func writeBuildDiskUsageMetrics(m *metrics.Metrics, config build.Config) {
 func preProductConfigSetup(buildCtx build.Context, config build.Config) {
 	log := buildCtx.ContextImpl.Logger
 	logsPrefix := config.GetLogsPrefix()
-	build.SetupOutDir(buildCtx, config)
+	// The signing run writes nothing into OUT_DIR. BuildSigningRun compares the
+	// files that SetupOutDir writes there with the values of the signing run.
+	if !config.SigningRun() {
+		build.SetupOutDir(buildCtx, config)
+	}
 	logsDir := config.LogsDir()
 
 	// Common list of metric file definition.
@@ -345,7 +349,8 @@ func preProductConfigSetup(buildCtx build.Context, config build.Config) {
 	// _SOONG_INTERNAL_NO_FINDER may only be enabled when soong_ui has already run
 	// and the source tree is known to have not changed since.  This is most beneficial
 	// if the job is iterating over a large number of lunch targets.
-	if !build.OsEnvironment().IsEnvTrue("_SOONG_INTERNAL_NO_FINDER") {
+	// The signing run runs neither Soong nor Kati, which read the found sources.
+	if !build.OsEnvironment().IsEnvTrue("_SOONG_INTERNAL_NO_FINDER") && !config.SigningRun() {
 		// Create a source finder.
 		e := buildCtx.BeginTrace(metrics.RunSetupTool, "Run finder")
 		defer e.End()
@@ -592,6 +597,10 @@ func runMake(ctx build.Context, config build.Config, _ []string) {
 		ctx.Fatal("Invalid environment")
 	}
 
+	if config.SigningRun() {
+		build.BuildSigningRun(ctx, config)
+		return
+	}
 	build.Build(ctx, config)
 }
 

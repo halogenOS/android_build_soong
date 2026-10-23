@@ -113,8 +113,8 @@ var PrebuiltEtcInfoProvider = blueprint.NewProvider[PrebuiltEtcInfo]()
 // If this provider is set, it means this module was converted from PRODUCT_COPY_FILES
 // @auto-generate: gob
 type ProductCopyFilesModuleInfo struct {
-	// The entries as they would've appeared in PRODUCT_COPY_FILES, that is, src:dst
-	ProductCopyFileEntries []string
+	// The entries as they would've appeared in PRODUCT_COPY_FILES, that is, src and dst
+	ProductCopyFileEntries []android.ComplianceProductCopy
 }
 
 var ProductCopyFilesModuleProvider = blueprint.NewProvider[ProductCopyFilesModuleInfo]()
@@ -576,9 +576,12 @@ func (p *PrebuiltEtc) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	SetCommonPrebuiltEtcInfo(ctx, p)
 
 	if proptools.Bool(p.properties.From_product_copy_files) {
-		entries := make([]string, 0, len(installs))
+		entries := make([]android.ComplianceProductCopy, 0, len(installs))
 		for _, install := range installs {
-			entries = append(entries, fmt.Sprintf("%s:%s", install.sourceFilePath, filepath.Join(install.installDirPath.String(), install.filename)))
+			entries = append(entries, android.ComplianceProductCopy{
+				Src:  install.sourceFilePath,
+				Dest: install.installDirPath.Join(ctx, install.filename),
+			})
 		}
 		android.SetProvider(ctx, ProductCopyFilesModuleProvider, ProductCopyFilesModuleInfo{
 			ProductCopyFileEntries: entries,

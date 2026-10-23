@@ -1279,3 +1279,39 @@ func TestSisoBin(t *testing.T) {
 		})
 	}
 }
+
+// fails reports whether f stops with a fatal error.
+func fails(f func()) (failed bool) {
+	defer logger.Recover(func(error) {
+		failed = true
+	})
+	f()
+	return false
+}
+
+func TestCheckKatiJsonLines(t *testing.T) {
+	kati := chosenTool{path: "ckati", capabilities: []string{katiJsonLines.name}}
+	oldKati := chosenTool{path: "ckati"}
+	for _, test := range []struct {
+		name     string
+		kati     chosenTool
+		skipKati bool
+		fails    bool
+	}{
+		{name: "ckati with JSON lines", kati: kati},
+		{name: "ckati without JSON lines", kati: oldKati, fails: true},
+		{name: "build without Kati", kati: oldKati, skipKati: true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			impl := &configImpl{
+				environ:  &Environment{"NO_ABFS=true"},
+				skipKati: test.skipKati,
+				kati:     test.kati,
+			}
+			impl.katiToolOnce.Do(func() {})
+			if got := fails(func() { checkKatiJsonLines(testContext(), Config{impl}) }); got != test.fails {
+				t.Errorf("fails: want %t, got %t", test.fails, got)
+			}
+		})
+	}
+}

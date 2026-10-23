@@ -683,3 +683,62 @@ func TestRuleBuilderHashInputs(t *testing.T) {
 		})
 	}
 }
+
+var testExternalVariable = blueprint.NewExternalVariable("rule_builder_test_value")
+
+type externalVariableTestModule struct {
+	ModuleBase
+	properties struct {
+		// Where the rule runs: "sbox", "nsjail", or Ninja itself when unset.
+		Run_in string
+	}
+}
+
+func externalVariableTestModuleFactory() Module {
+	module := &externalVariableTestModule{}
+	module.AddProperties(&module.properties)
+	InitAndroidModule(module)
+	return module
+}
+
+func (m *externalVariableTestModule) GenerateAndroidBuildActions(ctx ModuleContext) {
+	rule := NewRuleBuilder(pctx_ruleBuilderTest, ctx)
+	switch m.properties.Run_in {
+	case "sbox":
+		rule.Sbox(PathForModuleOut(ctx, "gen"), PathForModuleOut(ctx, "sbox.textproto"))
+	case "nsjail":
+		rule.Nsjail(PathForModuleOut(ctx, "gen"), PathForModuleOut(ctx, "nsjail"))
+	}
+	cmd := rule.Command().
+		Text("echo $HOME").
+		FlagWithExternalVariable("--value=", testExternalVariable, "/file")
+	cmd.FlagWithOutput("> ", PathForModuleOut(ctx, "gen", "out"))
+	rule.Build("external", "external")
+}
+
+var prepareForExternalVariableTest = FixtureRegisterWithContext(func(ctx RegistrationContext) {
+	ctx.RegisterModuleType("external_variable_test", externalVariableTestModuleFactory)
+})
+
+func TestRuleBuilderExternalVariable(t *testing.T) {
+	result := GroupFixturePreparers(
+		prepareForExternalVariableTest,
+		FixtureWithRootAndroidBp(`external_variable_test { name: "foo" }`),
+	).RunTest(t)
+
+	command := result.ModuleForTests(t, "foo", "").Rule("external").RuleParams.Command
+	AssertStringDoesContain(t, "command", command, "echo $$HOME --value=${rule_builder_test_value}/file > ")
+}
+
+func TestRuleBuilderExternalVariableOutsideNinja(t *testing.T) {
+	for _, runIn := range []string{"sbox", "nsjail"} {
+		t.Run(runIn, func(t *testing.T) {
+			GroupFixturePreparers(
+				prepareForExternalVariableTest,
+				FixtureWithRootAndroidBp(fmt.Sprintf(`external_variable_test { name: "foo", run_in: %q }`, runIn)),
+			).ExtendWithErrorHandler(FixtureExpectsOneErrorPattern(
+				`rule "external" references an external Ninja variable, so it cannot run in `)).
+				RunTest(t)
+		})
+	}
+}

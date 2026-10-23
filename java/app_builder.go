@@ -87,8 +87,11 @@ func SignAppPackage(ctx android.ModuleContext, signedApk android.WritablePath, u
 	var certificateArgs []string
 	var deps android.Paths
 	for _, c := range certificates {
-		certificateArgs = append(certificateArgs, c.Pem.String(), c.Key.String())
-		deps = append(deps, c.Pem, c.Key)
+		pem := android.SigningKeyFile(ctx, c.Pem)
+		key := android.SigningKeyFile(ctx, c.Key)
+		certificateArgs = append(certificateArgs, pem.Ref(), key.Ref())
+		deps = append(deps, pem.Inputs()...)
+		deps = append(deps, key.Inputs()...)
 	}
 	outputFiles := android.WritablePaths{signedApk}
 	var flags []string

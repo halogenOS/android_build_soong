@@ -124,11 +124,8 @@ func (m *otacertsZipModule) DepsMutator(ctx android.BottomUpMutatorContext) {
 }
 
 func (m *otacertsZipModule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
-	// Read .x509.pem file defined in PRODUCT_DEFAULT_DEV_CERTIFICATE or the default test key.
-	pem, _ := ctx.Config().DefaultAppCertificate(ctx)
 	// Read .x509.pem files listed  in PRODUCT_EXTRA_OTA_KEYS or PRODUCT_EXTRA_RECOVERY_KEYS.
 	extras := ctx.Config().ExtraOtaKeys(ctx, m.InRecovery())
-	srcPaths := append([]android.SourcePath{pem}, extras...)
 	outputPath := android.PathForModuleOut(ctx, m.outputFileName())
 
 	rule := android.NewRuleBuilder(pctx, ctx)
@@ -136,7 +133,10 @@ func (m *otacertsZipModule) GenerateAndroidBuildActions(ctx android.ModuleContex
 		FlagWithOutput("-o ", outputPath).
 		Flag("-j ").
 		Flag("-symlinks=false ")
-	for _, src := range srcPaths {
+	// Read the .x509.pem file defined in PRODUCT_DEFAULT_DEV_CERTIFICATE or the default test key,
+	// from keys_dir.
+	android.FlagWithKeysDirKey(cmd, "-f ", android.ReleaseCertificate(ctx))
+	for _, src := range extras {
 		cmd.FlagWithInput("-f ", src)
 	}
 	rule.Build(ctx.ModuleName(), "Generating the otacerts zip file")

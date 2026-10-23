@@ -127,7 +127,7 @@ type filesystem struct {
 }
 
 type filesystemBuilder interface {
-	BuildLinkerConfigFile(ctx android.ModuleContext, builder *android.RuleBuilder, rebasedDir android.OutputPath, fullInstallPaths *[]FullInstallPathInfo, platformGeneratedFiles *[]string)
+	BuildLinkerConfigFile(ctx android.ModuleContext, builder *android.RuleBuilder, rebasedDir android.OutputPath, fullInstallPaths *[]FullInstallPathInfo, platformGeneratedFiles *android.Paths)
 	// Function that filters PackagingSpec in PackagingBase.GatherPackagingSpecs()
 	FilterPackagingSpec(spec android.PackagingSpec) bool
 	// Function that modifies PackagingSpec in PackagingBase.GatherPackagingSpecs() to customize.
@@ -796,7 +796,7 @@ func (f *filesystem) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		})
 	}
 
-	platformGeneratedFiles := []string{}
+	platformGeneratedFiles := android.Paths{}
 	f.entries = f.copyPackagingSpecs(ctx, builder, specs, rootDir, rebasedDir)
 	f.verifyGenericConfig(ctx)
 	f.buildNonDepsFiles(ctx, builder, rootDir, rebasedDir, &fullInstallPaths, &platformGeneratedFiles)
@@ -967,18 +967,19 @@ func (f *filesystem) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 	// Dump metadata that can not be done in android/compliance-metadata.go
 	complianceMetadataInfo := ctx.ComplianceMetadataInfo()
-	filesContained := make([]string, 0, len(fullInstallPaths))
+	filesContained := make([]android.ComplianceFile, 0, len(fullInstallPaths))
 	for _, file := range fullInstallPaths {
-		filesContained = append(filesContained, file.FullInstallPath.String())
+		filesContained = append(filesContained, android.ComplianceFileOfPath(file.FullInstallPath))
 	}
 	complianceMetadataInfo.SetFilesContained(filesContained)
 	complianceMetadataInfo.SetPlatformGeneratedFiles(platformGeneratedFiles)
 
-	kernelModuleSrcDestPairs := []string{}
+	kernelModuleSrcDestPairs := []android.ComplianceKernelModuleCopy{}
 	ctx.VisitDirectDepsProxy(func(dep android.ModuleProxy) {
 		if pkmi, ok := android.OtherModuleProvider(ctx, dep, android.PrebuiltKernelModulesComplianceMetadataProvider); ok {
 			for i, _ := range pkmi.Srcs {
-				kernelModuleSrcDestPairs = append(kernelModuleSrcDestPairs, pkmi.Srcs[i]+"::"+pkmi.Dests[i])
+				kernelModuleSrcDestPairs = append(kernelModuleSrcDestPairs,
+					android.ComplianceKernelModuleCopy{Src: pkmi.Srcs[i], Dest: pkmi.Dests[i]})
 			}
 		}
 	})
@@ -1117,7 +1118,7 @@ func (f *filesystem) buildNonDepsFiles(
 	rootDir android.OutputPath,
 	rebasedDir android.OutputPath,
 	fullInstallPaths *[]FullInstallPathInfo,
-	platformGeneratedFiles *[]string,
+	platformGeneratedFiles *android.Paths,
 ) {
 	rebasedPrefix, err := filepath.Rel(rootDir.String(), rebasedDir.String())
 	if err != nil || strings.HasPrefix(rebasedPrefix, "../") {
@@ -1171,7 +1172,7 @@ func (f *filesystem) buildNonDepsFiles(
 			if !strings.HasPrefix(name, rebasedPrefix) {
 				installPath = android.PathForModuleInPartitionInstall(ctx, "root", name)
 			}
-			*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+			*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 			*fullInstallPaths = append(*fullInstallPaths, FullInstallPathInfo{
 				FullInstallPath: installPath,
 				SymlinkTarget:   target,
@@ -1183,7 +1184,7 @@ func (f *filesystem) buildNonDepsFiles(
 					FullInstallPath: installPath,
 					SymlinkTarget:   target,
 				})
-				*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+				*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 			}
 		}
 	}
@@ -1804,7 +1805,7 @@ func (f *filesystem) buildEventLogtagsFile(
 	builder *android.RuleBuilder,
 	rebasedDir android.OutputPath,
 	fullInstallPaths *[]FullInstallPathInfo,
-	platformGeneratedFiles *[]string,
+	platformGeneratedFiles *android.Paths,
 ) {
 	if !proptools.Bool(f.properties.Build_logtags) {
 		return
@@ -1822,7 +1823,7 @@ func (f *filesystem) buildEventLogtagsFile(
 	})
 
 	f.appendToEntry(ctx, eventLogtagsPath)
-	*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+	*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 }
 
 func (f *filesystem) BuildLinkerConfigFile(
@@ -1830,7 +1831,7 @@ func (f *filesystem) BuildLinkerConfigFile(
 	builder *android.RuleBuilder,
 	rebasedDir android.OutputPath,
 	fullInstallPaths *[]FullInstallPathInfo,
-	platformGeneratedFiles *[]string,
+	platformGeneratedFiles *android.Paths,
 ) {
 	if !proptools.Bool(f.properties.Linker_config.Gen_linker_config) {
 		return
@@ -1847,7 +1848,7 @@ func (f *filesystem) BuildLinkerConfigFile(
 		FullInstallPath: installPath,
 		SourcePath:      intermediateOutput,
 	})
-	*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+	*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 
 	f.appendToEntry(ctx, output)
 }
@@ -1860,7 +1861,7 @@ func (f *filesystem) assembleVintfs(
 	builder *android.RuleBuilder,
 	rebasedDir android.OutputPath,
 	fullInstallPaths *[]FullInstallPathInfo,
-	platformGeneratedFiles *[]string,
+	platformGeneratedFiles *android.Paths,
 ) {
 
 	if len(f.UniqueVintfFragmentsPaths) == 0 {
@@ -1890,7 +1891,7 @@ func (f *filesystem) assembleVintfs(
 			FullInstallPath: installPath,
 			SourcePath:      soongAssembledVintf,
 		})
-		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 	}
 }
 

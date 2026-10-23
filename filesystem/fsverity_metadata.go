@@ -115,7 +115,7 @@ func (f *filesystem) buildFsverityMetadataFiles(
 	rootDir android.OutputPath,
 	rebasedDir android.OutputPath,
 	fullInstallPaths *[]FullInstallPathInfo,
-	platformGeneratedFiles *[]string,
+	platformGeneratedFiles *android.Paths,
 ) {
 	match := func(path string) bool {
 		for _, pattern := range f.properties.Fsverity.Inputs.GetOrDefault(ctx, nil) {
@@ -298,5 +298,5 @@ func (f *filesystem) buildFsverityMetadataFiles(
 	})
 
 	f.appendToEntry(ctx, installedIdsigPath)
-	*platformGeneratedFiles = append(*platformGeneratedFiles, apkFullInstallPath.String(), idsigFullInstallPath.String())
+	*platformGeneratedFiles = append(*platformGeneratedFiles, apkFullInstallPath, idsigFullInstallPath)
 }

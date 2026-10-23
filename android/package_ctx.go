@@ -321,9 +321,15 @@ func (p PackageContext) HostTool(name string) blueprint.HostTool {
 	return p.HostToolFunc(func(ctx PathContext) blueprint.HostToolParams {
 		return blueprint.HostToolParams{
 			Value: ctx.Config().HostToolPath(ctx, name).String(),
-			Deps:  []string{PathForPhony(ctx, "hostTool-"+name+"-deps").String()},
+			Deps:  []string{HostToolDeps(ctx, name).String()},
 		}
 	})
+}
+
+// HostToolDeps returns the phony target for the installed files needed to run the host tool called
+// name, which a build step running the tool lists as an input.
+func HostToolDeps(ctx PathContext, name string) WritablePath {
+	return PathForPhony(ctx, "hostTool-"+name+"-deps")
 }
 
 func (p PackageContext) PathInterposerTool(name string) blueprint.HostTool {

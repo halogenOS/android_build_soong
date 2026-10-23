@@ -2326,6 +2326,8 @@ func TestCertificates(t *testing.T) {
 		certificateOverride      string
 		expectedCertSigningFlags string
 		expectedCertificate      string
+		// expectedCertificate as named on the signapk command line
+		signapkCertificate string
 	}{
 		{
 			name: "default",
@@ -2339,6 +2341,7 @@ func TestCertificates(t *testing.T) {
 			certificateOverride:      "",
 			expectedCertSigningFlags: "--disable-v1",
 			expectedCertificate:      "build/make/target/product/security/testkey",
+			signapkCertificate:       "${keys_dir}/releasekey",
 		},
 		{
 			name: "module certificate property",
@@ -2358,6 +2361,7 @@ func TestCertificates(t *testing.T) {
 			certificateOverride:      "",
 			expectedCertSigningFlags: "--disable-v1",
 			expectedCertificate:      "cert/new_cert",
+			signapkCertificate:       "cert/new_cert",
 		},
 		{
 			name: "path certificate property",
@@ -2372,6 +2376,7 @@ func TestCertificates(t *testing.T) {
 			certificateOverride:      "",
 			expectedCertSigningFlags: "--disable-v1",
 			expectedCertificate:      "build/make/target/product/security/expiredkey",
+			signapkCertificate:       "${keys_dir}/expiredkey",
 		},
 		{
 			name: "certificate overrides",
@@ -2391,6 +2396,7 @@ func TestCertificates(t *testing.T) {
 			certificateOverride:      "foo:new_certificate",
 			expectedCertSigningFlags: "--disable-v1",
 			expectedCertificate:      "cert/new_cert",
+			signapkCertificate:       "cert/new_cert",
 		},
 		{
 			name: "certificate signing flags",
@@ -2412,6 +2418,7 @@ func TestCertificates(t *testing.T) {
 			certificateOverride:      "",
 			expectedCertSigningFlags: "--lineage lineage.bin --rotation-min-sdk-version 32 --disable-v1",
 			expectedCertificate:      "cert/new_cert",
+			signapkCertificate:       "cert/new_cert",
 		},
 		{
 			name: "cert signing flags from filegroup",
@@ -2438,6 +2445,7 @@ func TestCertificates(t *testing.T) {
 			certificateOverride:      "",
 			expectedCertSigningFlags: "--lineage lineage.bin --rotation-min-sdk-version 32 --disable-v1",
 			expectedCertificate:      "cert/new_cert",
+			signapkCertificate:       "cert/new_cert",
 		},
 		{
 			name: "missing with AllowMissingDependencies",
@@ -2465,6 +2473,7 @@ func TestCertificates(t *testing.T) {
 			certificateOverride:      "",
 			expectedCertSigningFlags: "",
 			expectedCertificate:      "build/make/target/product/security/testkey",
+			signapkCertificate:       "${keys_dir}/releasekey",
 		},
 	}
 
@@ -2497,7 +2506,7 @@ func TestCertificates(t *testing.T) {
 			signapk := foo.Output("foo.apk")
 			if !android.IsErrorRule(signapk.Rule) {
 				signCertificateFlags := signapk.Args["certificates"]
-				expectedFlags := certificate.Pem.String() + " " + certificate.Key.String()
+				expectedFlags := test.signapkCertificate + ".x509.pem " + test.signapkCertificate + ".pk8"
 				android.AssertStringEquals(t, "certificates flags", expectedFlags, signCertificateFlags)
 
 				certSigningFlags := signapk.Args["flags"]
@@ -2766,7 +2775,7 @@ func TestOverrideAndroidApp(t *testing.T) {
 			moduleName:       "foo",
 			variantName:      "android_common",
 			apkPath:          "out/target/product/test_device/system/app/foo/foo.apk",
-			certFlag:         "build/make/target/product/security/expiredkey.x509.pem build/make/target/product/security/expiredkey.pk8",
+			certFlag:         "${keys_dir}/expiredkey.x509.pem ${keys_dir}/expiredkey.pk8",
 			certSigningFlags: "--disable-v1",
 			overrides:        []string{"qux"},
 			packageFlag:      "",
@@ -2790,7 +2799,7 @@ func TestOverrideAndroidApp(t *testing.T) {
 			moduleName:       "baz",
 			variantName:      "android_common_baz",
 			apkPath:          "out/target/product/test_device/system/app/baz/baz.apk",
-			certFlag:         "build/make/target/product/security/expiredkey.x509.pem build/make/target/product/security/expiredkey.pk8",
+			certFlag:         "${keys_dir}/expiredkey.x509.pem ${keys_dir}/expiredkey.pk8",
 			certSigningFlags: "--disable-v1",
 			overrides:        []string{"qux", "foo"},
 			packageFlag:      "org.dandroid.bp",
@@ -2802,7 +2811,7 @@ func TestOverrideAndroidApp(t *testing.T) {
 			moduleName:       "baz_no_rename_resources",
 			variantName:      "android_common_baz_no_rename_resources",
 			apkPath:          "out/target/product/test_device/system/app/baz_no_rename_resources/baz_no_rename_resources.apk",
-			certFlag:         "build/make/target/product/security/expiredkey.x509.pem build/make/target/product/security/expiredkey.pk8",
+			certFlag:         "${keys_dir}/expiredkey.x509.pem ${keys_dir}/expiredkey.pk8",
 			certSigningFlags: "--disable-v1",
 			overrides:        []string{"qux", "foo"},
 			packageFlag:      "org.dandroid.bp",
@@ -2814,7 +2823,7 @@ func TestOverrideAndroidApp(t *testing.T) {
 			moduleName:       "baz_base_no_rename_resources",
 			variantName:      "android_common_baz_base_no_rename_resources",
 			apkPath:          "out/target/product/test_device/system/app/baz_base_no_rename_resources/baz_base_no_rename_resources.apk",
-			certFlag:         "build/make/target/product/security/expiredkey.x509.pem build/make/target/product/security/expiredkey.pk8",
+			certFlag:         "${keys_dir}/expiredkey.x509.pem ${keys_dir}/expiredkey.pk8",
 			certSigningFlags: "--disable-v1",
 			overrides:        []string{"qux", "foo_no_rename_resources"},
 			packageFlag:      "org.dandroid.bp",
@@ -2826,7 +2835,7 @@ func TestOverrideAndroidApp(t *testing.T) {
 			moduleName:       "baz_override_base_rename_resources",
 			variantName:      "android_common_baz_override_base_rename_resources",
 			apkPath:          "out/target/product/test_device/system/app/baz_override_base_rename_resources/baz_override_base_rename_resources.apk",
-			certFlag:         "build/make/target/product/security/expiredkey.x509.pem build/make/target/product/security/expiredkey.pk8",
+			certFlag:         "${keys_dir}/expiredkey.x509.pem ${keys_dir}/expiredkey.pk8",
 			certSigningFlags: "--disable-v1",
 			overrides:        []string{"qux", "foo_no_rename_resources"},
 			packageFlag:      "org.dandroid.bp",

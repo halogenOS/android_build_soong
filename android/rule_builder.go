@@ -17,6 +17,7 @@ package android
 import (
 	"crypto/sha256"
 	"fmt"
+	"maps"
 	"path/filepath"
 	"runtime"
 	"sort"
@@ -41,6 +42,12 @@ const sboxSandboxBaseDir = "__SBOX_SANDBOX_DIR__"
 const sboxOutSubDir = "out"
 const sboxToolsSubDir = "tools"
 const sboxOutDir = sboxSandboxBaseDir + "/" + sboxOutSubDir
+
+// pathFilesVariable is the Ninja variable of a build statement that lists, separated by spaces,
+// input files that contain build paths, such as the sbox manifest. An executor that moves the
+// outputs of a build statement to another directory rewrites the paths in those files as it does
+// in the command.
+const pathFilesVariable = "path_files"
 
 const nsjailToolsSubDir = "tools"
 const nsjailOutDir = "out"
@@ -587,7 +594,9 @@ func (r *RuleBuilder) Build(name string, desc string) {
 		panic("No outputs specified from any Commands")
 	}
 
-	commandString := strings.Join(commands, " && ")
+	commandString, externalVariableRefs := r.commandLine()
+	// pathFiles are the inputs that contain build paths, for pathFilesVariable.
+	var pathFiles Paths
 
 	if !r.sbox {
 		// If not using sbox the rule will run the command directly, put the hash of the
@@ -597,6 +606,9 @@ func (r *RuleBuilder) Build(name string, desc string) {
 	}
 
 	if r.nsjail {
+		if !r.checkNoExternalVariables(name, externalVariableRefs, "nsjail") {
+			return
+		}
 		var nsjailCmd strings.Builder
 		nsjailPath := r.ctx.Config().PrebuiltBuildTool(r.ctx, "nsjail")
 		if !r.nsjailKeepGendir {
@@ -671,6 +683,9 @@ func (r *RuleBuilder) Build(name string, desc string) {
 		inputs = append(inputs, nsjailPath)
 		inputs = append(inputs, r.nsjailImplicits...)
 	} else if r.sbox {
+		if !r.checkNoExternalVariables(name, externalVariableRefs, "sbox") {
+			return
+		}
 		// If running the command inside sbox, write the rule data out to an sbox
 		// manifest.textproto.
 		manifest := sbox_proto.Manifest{}
@@ -839,6 +854,7 @@ func (r *RuleBuilder) Build(name string, desc string) {
 			FlagWithArg("--sandbox-path ", shared.TempDirForOutDir(PathForOutput(r.ctx).String())).
 			FlagWithArg("--output-dir ", r.outDir.String()).
 			FlagWithInput("--manifest ", r.sboxManifestPath)
+		pathFiles = append(pathFiles, r.sboxManifestPath)
 
 		if r.restat {
 			sboxCmd.Flag("--write-if-changed")
@@ -875,6 +891,7 @@ func (r *RuleBuilder) Build(name string, desc string) {
 				remoteRspFiles = append(remoteRspFiles, inputsListFile)
 				// Add the new rsp file as an extra input to the rule.
 				inputs = append(inputs, inputsListFile)
+				pathFiles = append(pathFiles, inputsListFile)
 			}
 
 			r.rbeParams.OutputFiles = outputs.Strings()
@@ -892,7 +909,19 @@ func (r *RuleBuilder) Build(name string, desc string) {
 
 	var rspFile, rspFileContent string
 	var rspFileInputs Paths
-	if len(rspFiles) > 0 {
+	extraRspFiles := rspFiles
+	if len(commandString) > 100000 {
+		// The command length is getting close to linux's maximum, so Ninja writes the commands into
+		// the rsp file of the rule right before it runs, and the rule runs that file. Ninja replaces
+		// references to its variables there as in the command line. A Ninja variable has no line
+		// breaks, so the shell options go on the command line.
+		hasher := sha256.New()
+		hasher.Write([]byte(output.String()))
+		rspFile = PathForOutput(r.ctx, "rule_builder_scripts", fmt.Sprintf("%x.sh", hasher.Sum(nil))).String()
+		rspFileContent = ninjaEscapeExcept(commandString, externalVariableRefs)
+		commandString = "/bin/sh -eu " + rspFile
+		externalVariableRefs = nil
+	} else if len(rspFiles) > 0 {
 		// The first rsp files uses Ninja's rsp file support for the rule
 		rspFile = rspFiles[0].file.String()
 		// Use "$in" for rspFileContent to avoid duplicating the list of files in the dependency
@@ -900,14 +929,18 @@ func (r *RuleBuilder) Build(name string, desc string) {
 		// rsp file will be listed in Implicits instead of Inputs so they don't show up in "$in".
 		rspFileContent = "$in"
 		rspFileInputs = append(rspFileInputs, rspFiles[0].paths...)
-
-		for _, rspFile := range rspFiles[1:] {
-			// Any additional rsp files need an extra rule to write the file.
-			writeRspFileRule(r.ctx, rspFile.file, rspFile.paths)
-			// The main rule needs to depend on the inputs listed in the extra rsp file.
-			inputs = append(inputs, rspFile.paths...)
-			// The main rule needs to depend on the extra rsp file.
-			inputs = append(inputs, rspFile.file)
+		extraRspFiles = rspFiles[1:]
+	}
+	for _, rspFile := range extraRspFiles {
+		// Any additional rsp files need an extra rule to write the file.
+		writeRspFileRule(r.ctx, rspFile.file, rspFile.paths)
+		// The main rule needs to depend on the inputs listed in the extra rsp file.
+		inputs = append(inputs, rspFile.paths...)
+		// The main rule needs to depend on the extra rsp file.
+		inputs = append(inputs, rspFile.file)
+		if r.sbox {
+			// sbox copies the files listed in the rsp files of its manifest by their paths there.
+			pathFiles = append(pathFiles, rspFile.file)
 		}
 	}
 
@@ -922,23 +955,17 @@ func (r *RuleBuilder) Build(name string, desc string) {
 		pool = localPool
 	}
 
-	// If the command length is getting close to linux's maximum, dump it to a file, which allows
-	// for longer commands.
-	if len(commandString) > 100000 {
-		hasher := sha256.New()
-		hasher.Write([]byte(output.String()))
-		script := PathForOutput(r.ctx, "rule_builder_scripts", fmt.Sprintf("%x.sh", hasher.Sum(nil)))
-		commandString = "#!/usr/bin/env sh\nset -eu\n\n" + commandString + "\n"
-		WriteExecutableFileRuleVerbatim(r.ctx, script, commandString)
-		inputs = append(inputs, script)
-		commandString = script.String()
+	commandString = ninjaEscapeExcept(commandString, externalVariableRefs)
+
+	args := r.args
+	if len(pathFiles) > 0 {
+		args = make(map[string]string, len(r.args)+1)
+		maps.Copy(args, r.args)
+		args[pathFilesVariable] = strings.Join(proptools.NinjaEscapeList(pathFiles.Strings()), " ")
 	}
-
-	commandString = proptools.NinjaEscape(commandString)
-
-	args_vars := make([]string, len(r.args))
+	args_vars := make([]string, len(args))
 	i := 0
-	for k, _ := range r.args {
+	for k, _ := range args {
 		args_vars[i] = k
 		i++
 	}
@@ -976,8 +1003,57 @@ func (r *RuleBuilder) Build(name string, desc string) {
 		Depfile:         depFile,
 		Deps:            depFormat,
 		Description:     desc,
-		Args:            r.args,
+		Args:            args,
 	})
+}
+
+// commandLine returns the commands joined with " && ", and the spans of the result that are
+// references to external Ninja variables.
+func (r *RuleBuilder) commandLine() (string, []textSpan) {
+	var line strings.Builder
+	var refs []textSpan
+	for i, c := range r.commands {
+		if i > 0 {
+			line.WriteString(" && ")
+		}
+		for _, ref := range c.externalVariableRefs {
+			refs = append(refs, textSpan{start: line.Len() + ref.start, end: line.Len() + ref.end})
+		}
+		line.WriteString(c.String())
+	}
+	return line.String(), refs
+}
+
+// checkNoExternalVariables reports an error for the rule called name and returns false when refs
+// contains a reference to an external Ninja variable, since the rule would run in place. Ninja
+// replaces such a reference only in the command line and the rsp file of the rule. sbox runs a
+// copy of the commands written before the build, and nsjail makes only the inputs of the rule
+// available.
+func (r *RuleBuilder) checkNoExternalVariables(name string, refs []textSpan, place string) bool {
+	if len(refs) == 0 {
+		return true
+	}
+	ReportPathErrorf(r.ctx, "rule %q references an external Ninja variable, so it cannot run in %s", name, place)
+	return false
+}
+
+// A textSpan is the part of a text from the byte at start up to the byte before end.
+type textSpan struct {
+	start, end int
+}
+
+// ninjaEscapeExcept escapes text for Ninja, except for the spans, which are references to Ninja
+// variables.
+func ninjaEscapeExcept(text string, spans []textSpan) string {
+	var escaped strings.Builder
+	last := 0
+	for _, span := range spans {
+		escaped.WriteString(proptools.NinjaEscape(text[last:span.start]))
+		escaped.WriteString(text[span.start:span.end])
+		last = span.end
+	}
+	escaped.WriteString(proptools.NinjaEscape(text[last:]))
+	return escaped.String()
 }
 
 // RuleBuilderCommand is a builder for a command in a command line.  It can be mutated by its methods to add to the
@@ -998,6 +1074,10 @@ type RuleBuilderCommand struct {
 	packagedTools       []PackagingSpec
 	rspFiles            []rspFileAndPaths
 	implicitDirectories DirectoryPaths
+
+	// The spans of buf that are references to external Ninja variables. RuleBuilder.Build writes them
+	// into the Ninja file as they are and escapes the rest of the command line.
+	externalVariableRefs []textSpan
 }
 
 type rspFileAndPaths struct {
@@ -1285,6 +1365,18 @@ func (c *RuleBuilderCommand) Flags(flags []string) *RuleBuilderCommand {
 // outputs.
 func (c *RuleBuilderCommand) FlagWithArg(flag, arg string) *RuleBuilderCommand {
 	return c.Text(flag + arg)
+}
+
+// FlagWithExternalVariable adds the specified flag, the reference to v and suffix to the command line, joined
+// directly.  Ninja puts the value of v in the place of the reference when it runs the command, so the rule cannot
+// use Sbox() or Nsjail().
+func (c *RuleBuilderCommand) FlagWithExternalVariable(flag string, v *blueprint.ExternalVariable, suffix string) *RuleBuilderCommand {
+	c.Text(flag)
+	start := c.buf.Len()
+	c.buf.WriteString(v.Ref())
+	c.externalVariableRefs = append(c.externalVariableRefs, textSpan{start: start, end: c.buf.Len()})
+	c.buf.WriteString(suffix)
+	return c
 }
 
 // FlagForEachArg adds the specified flag joined with each argument to the command line.  The result is identical to

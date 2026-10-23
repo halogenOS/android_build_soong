@@ -35,10 +35,31 @@ export ORIGINAL_PWD=${PWD}
 export TOP=$(gettop)
 source ${TOP}/build/soong/scripts/microfactory.bash
 
-soong_build_go soong_ui android/soong/cmd/soong_ui
-soong_build_go mk2rbc android/soong/mk2rbc/mk2rbc
-soong_build_go rbcrun rbcrun/rbcrun
-soong_build_go release-config android/soong/cmd/release_config/release_config
+# --build-date starts the signing run, which writes nothing into the output
+# directory of the regular build, so it runs the soong_ui of the regular build.
+# Any other spelling of the option fails here, before a soong_ui is built.
+signing_run=
+for arg in "$@"; do
+  case "${arg}" in
+    --build-date=*)
+      signing_run=true
+      ;;
+    *--build-date*)
+      echo "The signing run needs --build-date=YYYYMMDD-hhmmss as one argument, got \"${arg}\"." >&2
+      exit 1
+      ;;
+  esac
+done
+if [[ -z "${signing_run}" ]]; then
+  soong_build_go soong_ui android/soong/cmd/soong_ui
+  soong_build_go mk2rbc android/soong/mk2rbc/mk2rbc
+  soong_build_go rbcrun rbcrun/rbcrun
+  soong_build_go release-config android/soong/cmd/release_config/release_config
+elif [[ ! -x "$(getoutdir)/soong_ui" ]]; then
+  echo "The signing run runs the soong_ui of the regular build, and $(getoutdir) has none." \
+    "Run the regular build first." >&2
+  exit 1
+fi
 
 cd ${TOP}
 exec "$(getoutdir)/soong_ui" "$@"

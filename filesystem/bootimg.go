@@ -296,12 +296,12 @@ func (b *bootimg) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 	// Dump compliance metadata
 	complianceMetadataInfo := ctx.ComplianceMetadataInfo()
-	prebuiltFilesCopied := make([]string, 0)
+	prebuiltFilesCopied := make([]android.CompliancePrebuiltCopy, 0)
 	if kernelPath != nil {
-		prebuiltFilesCopied = append(prebuiltFilesCopied, kernelPath.String()+":kernel")
+		prebuiltFilesCopied = append(prebuiltFilesCopied, android.CompliancePrebuiltCopy{Src: kernelPath, Dest: "kernel"})
 	}
 	if dtbPath != nil {
-		prebuiltFilesCopied = append(prebuiltFilesCopied, dtbPath.String()+":dtb.img")
+		prebuiltFilesCopied = append(prebuiltFilesCopied, android.CompliancePrebuiltCopy{Src: dtbPath, Dest: "dtb.img"})
 	}
 	complianceMetadataInfo.SetPrebuiltFilesCopied(prebuiltFilesCopied)
 

@@ -263,6 +263,10 @@ type ModuleContext interface {
 
 	setAconfigPaths(paths Paths)
 
+	// buildActionsState returns the state stored for the module under key, and stores the state
+	// made by newState when there is none, see moduleState.
+	buildActionsState(key any, newState func() buildActionsState) buildActionsState
+
 	// DistForGoals creates a rule to copy one or more Paths to the artifacts
 	// directory on the build server when any of the specified goals are built.
 	DistForGoal(goal string, paths ...Path)
@@ -386,6 +390,10 @@ type moduleContext struct {
 	ninjaPhonies map[string]NinjaPhoniesGlobsInfo
 
 	runtimeHostToolDeps Paths
+
+	// The states stored by moduleState while GenerateAndroidBuildActions runs, in the order of
+	// their first use.
+	buildActionsStates []keyedBuildActionsState
 }
 
 var _ ModuleContext = &moduleContext{}

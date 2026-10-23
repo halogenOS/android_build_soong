@@ -1345,9 +1345,9 @@ func (j *Library) javaLibraryModuleInfoJSON(ctx android.ModuleContext) *android.
 func buildComplianceMetadata(ctx android.ModuleContext) {
 	// Dump metadata that can not be done in android/compliance-metadata.go
 	complianceMetadataInfo := ctx.ComplianceMetadataInfo()
-	builtFiles := ctx.GetOutputFiles().DefaultOutputFiles.Strings()
+	builtFiles := slices.Clone(ctx.GetOutputFiles().DefaultOutputFiles)
 	for _, paths := range ctx.GetOutputFiles().TaggedOutputFiles {
-		builtFiles = append(builtFiles, paths.Strings()...)
+		builtFiles = append(builtFiles, paths...)
 	}
 	complianceMetadataInfo.AddBuiltFiles(builtFiles...)
 
@@ -1363,7 +1363,7 @@ func buildComplianceMetadata(ctx android.ModuleContext) {
 		}
 	})
 	complianceMetadataInfo.SetListValue(android.ComplianceMetadataProp.STATIC_DEPS, android.SortedUniqueStrings(staticDepNames))
-	complianceMetadataInfo.SetListValue(android.ComplianceMetadataProp.STATIC_DEP_FILES, android.SortedUniqueStrings(staticDepFiles.Strings()))
+	complianceMetadataInfo.SetPaths(android.ComplianceMetadataProp.STATIC_DEP_FILES, android.SortedUniquePaths(staticDepFiles))
 }
 
 func (j *Library) getJarInstallDir(ctx android.ModuleContext) android.InstallPath {
@@ -2906,7 +2906,9 @@ func (al *ApiLibrary) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	generateMetalavaFlagConfigArgs(ctx, cmd, al.stubsType, al.aconfigProtoFiles)
 
 	al.stubsSrcJar = android.PathForModuleOut(ctx, "metalava", ctx.ModuleName()+"-"+"stubs.srcjar")
-	al.stubsJarWithoutStaticLibs = android.PathForModuleOut(ctx, "metalava", "stubs.jar")
+	// The metalava rule deletes every file in its sbox output directory that
+	// it does not write, so the stubs jar is written to a different one.
+	al.stubsJarWithoutStaticLibs = android.PathForModuleOut(ctx, "javac", "stubs.jar")
 	al.stubsJar = android.PathForModuleOut(ctx, ctx.ModuleName(), fmt.Sprintf("%s.jar", ctx.ModuleName()))
 
 	rule.Command().

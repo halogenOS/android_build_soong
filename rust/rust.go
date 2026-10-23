@@ -1401,7 +1401,7 @@ func buildComplianceMetadataInfo(ctx *moduleContext, mod *Module, deps PathDeps)
 	// Dump metadata that can not be done in android/compliance-metadata.go
 	metadataInfo := ctx.ComplianceMetadataInfo()
 	metadataInfo.SetStringValue(android.ComplianceMetadataProp.IS_STATIC_LIB, strconv.FormatBool(mod.Static()))
-	metadataInfo.AddBuiltFiles(mod.outputFile.String())
+	metadataInfo.AddBuiltFiles(mod.outputFile.AsPaths()...)
 
 	// Static libs
 	staticDeps := ctx.GetDirectDepsProxyWithTag(rlibDepTag)
@@ -1414,16 +1414,13 @@ func buildComplianceMetadataInfo(ctx *moduleContext, mod *Module, deps PathDeps)
 		staticDepNames = append(staticDepNames, dep.Name())
 	}
 
-	staticDepPaths := make([]string, 0, len(deps.StaticLibs)+len(deps.RLibs))
 	// C static libraries
-	for _, dep := range deps.StaticLibs {
-		staticDepPaths = append(staticDepPaths, dep.String())
-	}
+	staticDepPaths := slices.Clone(deps.StaticLibs)
 	// Rust static libraries
 	for _, dep := range deps.RLibs {
-		staticDepPaths = append(staticDepPaths, dep.Path.String())
+		staticDepPaths = append(staticDepPaths, dep.Path)
 	}
-	metadataInfo.SetListValue(android.ComplianceMetadataProp.STATIC_DEP_FILES, android.FirstUniqueStrings(staticDepPaths))
+	metadataInfo.SetPaths(android.ComplianceMetadataProp.STATIC_DEP_FILES, staticDepPaths)
 
 	// C Whole static libs
 	ccWholeStaticDeps := ctx.GetDirectDepsProxyWithTag(cc.StaticDepTag(true))

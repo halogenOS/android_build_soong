@@ -279,6 +279,37 @@ func ensureListNotContains(t *testing.T, result []string, notExpected string) {
 	}
 }
 
+// ensureKeysDirLink checks that the regular build links name in keys_dir to target.
+func ensureKeysDirLink(t *testing.T, ctx *android.TestContext, name, target string) {
+	t.Helper()
+	link := ctx.SingletonForTests(t, "keys_dir").Output("out/soong/test-keys/" + name)
+	ensureEquals(t, link.Args["fromPath"], target)
+}
+
+// ensurePayloadKey checks that the APEX called apexName is signed with the keys_dir file named after
+// it, linked to key in the regular build, and that apexer gets the public key of that file.
+func ensurePayloadKey(t *testing.T, ctx *android.TestContext, module android.TestingModule, apexName, key string) {
+	t.Helper()
+	payloadKey := "${keys_dir}/" + apexName + ".certificate.override.pem"
+	apexRule := module.Rule("apexRule")
+	ensureEquals(t, apexRule.Args["key"], payloadKey)
+	publicKey := module.Output(apexName + ".avbpubkey")
+	ensureEquals(t, publicKey.Args["key"], payloadKey)
+	ensureContains(t, apexRule.Args["opt_flags"], "--pubkey "+publicKey.Output.String())
+	ensureKeysDirLink(t, ctx, apexName+".certificate.override.pem", key)
+}
+
+// ensureContainerCertificate checks that the container of the APEX called apexName is signed with
+// the keys_dir files named after it, linked in the regular build to the files of cert.
+func ensureContainerCertificate(t *testing.T, ctx *android.TestContext, apexName, cert string) {
+	t.Helper()
+	rule := ctx.ModuleForTests(t, apexName, "android_common_"+apexName).Rule("signapk")
+	ensureEquals(t, rule.Args["certificates"], "${keys_dir}/"+apexName+".certificate.override.x509.pem "+
+		"${keys_dir}/"+apexName+".certificate.override.pk8")
+	ensureKeysDirLink(t, ctx, apexName+".certificate.override.x509.pem", cert+".x509.pem")
+	ensureKeysDirLink(t, ctx, apexName+".certificate.override.pk8", cert+".pk8")
+}
+
 func ensureListEmpty(t *testing.T, result []string) {
 	t.Helper()
 	if len(result) > 0 {
@@ -506,7 +537,7 @@ func TestBasicApex(t *testing.T) {
 			sdk_version: "none",
 			system_modules: "none",
 		}
-	`)
+	`, android.PrepareForTestWithKeysDir)
 
 	apexRule := ctx.ModuleForTests(t, "myapex", "android_common_myapex").Rule("apexRule")
 
@@ -520,8 +551,9 @@ func TestBasicApex(t *testing.T) {
 	ensureContains(t, androidMk, "LOCAL_MODULE := mylib.myapex\n")
 	ensureNotContains(t, androidMk, "LOCAL_MODULE := mylib.com.android.myapex\n")
 
+	ensurePayloadKey(t, ctx, ctx.ModuleForTests(t, "myapex", "android_common_myapex"), "myapex",
+		"vendor/foo/devkeys/testkey.pem")
 	optFlags := apexRule.Args["opt_flags"]
-	ensureContains(t, optFlags, "--pubkey vendor/foo/devkeys/testkey.avbpubkey")
 	// Ensure that the NOTICE output is being packaged as an asset.
 	ensureContains(t, optFlags, "--assets_dir out/soong/.intermediates/myapex/android_common_myapex/NOTICE")
 
@@ -3576,7 +3608,7 @@ func TestKeys(t *testing.T) {
 			certificate: "testkey.override",
 		}
 
-	`)
+	`, android.PrepareForTestWithKeysDir)
 
 	// check the APEX keys
 	keys := ctx.ModuleForTests(t, "myapex.key", "android_common").Module().(*apexKey)
@@ -3591,11 +3623,7 @@ func TestKeys(t *testing.T) {
 	}
 
 	// check the APK certs. It should be overridden to myapex.certificate.override
-	certs := ctx.ModuleForTests(t, "myapex_keytest", "android_common_myapex_keytest").Rule("signapk").Args["certificates"]
-	if certs != "testkey.override.x509.pem testkey.override.pk8" {
-		t.Errorf("cert and private key %q are not %q", certs,
-			"testkey.override.509.pem testkey.override.pk8")
-	}
+	ensureContainerCertificate(t, ctx, "myapex_keytest", "testkey.override")
 }
 
 func TestCertificate(t *testing.T) {
@@ -3612,12 +3640,8 @@ func TestCertificate(t *testing.T) {
 				name: "myapex.key",
 				public_key: "testkey.avbpubkey",
 				private_key: "testkey.pem",
-			}`)
-		rule := ctx.ModuleForTests(t, "myapex", "android_common_myapex").Rule("signapk")
-		expected := "vendor/foo/devkeys/test.x509.pem vendor/foo/devkeys/test.pk8"
-		if actual := rule.Args["certificates"]; actual != expected {
-			t.Errorf("certificates should be %q, not %q", expected, actual)
-		}
+			}`, android.PrepareForTestWithKeysDir)
+		ensureContainerCertificate(t, ctx, "myapex", "vendor/foo/devkeys/test")
 	})
 	t.Run("override when unspecified", func(t *testing.T) {
 		t.Parallel()
@@ -3636,12 +3660,8 @@ func TestCertificate(t *testing.T) {
 			android_app_certificate {
 				name: "myapex.certificate.override",
 				certificate: "testkey.override",
-			}`)
-		rule := ctx.ModuleForTests(t, "myapex_keytest", "android_common_myapex_keytest").Rule("signapk")
-		expected := "testkey.override.x509.pem testkey.override.pk8"
-		if actual := rule.Args["certificates"]; actual != expected {
-			t.Errorf("certificates should be %q, not %q", expected, actual)
-		}
+			}`, android.PrepareForTestWithKeysDir)
+		ensureContainerCertificate(t, ctx, "myapex_keytest", "testkey.override")
 	})
 	t.Run("if specified as :module, it respects the prop", func(t *testing.T) {
 		t.Parallel()
@@ -3660,12 +3680,8 @@ func TestCertificate(t *testing.T) {
 			android_app_certificate {
 				name: "myapex.certificate",
 				certificate: "testkey",
-			}`)
-		rule := ctx.ModuleForTests(t, "myapex", "android_common_myapex").Rule("signapk")
-		expected := "testkey.x509.pem testkey.pk8"
-		if actual := rule.Args["certificates"]; actual != expected {
-			t.Errorf("certificates should be %q, not %q", expected, actual)
-		}
+			}`, android.PrepareForTestWithKeysDir)
+		ensureContainerCertificate(t, ctx, "myapex", "testkey")
 	})
 	t.Run("override when specifiec as <:module>", func(t *testing.T) {
 		t.Parallel()
@@ -3685,12 +3701,8 @@ func TestCertificate(t *testing.T) {
 			android_app_certificate {
 				name: "myapex.certificate.override",
 				certificate: "testkey.override",
-			}`)
-		rule := ctx.ModuleForTests(t, "myapex_keytest", "android_common_myapex_keytest").Rule("signapk")
-		expected := "testkey.override.x509.pem testkey.override.pk8"
-		if actual := rule.Args["certificates"]; actual != expected {
-			t.Errorf("certificates should be %q, not %q", expected, actual)
-		}
+			}`, android.PrepareForTestWithKeysDir)
+		ensureContainerCertificate(t, ctx, "myapex_keytest", "testkey.override")
 	})
 	t.Run("if specified as name, finds it from DefaultDevKeyDir", func(t *testing.T) {
 		t.Parallel()
@@ -3709,12 +3721,9 @@ func TestCertificate(t *testing.T) {
 			android.MockFS{
 				"vendor/foo/devkeys/testkey.x509.pem": nil,
 			}.AddToFixture(),
+			android.PrepareForTestWithKeysDir,
 		)
-		rule := ctx.ModuleForTests(t, "myapex", "android_common_myapex").Rule("signapk")
-		expected := "vendor/foo/devkeys/testkey.x509.pem vendor/foo/devkeys/testkey.pk8"
-		if actual := rule.Args["certificates"]; actual != expected {
-			t.Errorf("certificates should be %q, not %q", expected, actual)
-		}
+		ensureContainerCertificate(t, ctx, "myapex", "vendor/foo/devkeys/testkey")
 	})
 	t.Run("override when specified as <name>", func(t *testing.T) {
 		t.Parallel()
@@ -3734,12 +3743,8 @@ func TestCertificate(t *testing.T) {
 			android_app_certificate {
 				name: "myapex.certificate.override",
 				certificate: "testkey.override",
-			}`)
-		rule := ctx.ModuleForTests(t, "myapex_keytest", "android_common_myapex_keytest").Rule("signapk")
-		expected := "testkey.override.x509.pem testkey.override.pk8"
-		if actual := rule.Args["certificates"]; actual != expected {
-			t.Errorf("certificates should be %q, not %q", expected, actual)
-		}
+			}`, android.PrepareForTestWithKeysDir)
+		ensureContainerCertificate(t, ctx, "myapex_keytest", "testkey.override")
 	})
 }
 
@@ -7488,7 +7493,7 @@ func TestOverrideApex(t *testing.T) {
 			name: "mylib64",
 			apex_available: [ "myapex" ],
 		}
-	`, withManifestPackageNameOverrides([]string{"myapex:com.android.myapex"}))
+	`, withManifestPackageNameOverrides([]string{"myapex:com.android.myapex"}), android.PrepareForTestWithKeysDir)
 
 	originalVariant := ctx.ModuleForTests(t, "myapex", "android_common_myapex").Module().(android.OverridableModule)
 	overriddenVariant := ctx.ModuleForTests(t, "myapex", "android_common_override_myapex_override_myapex").Module().(android.OverridableModule)
@@ -7524,10 +7529,12 @@ func TestOverrideApex(t *testing.T) {
 
 	optFlags := apexRule.Args["opt_flags"]
 	ensureContains(t, optFlags, "--override_apk_package_name test.overridden.package")
-	ensureContains(t, optFlags, "--pubkey testkey2.avbpubkey")
+	ensurePayloadKey(t, ctx, module, "override_myapex", "testkey2.pem")
 
 	signApkRule := module.Rule("signapk")
-	ensureEquals(t, signApkRule.Args["certificates"], "testkey.x509.pem testkey.pk8")
+	ensureEquals(t, signApkRule.Args["certificates"], "${keys_dir}/override_myapex.certificate.override.x509.pem "+
+		"${keys_dir}/override_myapex.certificate.override.pk8")
+	ensureKeysDirLink(t, ctx, "override_myapex.certificate.override.x509.pem", "testkey.x509.pem")
 
 	data := android.AndroidMkDataForTest(t, ctx, apexBundle)
 	var builder strings.Builder
@@ -9090,6 +9097,38 @@ func TestApexKeysTxt(t *testing.T) {
 	myapex := ctx.ModuleForTests(t, "myapex", "android_common_myapex")
 	content := android.ContentFromFileRuleForTests(t, ctx, myapex.Output("apexkeys.txt"))
 	ensureContains(t, content, `name="myapex.apex" public_key="vendor/foo/devkeys/testkey.avbpubkey" private_key="vendor/foo/devkeys/testkey.pem" container_certificate="vendor/foo/devkeys/test.x509.pem" container_private_key="vendor/foo/devkeys/test.pk8" partition="system" sign_tool="sign_myapex"`)
+}
+
+func TestApexCustomSignTool(t *testing.T) {
+	t.Parallel()
+	ctx := testApex(t, `
+		apex {
+			name: "myapex",
+			key: "myapex.key",
+			updatable: false,
+			custom_sign_tool: "sign_myapex",
+		}
+
+		apex {
+			name: "otherapex",
+			key: "myapex.key",
+			updatable: false,
+		}
+
+		apex_key {
+			name: "myapex.key",
+			public_key: "testkey.avbpubkey",
+			private_key: "testkey.pem",
+		}
+	`)
+
+	apexRule := ctx.ModuleForTests(t, "myapex", "android_common_myapex").Rule("apexWithSignToolRule")
+	ensureMatches(t, apexRule.Args["sign_tool"], `/bin/sign_myapex$`)
+	ensureEquals(t, apexRule.Args["key"], "${keys_dir}/myapex.certificate.override.pem")
+	ensureListContains(t, apexRule.Implicits.Strings(), "hostTool-sign_myapex-deps")
+
+	otherApexRule := ctx.ModuleForTests(t, "otherapex", "android_common_otherapex").Rule("apexRule")
+	ensureEquals(t, otherApexRule.Args["sign_tool"], "")
 }
 
 func TestApexKeysTxtOverrides(t *testing.T) {

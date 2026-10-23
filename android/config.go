@@ -988,6 +988,13 @@ func (c *config) mockFileSystem(bp string, fs map[string][]byte) {
 		mockFS[k] = v
 	}
 
+	// A build without Kati reads the header lines of the tables of Make.
+	for _, table := range []string{makeMetadataComplianceTable, makeModulesComplianceTable} {
+		if _, exists := mockFS[makeComplianceHeaderPath(table)]; !exists {
+			mockFS[makeComplianceHeaderPath(table)] = []byte(`{"columns":["installed_file"],"sort":[]}` + "\n")
+		}
+	}
+
 	// no module list file specified; find every file named Blueprints or Android.bp
 	pathsToParse := []string{}
 	for candidate := range mockFS {

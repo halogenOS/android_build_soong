@@ -137,7 +137,7 @@ func (m *systemOtherImage) GenerateAndroidBuildActions(ctx android.ModuleContext
 		})
 	}
 
-	platformGenerated := []string{}
+	platformGenerated := android.Paths{}
 	if len(m.properties.Preinstall_dexpreopt_files_from) > 0 {
 		builtPath := android.PathForModuleOut(ctx, "system_other", "system-other-odex-marker")
 		builder.Command().Textf("touch").Output(builtPath)
@@ -146,7 +146,7 @@ func (m *systemOtherImage) GenerateAndroidBuildActions(ctx android.ModuleContext
 			FullInstallPath: installPath,
 			SourcePath:      builtPath,
 		})
-		platformGenerated = append(platformGenerated, installPath.String())
+		platformGenerated = append(platformGenerated, installPath)
 	}
 	builder.Command().Textf("touch").Output(stagingDirTimestamp)
 	builder.Build("assemble_filesystem_staging_dir", "Assemble filesystem staging dir")
@@ -203,9 +203,9 @@ func (m *systemOtherImage) GenerateAndroidBuildActions(ctx android.ModuleContext
 
 	// Dump compliance metadata
 	complianceMetadataInfo := ctx.ComplianceMetadataInfo()
-	filesContained := make([]string, 0, len(fullInstallPaths))
+	filesContained := make([]android.ComplianceFile, 0, len(fullInstallPaths))
 	for _, file := range fullInstallPaths {
-		filesContained = append(filesContained, file.FullInstallPath.String())
+		filesContained = append(filesContained, android.ComplianceFileOfPath(file.FullInstallPath))
 	}
 	complianceMetadataInfo.SetFilesContained(filesContained)
 	complianceMetadataInfo.SetPlatformGeneratedFiles(platformGenerated)

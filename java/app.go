@@ -1215,13 +1215,13 @@ func (a *AndroidApp) generateAndroidBuildActions(ctx android.ModuleContext) {
 	complianceMetadataInfo := ctx.ComplianceMetadataInfo()
 	if allowlist != nil {
 		a.privAppAllowlist = android.OptionalPathForPath(allowlist)
-		complianceMetadataInfo.AddBuiltFiles(a.privAppAllowlist.Path().String())
+		complianceMetadataInfo.AddBuiltFiles(a.privAppAllowlist.Path())
 	}
 
 	preinstallAllowlist := a.createPreinstallAllowlist(ctx)
 	if preinstallAllowlist != nil {
 		a.preinstallAllowlist = android.OptionalPathForPath(preinstallAllowlist)
-		complianceMetadataInfo.AddBuiltFiles(a.preinstallAllowlist.Path().String())
+		complianceMetadataInfo.AddBuiltFiles(a.preinstallAllowlist.Path())
 	}
 
 	// Install the app package.
@@ -1291,9 +1291,11 @@ func (a *AndroidApp) generateAndroidBuildActions(ctx android.ModuleContext) {
 
 	buildComplianceMetadata(ctx)
 	if shouldInstallAppPackage && slices.Contains(ctx.Config().UnbundledBuildApps(), a.Name()) {
-		complianceMetadataInfo.SetFilesContained([]string{a.installedOutputFile.String()})
-		complianceMetadataInfo.SetBuildOutputPathsOfFilesContained([]string{a.outputFile.String()})
-		complianceMetadataInfo.AddBuiltFiles(a.outputFile.String())
+		android.SetUnbundledAppFiles(ctx, a.Name(), []android.UnbundledAppFile{{
+			Installed:   android.ComplianceFileOfPath(a.installedOutputFile),
+			BuildOutput: a.outputFile,
+		}})
+		complianceMetadataInfo.AddBuiltFiles(a.outputFile)
 	}
 
 	if !a.IsHideFromMake() {

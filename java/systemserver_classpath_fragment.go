@@ -150,7 +150,9 @@ func (s *SystemServerClasspathModule) GenerateAndroidBuildActions(ctx android.Mo
 		Contents:           s.properties.Contents.GetOrDefault(ctx, nil),
 		StandaloneContents: s.properties.Standalone_contents.GetOrDefault(ctx, nil),
 	})
-	ctx.ComplianceMetadataInfo().AddBuiltFiles(classpathProtoOutputPath.String())
+	if classpathProtoOutputPath.Valid() {
+		ctx.ComplianceMetadataInfo().AddBuiltFiles(classpathProtoOutputPath.Path())
+	}
 }
 
 // Map of java library name to their install partition.

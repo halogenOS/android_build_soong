@@ -26,6 +26,7 @@ import (
 	"text/template"
 
 	"android/soong/elf"
+	"android/soong/shared"
 	"android/soong/ui/metrics"
 )
 
@@ -51,22 +52,9 @@ func SetupOutDir(ctx Context, config Config) {
 		ctx.Fatalln("Missing BUILD_DATETIME_FILE")
 	}
 
-	writeValueIfChanged(ctx, filepath.Join(config.OutDir(), "file_name_tag.txt"), config.DistFileNameTag())
-	// Write the build number to a file so it can be read back in
-	// without changing the command line every time.  Avoids rebuilds
-	// when using ninja.
-	writeValueIfChanged(ctx, filepath.Join(config.SoongOutDir(), "build_number.txt"), config.BuildNumber())
-
-	hostname, ok := config.environ.Get("BUILD_HOSTNAME")
-	if !ok {
-		var err error
-		hostname, err = os.Hostname()
-		if err != nil {
-			ctx.Println("Failed to read hostname:", err)
-			hostname = "unknown"
-		}
+	for _, file := range buildInfoFiles(ctx, config) {
+		writeValueIfChanged(ctx, file.path, file.value)
 	}
-	writeValueIfChanged(ctx, filepath.Join(config.SoongOutDir(), "build_hostname.txt"), hostname)
 
 	buildTargetName, ok := config.environ.Get("BUILD_TARGET_NAME")
 	if targetProduct, err := config.TargetProductOrErr(); !ok && err == nil {
@@ -77,6 +65,35 @@ func SetupOutDir(ctx Context, config Config) {
 	buildUUIDFile := config.BuildUUIDFile()
 	writeValueIfChanged(ctx, buildUUIDFile, buildUUID)
 	distFileToFile(ctx, config, buildUUIDFile, "BUILD_UUID")
+}
+
+// buildInfoFile is a file with information about the build, which SetupOutDir
+// writes and steps of the build read.
+type buildInfoFile struct {
+	path  string
+	value string
+}
+
+// buildInfoFiles returns the files with information about the build that
+// SetupOutDir writes, with their values for this build.
+func buildInfoFiles(ctx Context, config Config) []buildInfoFile {
+	hostname, ok := config.environ.Get("BUILD_HOSTNAME")
+	if !ok {
+		var err error
+		hostname, err = os.Hostname()
+		if err != nil {
+			ctx.Println("Failed to read hostname:", err)
+			hostname = "unknown"
+		}
+	}
+	return []buildInfoFile{
+		{path: filepath.Join(config.OutDir(), "file_name_tag.txt"), value: config.DistFileNameTag()},
+		// Write the build number to a file so it can be read back in
+		// without changing the command line every time.  Avoids rebuilds
+		// when using ninja.
+		{path: filepath.Join(config.SoongOutDir(), "build_number.txt"), value: config.BuildNumber()},
+		{path: filepath.Join(config.SoongOutDir(), "build_hostname.txt"), value: hostname},
+	}
 }
 
 // Compute a UUID based on the hash of the build name and the build number.
@@ -97,9 +114,19 @@ func SetupTempDir(ctx Context, config Config) {
 	ensureEmptyDirectoriesExist(ctx, config.TempDir())
 }
 
+// combinedBuildNinjaData is the data of combinedBuildNinjaTemplate.
+type combinedBuildNinjaData struct {
+	Config
+	// The signing variables with their values. They come before the
+	// subninja lines, since Ninja expands the variables in the arguments of
+	// a build statement when it reads the statement.
+	SigningVariables []shared.NinjaVariable
+}
+
 var combinedBuildNinjaTemplate = template.Must(template.New("combined").Parse(`
-builddir = {{.OutDir}}
-{{if .UseRemoteBuild }}pool local_pool
+builddir = {{.WriteDir}}
+{{range .SigningVariables}}{{.Name}} = {{.Value}}
+{{end}}{{if .UseRemoteBuild }}pool local_pool
  depth = {{.Parallel}}
 {{end -}}
 pool highmem_pool
@@ -115,21 +142,27 @@ distFileNameTag={{.DistFileNameTag}}
 subninja {{.SoongNinjaFile}}
 `))
 
-func createCombinedBuildNinjaFile(ctx Context, config Config) {
+func createCombinedBuildNinjaFile(ctx Context, config Config, signingVariables []shared.NinjaVariable) {
 	// If we're in SkipKati mode but want to run kati ninja, skip creating this file if it already exists
 	if config.SkipKati() && !config.SkipKatiNinja() {
 		if _, err := os.Stat(config.CombinedNinjaFile()); err == nil || !os.IsNotExist(err) {
 			return
 		}
 	}
+	writeCombinedBuildNinjaFile(ctx, config, signingVariables)
+}
 
+// writeCombinedBuildNinjaFile writes the combined Ninja file, with the
+// signing variables and their values.
+func writeCombinedBuildNinjaFile(ctx Context, config Config, signingVariables []shared.NinjaVariable) {
 	file, err := os.Create(config.CombinedNinjaFile())
 	if err != nil {
 		ctx.Fatalln("Failed to create combined ninja file:", err)
 	}
 	defer file.Close()
 
-	if err := combinedBuildNinjaTemplate.Execute(file, config); err != nil {
+	data := combinedBuildNinjaData{Config: config, SigningVariables: signingVariables}
+	if err := combinedBuildNinjaTemplate.Execute(file, data); err != nil {
 		ctx.Fatalln("Failed to write combined ninja file:", err)
 	}
 }
@@ -289,6 +322,11 @@ func Build(ctx Context, config Config) {
 		return
 	}
 
+	checkKatiJsonLines(ctx, config)
+	if config.signingGoals != nil {
+		checkSisoDeltaVariables(ctx, config)
+	}
+
 	defer waitForDist(ctx)
 
 	// checkProblematicFiles aborts the build if Android.mk or CleanSpec.mk are found at the root of the tree.
@@ -298,6 +336,7 @@ func Build(ctx Context, config Config) {
 
 	SetupOutDir(ctx, config)
 	SetupTempDir(ctx, config)
+	variables := signingVariables(ctx, config)
 
 	// checkCaseSensitivity issues a warning if a case-insensitive file system is being used.
 	checkCaseSensitivity(ctx, config)
@@ -397,7 +436,7 @@ func Build(ctx Context, config Config) {
 	os.WriteFile(config.LastKatiSuffixFile(), []byte(config.KatiSuffix()), 0666) // a+rw
 
 	// Write combined ninja file
-	createCombinedBuildNinjaFile(ctx, config)
+	createCombinedBuildNinjaFile(ctx, config, variables)
 
 	distGzipFile(ctx, config, config.CombinedNinjaFile(), "soong_ui")
 
@@ -416,7 +455,7 @@ func Build(ctx Context, config Config) {
 			installCleanIfNecessary(ctx, config)
 		}
 		partialCompileCleanIfNecessary(ctx, config)
-		runNinjaForBuild(ctx, config)
+		runNinjaForBuild(ctx, config, variables)
 		updateBuildIdDir(ctx, config)
 
 		runUpdateApi(ctx, config)

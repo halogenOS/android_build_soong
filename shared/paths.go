@@ -39,3 +39,8 @@ func JoinPath(base string, rest ...string) string {
 func TempDirForOutDir(outDir string) (tempPath string) {
 	return filepath.Join(outDir, ".temp")
 }
+
+// TestKeysDir is the directory in the Soong output directory with links to the
+// test keys under the file names of a release key directory. It is the value
+// of keys_dir in a build without signing keys.
+const TestKeysDir = "test-keys"

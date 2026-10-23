@@ -180,6 +180,8 @@ func (ctx *Context) Register() {
 
 	singletons := collateGloballyRegisteredSingletons()
 	singletons.registerAll(ctx)
+
+	registerComplianceRecordStreams(ctx)
 }
 
 func (ctx *Context) Config() Config {

@@ -330,6 +330,18 @@ python_binary_host {
     srcs: ["gen_build_prop.py"],
 }
 
+python_test_host {
+    name: "gen_build_prop_test",
+    main: "gen_build_prop_test.py",
+    srcs: [
+        "gen_build_prop_test.py",
+        "gen_build_prop.py",
+    ],
+    test_options: {
+        unit_test: true,
+    },
+}
+
 python_binary_host {
     name: "extra_install_zips_file_list",
     main: "extra_install_zips_file_list.py",

@@ -99,7 +99,7 @@ func TestRuntimeResourceOverlay(t *testing.T) {
 	}
 
 	signingFlag := signedApk.Args["certificates"]
-	expected := "build/make/target/product/security/platform.x509.pem build/make/target/product/security/platform.pk8"
+	expected := "${keys_dir}/platform.x509.pem ${keys_dir}/platform.pk8"
 	if expected != signingFlag {
 		t.Errorf("Incorrect signing flags, expected: %q, got: %q", expected, signingFlag)
 	}

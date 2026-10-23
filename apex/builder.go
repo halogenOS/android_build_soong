@@ -130,57 +130,20 @@ var (
 	// against the binary policy using sefcontext_compiler -p <policy>.
 
 	// TODO(b/114327326): automate the generation of file_contexts
-	apexRule = pctx.StaticRule("apexRule", blueprint.RuleParams{
-		Command2: blueprint.NewCommand(
-			android.Rm, ` -rf ${image_dir} && `, android.Mkdir, ` -p ${image_dir} && `,
-			`(. ${out}.copy_commands) && `,
-			`APEXER_TOOL_PATH=${tool_path} `,
-			apexer, ` --force --manifest ${manifest} `,
-			`--file_contexts ${file_contexts} `,
-			`--canned_fs_config ${canned_fs_config} `,
-			`--include_build_info `,
-			`--payload_type image `,
-			`--key ${key} ${opt_flags} ${image_dir} ${out} && `,
-			android.SoongZip, ` -d -C ${image_dir} -D ${image_dir} -o ${image_zip}`,
-		),
-		CommandDeps: []string{"${aapt2}", "prebuilts/sdk/current/public/android.jar"},
-		CommandDepsTools: []blueprint.HostTool{avbtool, e2fsdroid, android.MergeZips,
-			mke2fs, resize2fs, sefcontext_compile, make_f2fs, sload_f2fs, make_erofs,
-			android.SoongZip, zipalign, android.Cp, android.Ln, android.ZipSync},
-		Rspfile:        "${out}.copy_commands",
-		RspfileContent: "${copy_commands}",
-		Description:    "APEX ${image_dir} => ${out}",
-	}, "tool_path", "image_dir", "image_zip", "copy_commands", "file_contexts", "canned_fs_config", "key",
-		"opt_flags", "manifest")
+	apexRule             = pctx.StaticRule("apexRule", apexRuleParams(), apexRuleArgs...)
+	apexWithSignToolRule = pctx.StaticRule("apexWithSignToolRule", apexRuleParams(signToolCommand...),
+		slices.Concat(apexRuleArgs, []string{"sign_tool"})...)
 
-	DCLAApexRule = pctx.StaticRule("DCLAApexRule", blueprint.RuleParams{
-		Command2: blueprint.NewCommand(
-			android.Rm, ` -rf ${image_dir} && `, android.Mkdir, ` -p ${image_dir} && `,
-			`(. ${out}.copy_commands) && `,
-			`APEXER_TOOL_PATH=${tool_path} `,
-			apexer_with_DCLA_preprocessing, ` --apexer `, apexer,
-			` --canned_fs_config ${canned_fs_config} `,
-			`${image_dir} `,
-			`${out} `,
-			`-- `,
-			`--include_build_info `,
-			`--force `,
-			`--payload_type image `,
-			`--key ${key} `,
-			`--file_contexts ${file_contexts} `,
-			`--manifest ${manifest} `,
-			`${opt_flags} && `,
-			android.SoongZip, ` -d -C ${image_dir} -D ${image_dir} -o ${image_zip}`,
-		),
-		CommandDeps: []string{"${aapt2}", "prebuilts/sdk/current/public/android.jar"},
-		CommandDepsTools: []blueprint.HostTool{avbtool, e2fsdroid, android.MergeZips,
-			mke2fs, resize2fs, sefcontext_compile, make_f2fs, sload_f2fs, make_erofs,
-			android.SoongZip, zipalign, android.Cp, android.Ln, android.ZipSync},
-		Rspfile:        "${out}.copy_commands",
-		RspfileContent: "${copy_commands}",
-		Description:    "APEX ${image_dir} => ${out}",
-	}, "tool_path", "image_dir", "image_zip", "copy_commands", "file_contexts", "canned_fs_config", "key",
-		"opt_flags", "manifest", "is_DCLA")
+	DCLAApexRule             = pctx.StaticRule("DCLAApexRule", dclaApexRuleParams(), dclaApexRuleArgs...)
+	DCLAApexWithSignToolRule = pctx.StaticRule("DCLAApexWithSignToolRule", dclaApexRuleParams(signToolCommand...),
+		slices.Concat(dclaApexRuleArgs, []string{"sign_tool"})...)
+
+	// apexer fails when the public key given with --pubkey does not belong to the payload key.
+	extractPayloadPublicKeyRule = pctx.StaticRule("extractPayloadPublicKeyRule", blueprint.RuleParams{
+		Command2:        blueprint.NewCommand(avbtool, ` extract_public_key --key ${key} --output ${out}`),
+		Description:     "extract public key ${key}",
+		SandboxDisabled: true,
+	}, "key")
 
 	apexProtoConvertRule = pctx.AndroidStaticRule("apexProtoConvertRule",
 		blueprint.RuleParams{
@@ -277,6 +240,78 @@ var (
 		Description: "create aconfig_flags.pb file",
 	}, "container", "beta_namespace", "cache_files")
 )
+
+var (
+	apexRuleArgs = []string{"tool_path", "image_dir", "image_zip", "copy_commands", "file_contexts",
+		"canned_fs_config", "key", "opt_flags", "manifest"}
+	dclaApexRuleArgs = slices.Concat(apexRuleArgs, []string{"is_DCLA"})
+
+	// signToolCommand runs ${sign_tool}, the custom_sign_tool used by an APEX, on the files in
+	// ${image_dir} with the payload key before apexer packs them, as the stock signer runs the tool
+	// on the payload of an APEX that it signs again. The tool finds the helper tools it needs in
+	// ${tool_path}.
+	signToolCommand = []any{`PATH=${tool_path}:$$PATH ${sign_tool} ${key} ${image_dir} && `}
+)
+
+// apexRuleParams returns the parameters of a rule that copies the files of an APEX into
+// ${image_dir}, runs payloadCommand on them and packs them with apexer.
+func apexRuleParams(payloadCommand ...any) blueprint.RuleParams {
+	return blueprint.RuleParams{
+		Command2: blueprint.NewCommand(slices.Concat(
+			[]any{android.Rm, ` -rf ${image_dir} && `, android.Mkdir, ` -p ${image_dir} && `,
+				`(. ${out}.copy_commands) && `},
+			payloadCommand,
+			[]any{`APEXER_TOOL_PATH=${tool_path} `,
+				apexer, ` --force --manifest ${manifest} `,
+				`--file_contexts ${file_contexts} `,
+				`--canned_fs_config ${canned_fs_config} `,
+				`--include_build_info `,
+				`--payload_type image `,
+				`--key ${key} ${opt_flags} ${image_dir} ${out} && `,
+				android.SoongZip, ` -d -C ${image_dir} -D ${image_dir} -o ${image_zip}`},
+		)...),
+		CommandDeps: []string{"${aapt2}", "prebuilts/sdk/current/public/android.jar"},
+		CommandDepsTools: []blueprint.HostTool{avbtool, e2fsdroid, android.MergeZips,
+			mke2fs, resize2fs, sefcontext_compile, make_f2fs, sload_f2fs, make_erofs,
+			android.SoongZip, zipalign, android.Cp, android.Ln, android.ZipSync},
+		Rspfile:        "${out}.copy_commands",
+		RspfileContent: "${copy_commands}",
+		Description:    "APEX ${image_dir} => ${out}",
+	}
+}
+
+// dclaApexRuleParams returns the parameters of a rule that copies the files of a dynamic common lib
+// APEX into ${image_dir}, runs payloadCommand on them and packs them with apexer.
+func dclaApexRuleParams(payloadCommand ...any) blueprint.RuleParams {
+	return blueprint.RuleParams{
+		Command2: blueprint.NewCommand(slices.Concat(
+			[]any{android.Rm, ` -rf ${image_dir} && `, android.Mkdir, ` -p ${image_dir} && `,
+				`(. ${out}.copy_commands) && `},
+			payloadCommand,
+			[]any{`APEXER_TOOL_PATH=${tool_path} `,
+				apexer_with_DCLA_preprocessing, ` --apexer `, apexer,
+				` --canned_fs_config ${canned_fs_config} `,
+				`${image_dir} `,
+				`${out} `,
+				`-- `,
+				`--include_build_info `,
+				`--force `,
+				`--payload_type image `,
+				`--key ${key} `,
+				`--file_contexts ${file_contexts} `,
+				`--manifest ${manifest} `,
+				`${opt_flags} && `,
+				android.SoongZip, ` -d -C ${image_dir} -D ${image_dir} -o ${image_zip}`},
+		)...),
+		CommandDeps: []string{"${aapt2}", "prebuilts/sdk/current/public/android.jar"},
+		CommandDepsTools: []blueprint.HostTool{avbtool, e2fsdroid, android.MergeZips,
+			mke2fs, resize2fs, sefcontext_compile, make_f2fs, sload_f2fs, make_erofs,
+			android.SoongZip, zipalign, android.Cp, android.Ln, android.ZipSync},
+		Rspfile:        "${out}.copy_commands",
+		RspfileContent: "${copy_commands}",
+		Description:    "APEX ${image_dir} => ${out}",
+	}
+}
 
 func (a *apexBundle) buildAconfigFiles(ctx android.ModuleContext) []apexFile {
 	var aconfigFiles android.Paths
@@ -818,8 +853,13 @@ func (a *apexBundle) buildApex(ctx android.ModuleContext) {
 	fileContexts := a.buildFileContexts(ctx)
 	implicitInputs = append(implicitInputs, fileContexts)
 
-	implicitInputs = append(implicitInputs, a.privateKeyFile, a.publicKeyFile)
-	optFlags = append(optFlags, "--pubkey "+a.publicKeyFile.String())
+	payloadKey := android.ApexPayloadKey(ctx, a.Name(), a.privateKeyFile)
+	publicKey := a.extractPayloadPublicKey(ctx, payloadKey)
+	implicitInputs = append(implicitInputs, payloadKey.Inputs()...)
+	implicitInputs = append(implicitInputs, publicKey)
+	// apexer sets the key name of the payload to the APEX name, as the stock signer does when it
+	// builds a payload again, instead of the name of the key file in keys_dir.
+	optFlags = append(optFlags, "--pubkey "+publicKey.String(), "--do_not_check_keyname")
 
 	manifestPackageName := a.getOverrideManifestPackageName(ctx)
 	if manifestPackageName != "" {
@@ -915,45 +955,34 @@ func (a *apexBundle) buildApex(ctx android.ModuleContext) {
 	}
 
 	imageZipOut := android.PathForModuleOut(ctx, "image.zip")
+	imageRule, signToolRule := apexRule, apexWithSignToolRule
 	if a.dynamic_common_lib_apex() {
-		ctx.Build(pctx, android.BuildParams{
-			Rule:           DCLAApexRule,
-			Implicits:      implicitInputs,
-			Output:         unsignedOutputFile,
-			ImplicitOutput: imageZipOut,
-			Description:    "apex",
-			Args: map[string]string{
-				"tool_path":        outHostBinDir + ":" + prebuiltSdkToolsBinDir,
-				"image_dir":        imageDir.String(),
-				"image_zip":        imageZipOut.String(),
-				"copy_commands":    strings.Join(copyCommands, " && "),
-				"manifest":         a.manifestPbOut.String(),
-				"file_contexts":    fileContexts.String(),
-				"canned_fs_config": cannedFsConfig.String(),
-				"key":              a.privateKeyFile.String(),
-				"opt_flags":        strings.Join(optFlags, " "),
-			},
-		})
-	} else {
-		ctx.Build(pctx, android.BuildParams{
-			Rule:           apexRule,
-			Implicits:      implicitInputs,
-			Output:         unsignedOutputFile,
-			ImplicitOutput: imageZipOut,
-			Description:    "apex",
-			Args: map[string]string{
-				"tool_path":        outHostBinDir + ":" + prebuiltSdkToolsBinDir,
-				"image_dir":        imageDir.String(),
-				"image_zip":        imageZipOut.String(),
-				"copy_commands":    strings.Join(copyCommands, " && "),
-				"manifest":         a.manifestPbOut.String(),
-				"file_contexts":    fileContexts.String(),
-				"canned_fs_config": cannedFsConfig.String(),
-				"key":              a.privateKeyFile.String(),
-				"opt_flags":        strings.Join(optFlags, " "),
-			},
-		})
+		imageRule, signToolRule = DCLAApexRule, DCLAApexWithSignToolRule
 	}
+	imageArgs := map[string]string{
+		"tool_path":        outHostBinDir + ":" + prebuiltSdkToolsBinDir,
+		"image_dir":        imageDir.String(),
+		"image_zip":        imageZipOut.String(),
+		"copy_commands":    strings.Join(copyCommands, " && "),
+		"manifest":         a.manifestPbOut.String(),
+		"file_contexts":    fileContexts.String(),
+		"canned_fs_config": cannedFsConfig.String(),
+		"key":              payloadKey.Ref(),
+		"opt_flags":        strings.Join(optFlags, " "),
+	}
+	if signTool := proptools.String(a.properties.Custom_sign_tool); signTool != "" {
+		imageRule = signToolRule
+		imageArgs["sign_tool"] = ctx.Config().HostToolPath(ctx, signTool).String()
+		implicitInputs = append(implicitInputs, android.HostToolDeps(ctx, signTool))
+	}
+	ctx.Build(pctx, android.BuildParams{
+		Rule:           imageRule,
+		Implicits:      implicitInputs,
+		Output:         unsignedOutputFile,
+		ImplicitOutput: imageZipOut,
+		Description:    "apex",
+		Args:           imageArgs,
+	})
 
 	// TODO(jiyong): make the two rules below as separate functions
 	apexProtoFile := android.PathForModuleOut(ctx, a.Name()+".pb"+suffix)
@@ -1046,13 +1075,14 @@ func (a *apexBundle) buildApex(ctx android.ModuleContext) {
 	// Step 4: Sign the APEX using signapk
 	signedOutputFile := android.PathForModuleOut(ctx, a.Name()+suffix)
 
-	pem, key := a.getCertificateAndPrivateKey(ctx)
+	pemSrc, keySrc := a.getCertificateAndPrivateKey(ctx)
+	pem, key := android.ApexContainerKeys(ctx, a.Name(), pemSrc, keySrc)
 	rule := java.Signapk
 	args := map[string]string{
-		"certificates": pem.String() + " " + key.String(),
+		"certificates": pem.Ref() + " " + key.Ref(),
 		"flags":        "--disable-v1 -a 4096 --align-file-size", //alignment
 	}
-	implicits := android.Paths{pem, key}
+	implicits := slices.Concat(pem.Inputs(), key.Inputs())
 	if ctx.Config().UseREWrapper() && ctx.Config().IsEnvTrue("RBE_SIGNAPK") {
 		rule = java.SignapkRE
 		args["implicits"] = strings.Join(implicits.Strings(), ",")
@@ -1134,6 +1164,20 @@ func (a *apexBundle) buildApex(ctx android.ModuleContext) {
 	a.installedFilesFile = a.buildInstalledFilesFile(ctx, a.outputFile, imageZipOut)
 
 	a.apexKeysPath = writeApexKeys(ctx, a)
+}
+
+// extractPayloadPublicKey writes the public key of payloadKey.
+func (a *apexBundle) extractPayloadPublicKey(ctx android.ModuleContext, payloadKey android.KeysDirKey) android.Path {
+	publicKey := android.PathForModuleOut(ctx, a.Name()+".avbpubkey")
+	ctx.Build(pctx, android.BuildParams{
+		Rule:      extractPayloadPublicKeyRule,
+		Implicits: payloadKey.Inputs(),
+		Output:    publicKey,
+		Args: map[string]string{
+			"key": payloadKey.Ref(),
+		},
+	})
+	return publicKey
 }
 
 // getCertificateAndPrivateKey retrieves the cert and the private key that will be used to sign

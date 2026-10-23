@@ -132,6 +132,8 @@ type configImpl struct {
 	ensureAllowlistIntegrity            bool // For CI builds - make sure modules are mixed-built
 	runCIPDProxyServer                  bool
 	runCIPDProxyServerControlledByFlags bool
+	signing                             *signingRun // nil in a regular build, one without --build-date
+	signingGoals                        *string     // the value of --signing-goals, nil without it
 
 	// From the product config
 	katiArgs        []string
@@ -198,12 +200,16 @@ type configImpl struct {
 	useABFSMu sync.Mutex
 	useABFS   *bool
 
-	// Reports a siso on PATH that SisoBin() skips.
+	// Reports a siso or ckati on PATH that sisoTool() or katiTool() skips.
 	logger logger.Logger
 
-	// The siso that the first call to SisoBin() chose.
-	sisoBinOnce sync.Once
-	sisoBin     string
+	// The siso that the first call to sisoTool() chose.
+	sisoToolOnce sync.Once
+	siso         chosenTool
+
+	// The ckati that the first call to katiTool() chose.
+	katiToolOnce sync.Once
+	kati         chosenTool
 }
 
 type NinjaWeightListSource uint
@@ -627,6 +633,9 @@ func newConfig(ctx Context, isDumpVar bool, args ...string) Config {
 	}
 
 	ret.environ.Set("BUILD_DATETIME_FILE", buildDateTimeFile)
+	// Product makefiles write the placeholder where gen_build_prop.py writes the
+	// value of build_date.
+	ret.environ.Set("BUILD_DATE_PLACEHOLDER", shared.SigningDatePlaceholder)
 
 	if _, ok := ret.environ.Get("BUILD_USERNAME"); !ok {
 		username := "unknown"
@@ -1154,6 +1163,7 @@ func (c *configImpl) EnforceNoReanalysis() bool {
 }
 
 func (c *configImpl) parseArgs(ctx Context, args []string) {
+	var signingKeysDir, signingDate, signingGoals, weightListFile *string
 	for i := 0; i < len(args); i++ {
 		arg := strings.TrimSpace(args[i])
 		if arg == "showcommands" {
@@ -1208,10 +1218,7 @@ func (c *configImpl) parseArgs(ctx Context, args []string) {
 				if err != nil {
 					ctx.Fatalf("Malformed weight list from %s: %s", filePath, err)
 				}
-				_, err = copyFile(filePath, filepath.Join(c.OutDir(), ".ninja_weight_list"))
-				if err != nil {
-					ctx.Fatalf("Error to copy ninja weight list from %s: %s", filePath, err)
-				}
+				weightListFile = &filePath
 			} else {
 				ctx.Fatalf("unknown option for ninja_weight_source: %s", source)
 			}
@@ -1235,6 +1242,12 @@ func (c *configImpl) parseArgs(ctx Context, args []string) {
 			} else {
 				ctx.Fatalf("Error parsing build-time-started-unix-millis", err)
 			}
+		} else if value, ok := strings.CutPrefix(arg, "--signing-keys-dir="); ok {
+			signingKeysDir = &value
+		} else if value, ok := strings.CutPrefix(arg, "--build-date="); ok {
+			signingDate = &value
+		} else if value, ok := strings.CutPrefix(arg, "--signing-goals="); ok {
+			signingGoals = &value
 		} else if arg == "--ensure-allowlist-integrity" {
 			c.ensureAllowlistIntegrity = true
 		} else if arg == "--enforce-no-reanalysis" {
@@ -1289,6 +1302,54 @@ func (c *configImpl) parseArgs(ctx Context, args []string) {
 			c.arguments = append(c.arguments, arg)
 		}
 	}
+	if signingKeysDir != nil || signingDate != nil {
+		c.signing = newSigningRun(ctx, signingKeysDir, signingDate)
+	}
+	if signingGoals != nil && c.SigningRun() {
+		ctx.Fatalf("--signing-goals is an option of the regular build, and --build-date starts the signing run")
+	}
+	c.signingGoals = signingGoals
+	// The copy goes into the directory that the build writes into, which
+	// depends on whether this is the signing run.
+	if weightListFile != nil {
+		if _, err := copyFile(*weightListFile, filepath.Join(c.WriteDir(), ".ninja_weight_list")); err != nil {
+			ctx.Fatalf("Error to copy ninja weight list from %s: %s", *weightListFile, err)
+		}
+	}
+}
+
+// signingDateLayout is the form of --build-date, as a layout for time.Parse.
+const signingDateLayout = "20060102-150405"
+
+// signingRun has the options of the signing run, the build of the goals that
+// need signing on top of the regular build.
+type signingRun struct {
+	keysDir *string   // The release key directory, an absolute path, or nil to sign with the test keys
+	date    time.Time // The date written into the build properties
+}
+
+// newSigningRun checks the values of --signing-keys-dir and --build-date.
+// --build-date starts the signing run, which signs with the release keys in
+// --signing-keys-dir, or with the test keys without that option.
+// --signing-keys-dir alone is an error, since release keys with the placeholder
+// date would write a build that is neither a release nor a regular build.
+func newSigningRun(ctx Context, keysDir, date *string) *signingRun {
+	if date == nil {
+		ctx.Fatalf("--signing-keys-dir needs --build-date, which starts the signing run")
+	}
+	if keysDir != nil && !filepath.IsAbs(*keysDir) {
+		ctx.Fatalf("--signing-keys-dir needs an absolute path, got %q", *keysDir)
+	}
+	parsedDate, err := time.Parse(signingDateLayout, *date)
+	if err != nil {
+		ctx.Fatalf("--build-date needs the form YYYYMMDD-hhmmss, got %q", *date)
+	}
+	return &signingRun{keysDir: keysDir, date: parsedDate}
+}
+
+// SigningRun reports whether this build is the signing run.
+func (c *configImpl) SigningRun() bool {
+	return c.signing != nil
 }
 
 func validateNinjaWeightList(weightListFilePath string) (err error) {
@@ -1394,6 +1455,22 @@ func (c *configImpl) OutDir() string {
 	return "out"
 }
 
+// WriteDir returns the directory that this build writes into: OUT_DIR, or the
+// signed directory in the signing run, which reads the regular build in
+// OUT_DIR and writes nothing there.
+func (c *configImpl) WriteDir() string {
+	if c.SigningRun() {
+		return c.signedOutDir()
+	}
+	return c.OutDir()
+}
+
+// signedOutDir returns the directory that the signing run writes into. Its
+// steps write their outputs there at the same relative paths as in OUT_DIR.
+func (c *configImpl) signedOutDir() string {
+	return filepath.Join(c.OutDir(), "signed")
+}
+
 func (c *configImpl) DistDir() string {
 	return c.distDir
 }
@@ -1455,7 +1532,7 @@ func (c *configImpl) ModuleActionsFile() string {
 }
 
 func (c *configImpl) TempDir() string {
-	return shared.TempDirForOutDir(c.SoongOutDir())
+	return shared.TempDirForOutDir(filepath.Join(c.WriteDir(), "soong"))
 }
 
 func (c *configImpl) FileListDir() string {
@@ -1981,9 +2058,18 @@ func (c *configImpl) SoongNoDistNinjaFile() string {
 
 func (c *configImpl) CombinedNinjaFile() string {
 	if c.katiSuffix == "" {
-		return filepath.Join(c.OutDir(), "combined.ninja")
+		return filepath.Join(c.WriteDir(), "combined.ninja")
 	}
-	return filepath.Join(c.OutDir(), "combined"+c.KatiSuffix()+".ninja")
+	return filepath.Join(c.WriteDir(), "combined"+c.KatiSuffix()+".ninja")
+}
+
+// signingDate returns the value of the build_date Ninja variable: the date
+// given with --build-date, or the placeholder of a regular build.
+func (c *configImpl) signingDate() string {
+	if !c.SigningRun() {
+		return shared.SigningDatePlaceholder
+	}
+	return c.signing.date.Format(signingDateLayout)
 }
 
 func (c *configImpl) SoongAndroidMk() string {
@@ -1994,11 +2080,20 @@ func (c *configImpl) SoongMakeVarsMk() string {
 	return filepath.Join(c.SoongOutDir(), "make_vars-"+c.TargetProduct()+c.CoverageSuffix()+".mk")
 }
 
-// SoongReplacedInstallDirs returns the file that soong_build writes when a module of the build
-// replaces an install directory as a whole: a JSON array with one object {"primary": <primary
-// file>, "dir": <directory>} per such directory, both paths relative to the product out directory.
+// SoongReplacedInstallDirs returns the file that soong_build writes with the install directories
+// that installs replace as a whole: a JSON array with one object {"primary": <primary file>, "dir":
+// <directory>} per such directory, both paths relative to the product out directory. soong_build
+// writes it on every run, as an empty array when no install replaces a directory.
 func (c *configImpl) SoongReplacedInstallDirs() string {
 	return filepath.Join(c.SoongOutDir(), "replaced_install_dirs-"+c.TargetProduct()+c.CoverageSuffix()+".json")
+}
+
+// SoongExtractedZipInstalls returns the file that soong_build writes with the primary files of the
+// installs that extract an extra files zip into the directory that contains the primary file and
+// keep the other files in that directory: a JSON array of paths relative to the product out
+// directory. soong_build writes it on every run, as an empty array when no such install exists.
+func (c *configImpl) SoongExtractedZipInstalls() string {
+	return filepath.Join(c.SoongOutDir(), "extracted_zip_installs-"+c.TargetProduct()+c.CoverageSuffix()+".json")
 }
 
 func (c *configImpl) SoongBuildMetrics() string {
@@ -2047,6 +2142,8 @@ func (c *configImpl) HostPrebuiltTag() string {
 	return c.PrebuiltOS()
 }
 
+// KatiBin returns the ckati on PATH when its version answer shows the Make functions of the JSON
+// lines, and the prebuilt otherwise. With rkati or ABFS, it returns the prebuilt for them.
 func (c *configImpl) KatiBin() string {
 	binName := "ckati"
 	if c.useRkati {
@@ -2055,9 +2152,23 @@ func (c *configImpl) KatiBin() string {
 	if c.UseABFS() {
 		binName += "-wrap"
 	}
-
-	return c.PrebuiltBuildTool(binName)
+	if binName != "ckati" {
+		return c.PrebuiltBuildTool(binName)
+	}
+	return c.katiTool().path
 }
+
+// katiTool returns the ckati that the first call chose, and every later call returns the same.
+func (c *configImpl) katiTool() chosenTool {
+	c.katiToolOnce.Do(func() {
+		c.kati = c.chooseTool("ckati", c.PrebuiltBuildTool("ckati"), []string{"--version"}, "kati ", katiJsonLines)
+	})
+	return c.kati
+}
+
+// katiJsonLines is the Make functions KATI_json_quote and KATI_file_stream, which Make writes the
+// compliance metadata with.
+var katiJsonLines = toolCapability{"json-lines"}
 
 func (c *configImpl) NinjaBin() string {
 	binName := "ninja"
@@ -2073,52 +2184,90 @@ func (c *configImpl) N2Bin() string {
 	return strings.ReplaceAll(path, "/linux-x86/", "/linux_musl-x86/")
 }
 
-// sisoVersionSuffix ends the first line of the version answer of a siso that
-// supports build outputs outside the exec root.
-const sisoVersionSuffix = "+absolute-outputs"
+// toolCapability is a capability of a build tool built from source, shown as a
+// suffix "+<name>" of the version in the first line of its version answer.
+type toolCapability struct{ name string }
 
-// SisoBin returns the siso on PATH when its version answer names support for
-// build outputs outside the exec root, and the prebuilt otherwise. The first
-// call chooses, and every later call returns the same path.
+var (
+	// sisoAbsoluteOutputs is the support for build outputs outside the exec root.
+	sisoAbsoluteOutputs = toolCapability{"absolute-outputs"}
+	// sisoDeltaVariables is the support for delta builds of the steps that
+	// refer to -delta_variables, with -delta_base_dir and -delta_dir. The
+	// signing run builds with them. It also covers the builds that prepare a
+	// delta build, with -delta_targets, as the regular build with
+	// --signing-goals does.
+	sisoDeltaVariables = toolCapability{"delta-variables"}
+	// sisoDeltaWholeDirOutputs is the support for -delta_whole_dir_output in
+	// delta builds. The signing run passes this flag once for each primary file
+	// of an install that extracts an extra files zip next to it.
+	sisoDeltaWholeDirOutputs = toolCapability{"delta-whole-dir-outputs"}
+)
+
+// SisoBin returns the siso on PATH when its version answer shows support for build outputs outside
+// the exec root, and the prebuilt otherwise. The first call chooses, and every later call returns
+// the same path.
 func (c *configImpl) SisoBin() string {
-	c.sisoBinOnce.Do(func() {
-		c.sisoBin = c.chooseSisoBin()
+	return c.sisoTool().path
+}
+
+func (c *configImpl) sisoTool() chosenTool {
+	c.sisoToolOnce.Do(func() {
+		// -online=false stops a siso installed from CIPD from using the network.
+		c.siso = c.chooseTool("siso", c.prebuiltSisoBin(), []string{"version", "-online=false"}, "siso v",
+			sisoAbsoluteOutputs)
 	})
-	return c.sisoBin
+	return c.siso
 }
 
-func (c *configImpl) chooseSisoBin() string {
-	prebuilt := c.prebuiltSisoBin()
-	path, err := exec.LookPath("siso")
+// A chosenTool is the build tool that soong_ui runs, with the capabilities of its version answer.
+type chosenTool struct {
+	path string
+	// The capabilities in the version answer of the tool. A prebuilt tool has none.
+	capabilities []string
+}
+
+// supports reports whether the tool has capability.
+func (t chosenTool) supports(capability toolCapability) bool {
+	return slices.Contains(t.capabilities, capability.name)
+}
+
+// chooseTool returns the tool called name on PATH when its version answer, which it gets by running
+// it with versionArgs, shows the required capability, and prebuilt otherwise.
+func (c *configImpl) chooseTool(name, prebuilt string, versionArgs []string, versionPrefix string,
+	required toolCapability) chosenTool {
+	path, err := exec.LookPath(name)
 	if err != nil && !errors.Is(err, exec.ErrDot) {
-		return prebuilt
+		return chosenTool{path: prebuilt}
 	}
-	if err == nil && sisoSupportsAbsoluteOutputs(path) {
-		return path
+	if err == nil {
+		tool := chosenTool{path: path, capabilities: toolCapabilities(path, versionArgs, versionPrefix)}
+		if tool.supports(required) {
+			return tool
+		}
 	}
-	c.logger.Printf("Skipping siso at %s, running the prebuilt %s instead", path, prebuilt)
-	return prebuilt
+	c.logger.Printf("Skipping %s at %s, running the prebuilt %s instead", name, path, prebuilt)
+	return chosenTool{path: prebuilt}
 }
 
-// sisoSupportsAbsoluteOutputs reports whether the first line of the version
-// answer of the siso at path has the form "siso v...+absolute-outputs".
-// -online=false keeps a siso installed from CIPD off the network.
-func sisoSupportsAbsoluteOutputs(path string) bool {
-	out, err := exec.Command(path, "version", "-online=false").Output()
+// toolCapabilities returns the capabilities in the version answer of the tool at path, which it
+// gets by running the tool with versionArgs. The first line of the answer has the form
+// "<prefix><version>+<capability>...", and the result is empty for any other answer.
+func toolCapabilities(path string, versionArgs []string, prefix string) []string {
+	out, err := exec.Command(path, versionArgs...).Output()
 	if err != nil {
-		return false
+		return nil
 	}
 	first, _, _ := strings.Cut(string(out), "\n")
-	return strings.HasPrefix(first, "siso v") && strings.HasSuffix(first, sisoVersionSuffix)
+	version, ok := strings.CutPrefix(first, prefix)
+	if !ok {
+		return nil
+	}
+	return strings.Split(version, "+")[1:]
 }
 
 func (c *configImpl) prebuiltSisoBin() string {
 	// TODO(b/374176257): remove this once Siso is built from source.
 	return filepath.Join("prebuilts/siso", c.HostPrebuiltTag(), "siso")
-
-	path := c.PrebuiltBuildTool("siso")
-	// Use musl instead of glibc because glibc on the build server is old and has bugs
-	return strings.ReplaceAll(path, "/linux-x86/", "/linux_musl-x86/")
 }
 
 func (c *configImpl) PrebuiltBuildTool(name string) string {
@@ -2180,11 +2329,11 @@ func (c *configImpl) MetricsUploaderApp() string {
 }
 
 // LogsDir returns the absolute path to the logs directory where build log and
-// metrics files are located. By default, the logs directory is the out
-// directory. If the argument dist is specified, the logs directory
-// is <dist_dir>/logs.
+// metrics files are located. By default, the logs directory is the directory
+// that the build writes into. If the argument dist is specified, the logs
+// directory is <dist_dir>/logs.
 func (c *configImpl) LogsDir() string {
-	dir := c.OutDir()
+	dir := c.WriteDir()
 	if c.Dist() {
 		// Always write logs to the real dist dir, even if Bazel is using a rigged dist dir for other files
 		dir = filepath.Join(c.RealDistDir(), "logs")

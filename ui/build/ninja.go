@@ -36,9 +36,19 @@ const (
 )
 
 // Runs ninja with the arguments from the command line, as found in
-// config.NinjaArgs().
-func runNinjaForBuild(ctx Context, config Config) {
-	runNinja(ctx, config, config.NinjaArgs())
+// config.NinjaArgs(). With --signing-goals, siso also builds every step that
+// the goals of the signing run need, except the steps that the signing run
+// runs: the steps that refer to one of signingVariables, and the steps that
+// read an output of such a step. siso checks the list of goals.
+func runNinjaForBuild(ctx Context, config Config, signingVariables []shared.NinjaVariable) {
+	args := config.NinjaArgs()
+	if goals := config.signingGoals; goals != nil {
+		args = append([]string{
+			deltaVariablesArg(signingVariables),
+			"-delta_targets=" + *goals,
+		}, args...)
+	}
+	runNinja(ctx, config, args)
 }
 
 // Constructs and runs the Ninja command line with a restricted set of
@@ -51,7 +61,7 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 	// Sets up the FIFO status updater that reads the Ninja protobuf output, and
 	// translates it to the soong_ui status output, displaying real-time
 	// progress of the build.
-	fifo := filepath.Join(config.OutDir(), ".ninja_fifo")
+	fifo := filepath.Join(config.WriteDir(), ".ninja_fifo")
 	nr := status.NewNinjaReader(ctx, ctx.Status.StartTool(), fifo, ctx.SigNumFunc)
 	defer nr.Close()
 
@@ -218,7 +228,7 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 			fallthrough
 		case HINT_FROM_SOONG:
 			// The weight list is already copied/generated.
-			ninjaWeightListPath := filepath.Join(config.OutDir(), ninjaWeightListFileName)
+			ninjaWeightListPath := filepath.Join(config.WriteDir(), ninjaWeightListFileName)
 			cmd.Args = append(cmd.Args, "-o", "usesweightlist="+ninjaWeightListPath)
 		}
 	case NINJA_SISO:
@@ -361,7 +371,7 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 	}
 
 	// Set up the metrics aggregation directory.
-	ctx.ExecutionMetrics.SetDir(filepath.Join(config.OutDir(), "soong", "metrics_aggregation"))
+	ctx.ExecutionMetrics.SetDir(filepath.Join(config.WriteDir(), "soong", "metrics_aggregation"))
 	cmd.Environment.Set("SOONG_METRICS_AGGREGATION_DIR", ctx.ExecutionMetrics.MetricsAggregationDir)
 
 	// Print the environment variables that Ninja is operating in.
@@ -381,7 +391,7 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 	// Write the file in every single run. This is fine because
 	// 1. It is not a dep of Soong analysis, so will not retrigger Soong analysis.
 	// 2. Is is fairly lightweight (~1Kb)
-	ninjaEnvVarsFile := shared.JoinPath(config.SoongOutDir(), ninjaEnvFileName)
+	ninjaEnvVarsFile := shared.JoinPath(config.WriteDir(), "soong", ninjaEnvFileName)
 	err = os.WriteFile(ninjaEnvVarsFile, data, 0666)
 	if err != nil {
 		ctx.Panicf("Could not write ninja environment file %s", err)
@@ -395,7 +405,7 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 	ticker := time.NewTicker(ninjaHeartbeatDuration)
 	defer ticker.Stop()
 	ninjaChecker := &ninjaStucknessChecker{
-		logPath: filepath.Join(config.OutDir(), ninjaLogFileName),
+		logPath: filepath.Join(config.WriteDir(), ninjaLogFileName),
 	}
 	go func() {
 		for {

@@ -17,12 +17,20 @@ package android
 import (
 	"fmt"
 
+	"github.com/google/blueprint"
 	"github.com/google/blueprint/proptools"
+
+	"android/soong/shared"
 )
 
 func init() {
 	registerBuildPropComponents(InitRegistrationContext)
 }
+
+// SigningDate is the date of the signing build in the form 20261023-143000, which gen_build_prop
+// writes into the product properties in the place of shared.SigningDatePlaceholder. soong_ui sets it
+// in combined-<product>.ninja, to the placeholder itself in a regular build.
+var SigningDate = blueprint.NewExternalVariable(shared.SigningDateVariable)
 
 func registerBuildPropComponents(ctx RegistrationContext) {
 	ctx.RegisterModuleType("build_prop", BuildPropFactory)
@@ -155,6 +163,8 @@ func (p *buildPropModule) GenerateAndroidBuildActions(ctx ModuleContext) {
 	// build.
 	cmd.FlagWithArg("--date-file=", ctx.Config().Getenv("BUILD_DATETIME_FILE"))
 	cmd.OrderOnly(config.BuildDateFile(ctx))
+	cmd.FlagWithExternalVariable("--build-date=", SigningDate, "")
+	cmd.FlagWithArg("--build-date-placeholder=", shared.SigningDatePlaceholder)
 	cmd.FlagWithInput("--platform-preview-sdk-fingerprint-file=", ApiFingerprintPath(ctx))
 	cmd.FlagWithInput("--product-config=", PathForModuleSrc(ctx, proptools.String(p.properties.Product_config)))
 	cmd.FlagWithArg("--partition=", partition)

@@ -78,7 +78,7 @@ func GenerateDexpreoptRule(ctx android.BuilderContext, globalSoong *GlobalSoongC
 	if generateProfile {
 		profile = profileCommand(ctx, globalSoong, global, module, rule)
 		if mc, ok := ctx.(android.ModuleContext); ok {
-			mc.ComplianceMetadataInfo().AddBuiltFiles(profile.String())
+			mc.ComplianceMetadataInfo().AddBuiltFiles(profile)
 		}
 	}
 	if generateBootProfile {

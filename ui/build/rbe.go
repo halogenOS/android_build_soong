@@ -205,7 +205,7 @@ func sisoRelConfigDir(ctx Context, dir string) string {
 
 func createSisoConfigDir(ctx Context, config Config, value string) string {
 	// We need to fabricate a working directory.
-	confDir := filepath.Join(config.OutDir(), "siso_config")
+	confDir := filepath.Join(config.WriteDir(), "siso_config")
 	if value == confDir {
 		_, err := os.Stat(filepath.Join(confDir, "main.star"))
 		if err != nil {

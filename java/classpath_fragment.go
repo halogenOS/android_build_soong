@@ -205,7 +205,10 @@ func (c *ClasspathFragmentBase) outputFilename() string {
 	return strings.ToLower(c.classpathType.String()) + ".pb"
 }
 
-func (c *ClasspathFragmentBase) generateClasspathProtoBuildActions(ctx android.ModuleContext, configuredJars android.ConfiguredJarList, jars []classpathJar) android.OutputPath {
+// generateClasspathProtoBuildActions returns the classpath proto, and no path when the module does
+// not generate it.
+func (c *ClasspathFragmentBase) generateClasspathProtoBuildActions(ctx android.ModuleContext, configuredJars android.ConfiguredJarList, jars []classpathJar) android.OptionalPath {
+	var proto android.OptionalPath
 	generateProto := proptools.BoolDefault(c.properties.Generate_classpaths_proto, true)
 	if generateProto {
 		outputFilename := c.outputFilename()
@@ -224,6 +227,7 @@ func (c *ClasspathFragmentBase) generateClasspathProtoBuildActions(ctx android.M
 			FlagWithOutput("--output=", c.outputFilepath)
 
 		rule.Build("classpath_fragment", "Compiling "+c.outputFilepath.String())
+		proto = android.OptionalPathForPath(c.outputFilepath)
 	}
 
 	classpathProtoInfo := ClasspathFragmentProtoContentInfo{
@@ -233,7 +237,7 @@ func (c *ClasspathFragmentBase) generateClasspathProtoBuildActions(ctx android.M
 		ClasspathFragmentProtoOutput:     c.outputFilepath,
 	}
 	android.SetProvider(ctx, ClasspathFragmentProtoContentInfoProvider, classpathProtoInfo)
-	return c.outputFilepath
+	return proto
 }
 
 func (c *ClasspathFragmentBase) installClasspathProto(ctx android.ModuleContext) android.InstallPath {

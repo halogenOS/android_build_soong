@@ -618,8 +618,10 @@ func (b *BootclasspathFragmentModule) GenerateAndroidBuildActions(ctx android.Mo
 		DexPreoptProfileGuided:  ctx.Config().GetBuildFlagBool("RELEASE_ART_COMPILE_BCP_APEX_SPEED_PROFILE") && b.properties.Dex_preopt.Profile.GetOrDefault(ctx, "") != "",
 	})
 
-	ctx.ComplianceMetadataInfo().AddBuiltFiles(classpathProtoOutputPath.String())
-	ctx.ComplianceMetadataInfo().AddBuiltFiles(hiddenAPIOutput.EncodedBootDexFilesByModule.bootDexJars().Strings()...)
+	if classpathProtoOutputPath.Valid() {
+		ctx.ComplianceMetadataInfo().AddBuiltFiles(classpathProtoOutputPath.Path())
+	}
+	ctx.ComplianceMetadataInfo().AddBuiltFiles(hiddenAPIOutput.EncodedBootDexFilesByModule.bootDexJars()...)
 }
 
 // getProfileProviderApexFromSource returns the name and profile path of the apex
@@ -685,7 +687,7 @@ func (b *BootclasspathFragmentModule) provideApexProguardInfo(ctx android.Module
 }
 
 // generateClasspathProtoBuildActions generates all required build actions for classpath.proto config
-func (b *BootclasspathFragmentModule) generateClasspathProtoBuildActions(ctx android.ModuleContext) android.OutputPath {
+func (b *BootclasspathFragmentModule) generateClasspathProtoBuildActions(ctx android.ModuleContext) android.OptionalPath {
 	var classpathJars []classpathJar
 	configuredJars := b.configuredJars(ctx)
 	if "art" == proptools.String(b.properties.Image_name) {

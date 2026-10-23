@@ -49,7 +49,7 @@ func TestAndroidAppImport(t *testing.T) {
 	// Check cert signing flag.
 	signedApk := variant.Output("signed/foo.apk")
 	signingFlag := signedApk.Args["certificates"]
-	expected := "build/make/target/product/security/platform.x509.pem build/make/target/product/security/platform.pk8"
+	expected := "${keys_dir}/platform.x509.pem ${keys_dir}/platform.pk8"
 	if expected != signingFlag {
 		t.Errorf("Incorrect signing flags, expected: %q, got: %q", expected, signingFlag)
 	}
@@ -89,7 +89,7 @@ func TestAndroidAppImportWithDefaults(t *testing.T) {
 	// Check cert signing flag.
 	signedApk := variant.Output("signed/foo.apk")
 	signingFlag := signedApk.Args["certificates"]
-	expected := "build/make/target/product/security/platform.x509.pem build/make/target/product/security/platform.pk8"
+	expected := "${keys_dir}/platform.x509.pem ${keys_dir}/platform.pk8"
 	if expected != signingFlag {
 		t.Errorf("Incorrect signing flags, expected: %q, got: %q", expected, signingFlag)
 	}
@@ -186,8 +186,7 @@ func TestAndroidAppImport_SigningLineage(t *testing.T) {
 	signedApk := variant.Output("signed/foo.apk")
 	// Check certificates
 	certificatesFlag := signedApk.Args["certificates"]
-	expected := "build/make/target/product/security/platform.x509.pem " +
-		"build/make/target/product/security/platform.pk8 " +
+	expected := "${keys_dir}/platform.x509.pem ${keys_dir}/platform.pk8 " +
 		"cert/additional_cert.x509.pem cert/additional_cert.pk8"
 	if expected != certificatesFlag {
 		t.Errorf("Incorrect certificates flags, expected: %q, got: %q", expected, certificatesFlag)
@@ -264,7 +263,7 @@ func TestAndroidAppImport_DefaultDevCert(t *testing.T) {
 	// Check cert signing flag.
 	signedApk := variant.Output("signed/foo.apk")
 	signingFlag := signedApk.Args["certificates"]
-	expected := "build/make/target/product/security/testkey.x509.pem build/make/target/product/security/testkey.pk8"
+	expected := "${keys_dir}/releasekey.x509.pem ${keys_dir}/releasekey.pk8"
 	if expected != signingFlag {
 		t.Errorf("Incorrect signing flags, expected: %q, got: %q", expected, signingFlag)
 	}

@@ -550,6 +550,8 @@ func (ctx *TestContext) Register() {
 	globalOrder.singletonOrder.enforceOrdering(ctx.singletons)
 	ctx.singletons.registerAll(ctx.Context)
 
+	registerComplianceRecordStreams(ctx.Context)
+
 	// Save the sorted components order away to make them easy to access while debugging.
 	ctx.mutatorOrder = componentsToNames(mutators)
 	ctx.singletonOrder = componentsToNames(singletons)

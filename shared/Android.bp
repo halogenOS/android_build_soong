@@ -10,6 +10,7 @@ bootstrap_go_package {
         "paths.go",
         "debug.go",
         "proto.go",
+        "signing.go",
     ],
     testSrcs: [
         "paths_test.go",

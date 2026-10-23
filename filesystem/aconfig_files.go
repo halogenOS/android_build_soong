@@ -44,7 +44,7 @@ func (f *filesystem) buildAconfigFlagsFiles(
 	specs map[string]android.PackagingSpec,
 	dir android.OutputPath,
 	fullInstallPaths *[]FullInstallPathInfo,
-	platformGeneratedFiles *[]string,
+	platformGeneratedFiles *android.Paths,
 ) {
 	if !proptools.Bool(f.properties.Gen_aconfig_flags_pb) {
 		return
@@ -94,7 +94,7 @@ func (f *filesystem) buildAconfigFlagsFiles(
 			SourcePath:      aconfigFlagsPb,
 		})
 		f.appendToEntry(ctx, installAconfigFlagsPath)
-		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath.String())
+		*platformGeneratedFiles = append(*platformGeneratedFiles, installPath)
 
 		storageFilesVersion := ctx.Config().ReleaseAconfigStorageVersion()
 		installAconfigStorageDir := installEtcDir.Join(ctx, "aconfig")
@@ -121,7 +121,7 @@ func (f *filesystem) buildAconfigFlagsFiles(
 				FullInstallPath: fip,
 			})
 			f.appendToEntry(ctx, installPath)
-			*platformGeneratedFiles = append(*platformGeneratedFiles, fip.String())
+			*platformGeneratedFiles = append(*platformGeneratedFiles, fip)
 		}
 
 		if ctx.Config().ReleaseCreateAconfigStorageFile() {

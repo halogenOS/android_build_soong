@@ -132,7 +132,7 @@ func SetupPath(ctx Context, config Config) {
 
 	origPath, _ := config.Environment().Get("PATH")
 	// The directory containing symlinks from binaries in $PATH to the interposer.
-	myPath := filepath.Join(config.OutDir(), ".path")
+	myPath := filepath.Join(config.WriteDir(), ".path")
 	interposer := myPath + "_interposer"
 
 	// Bootstrap the path_interposer Go binary with microfactory.

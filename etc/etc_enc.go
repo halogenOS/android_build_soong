@@ -3,6 +3,7 @@
 package etc
 
 import (
+	"android/soong/android"
 	"bytes"
 	"github.com/google/blueprint/gobtools"
 	"github.com/google/blueprint/proptools"
@@ -71,7 +72,7 @@ func (r ProductCopyFilesModuleInfo) Encode(ctx gobtools.EncContext, buf *bytes.B
 			return err
 		}
 		for val1 := 0; val1 < len(r.ProductCopyFileEntries); val1++ {
-			if err = gobtools.EncodeString(buf, r.ProductCopyFileEntries[val1]); err != nil {
+			if err = r.ProductCopyFileEntries[val1].Encode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -82,11 +83,12 @@ func (r ProductCopyFilesModuleInfo) Encode(ctx gobtools.EncContext, buf *bytes.B
 func (r ProductCopyFilesModuleInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":etc.ProductCopyFilesModuleInfo")
 	hasher.WriteInt(1)
-	hasher.WriteString(":.[]string")
+	hasher.WriteString(":.[]android.ComplianceProductCopy")
 	hasher.WriteInt(len(r.ProductCopyFileEntries))
 	for val1 := 0; val1 < len(r.ProductCopyFileEntries); val1++ {
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.ProductCopyFileEntries[val1])
+		if err := r.ProductCopyFileEntries[val1].CustomHash(hasher); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -100,10 +102,9 @@ func (r *ProductCopyFilesModuleInfo) Decode(ctx gobtools.EncContext, buf *bytes.
 		return err
 	}
 	if val2 != -1 {
-		r.ProductCopyFileEntries = make([]string, val2)
+		r.ProductCopyFileEntries = make([]android.ComplianceProductCopy, val2)
 		for val3 := 0; val3 < int(val2); val3++ {
-			err = gobtools.DecodeString(buf, &r.ProductCopyFileEntries[val3])
-			if err != nil {
+			if err = r.ProductCopyFileEntries[val3].Decode(ctx, buf); err != nil {
 				return err
 			}
 		}

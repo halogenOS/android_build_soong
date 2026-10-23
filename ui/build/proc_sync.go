@@ -30,23 +30,30 @@ import (
 // i.e. making sure only one Soong process is running for a given output directory
 
 func BecomeSingletonOrFail(ctx Context, config Config) (lock *fileLock) {
-	lockingInfo, err := newLock(config.OutDir())
+	lockingInfo, err := newLock(config.WriteDir())
 	if err != nil {
 		ctx.Logger.Fatal(err)
 	}
+	waitForLock(ctx, lockingInfo)
+	return lockingInfo
+}
+
+// waitForLock locks lock, and waits until the timeout for another Soong
+// process that has it.
+func waitForLock(ctx Context, lock *fileLock) {
 	lockfilePollDuration := time.Second
 	lockfileTimeout := time.Second * 10
+	var err error
 	if envTimeout := os.Getenv("SOONG_LOCK_TIMEOUT"); envTimeout != "" {
 		lockfileTimeout, err = time.ParseDuration(envTimeout)
 		if err != nil {
 			ctx.Logger.Fatalf("failure parsing SOONG_LOCK_TIMEOUT %q: %s", envTimeout, err)
 		}
 	}
-	err = lockSynchronous(*lockingInfo, newSleepWaiter(lockfilePollDuration, lockfileTimeout), ctx.Logger)
+	err = lockSynchronous(*lock, newSleepWaiter(lockfilePollDuration, lockfileTimeout), ctx.Logger)
 	if err != nil {
 		ctx.Logger.Fatal(err)
 	}
-	return lockingInfo
 }
 
 type lockable interface {

@@ -3036,29 +3036,15 @@ func (r allArchInfo) GetTypeId() int16 {
 
 // begin of compliance_metadata.go
 func init() {
-	ComplianceMetadataInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ComplianceMetadataInfo) })
+	ComplianceFilesInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ComplianceFilesInfo) })
+	ComplianceFileGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ComplianceFile) })
+	CompliancePrebuiltCopyGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(CompliancePrebuiltCopy) })
+	ComplianceProductCopyGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ComplianceProductCopy) })
+	ComplianceKernelModuleCopyGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ComplianceKernelModuleCopy) })
 }
 
-func (r ComplianceMetadataInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+func (r ComplianceFilesInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 	var err error
-
-	if r.properties == nil {
-		if err = gobtools.EncodeInt(buf, -1); err != nil {
-			return err
-		}
-	} else {
-		if err = gobtools.EncodeInt(buf, len(r.properties)); err != nil {
-			return err
-		}
-		for val1, val2 := range r.properties {
-			if err = gobtools.EncodeString(buf, val1); err != nil {
-				return err
-			}
-			if err = gobtools.EncodeString(buf, val2); err != nil {
-				return err
-			}
-		}
-	}
 
 	if r.filesContained == nil {
 		if err = gobtools.EncodeInt(buf, -1); err != nil {
@@ -3068,23 +3054,8 @@ func (r ComplianceMetadataInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffe
 		if err = gobtools.EncodeInt(buf, len(r.filesContained)); err != nil {
 			return err
 		}
-		for val3 := 0; val3 < len(r.filesContained); val3++ {
-			if err = gobtools.EncodeString(buf, r.filesContained[val3]); err != nil {
-				return err
-			}
-		}
-	}
-
-	if r.buildOutputPathsOfFilesContained == nil {
-		if err = gobtools.EncodeInt(buf, -1); err != nil {
-			return err
-		}
-	} else {
-		if err = gobtools.EncodeInt(buf, len(r.buildOutputPathsOfFilesContained)); err != nil {
-			return err
-		}
-		for val4 := 0; val4 < len(r.buildOutputPathsOfFilesContained); val4++ {
-			if err = gobtools.EncodeString(buf, r.buildOutputPathsOfFilesContained[val4]); err != nil {
+		for val1 := 0; val1 < len(r.filesContained); val1++ {
+			if err = r.filesContained[val1].Encode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -3098,8 +3069,8 @@ func (r ComplianceMetadataInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffe
 		if err = gobtools.EncodeInt(buf, len(r.prebuiltFilesCopied)); err != nil {
 			return err
 		}
-		for val5 := 0; val5 < len(r.prebuiltFilesCopied); val5++ {
-			if err = gobtools.EncodeString(buf, r.prebuiltFilesCopied[val5]); err != nil {
+		for val2 := 0; val2 < len(r.prebuiltFilesCopied); val2++ {
+			if err = r.prebuiltFilesCopied[val2].Encode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -3113,8 +3084,8 @@ func (r ComplianceMetadataInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffe
 		if err = gobtools.EncodeInt(buf, len(r.platformGeneratedFiles)); err != nil {
 			return err
 		}
-		for val6 := 0; val6 < len(r.platformGeneratedFiles); val6++ {
-			if err = gobtools.EncodeString(buf, r.platformGeneratedFiles[val6]); err != nil {
+		for val3 := 0; val3 < len(r.platformGeneratedFiles); val3++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.platformGeneratedFiles[val3]); err != nil {
 				return err
 			}
 		}
@@ -3128,8 +3099,8 @@ func (r ComplianceMetadataInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffe
 		if err = gobtools.EncodeInt(buf, len(r.productCopyFiles)); err != nil {
 			return err
 		}
-		for val7 := 0; val7 < len(r.productCopyFiles); val7++ {
-			if err = gobtools.EncodeString(buf, r.productCopyFiles[val7]); err != nil {
+		for val4 := 0; val4 < len(r.productCopyFiles); val4++ {
+			if err = r.productCopyFiles[val4].Encode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -3143,8 +3114,8 @@ func (r ComplianceMetadataInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffe
 		if err = gobtools.EncodeInt(buf, len(r.kernelModuleCopyFiles)); err != nil {
 			return err
 		}
-		for val8 := 0; val8 < len(r.kernelModuleCopyFiles); val8++ {
-			if err = gobtools.EncodeString(buf, r.kernelModuleCopyFiles[val8]); err != nil {
+		for val5 := 0; val5 < len(r.kernelModuleCopyFiles); val5++ {
+			if err = r.kernelModuleCopyFiles[val5].Encode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -3152,112 +3123,115 @@ func (r ComplianceMetadataInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffe
 	return err
 }
 
-func (r ComplianceMetadataInfo) CustomHash(hasher *proptools.Hasher) error {
-	hasher.WriteString(":android.ComplianceMetadataInfo")
-	hasher.WriteInt(7)
-	hasher.WriteString(":.map[string]string")
-	hasher.WriteInt(len(r.properties))
-	val1 := make([]string, 0, len(r.properties))
-	for val3 := range r.properties {
-		val1 = append(val1, val3)
-	}
-	proptools.SortOrdered(val1)
-	for _, val2 := range val1 {
-		hasher.WriteString(":.string")
-		hasher.WriteString(val2)
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.properties[val2])
-	}
-	hasher.WriteString(":.[]string")
+func (r ComplianceFilesInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ComplianceFilesInfo")
+	hasher.WriteInt(5)
+	hasher.WriteString(":.[]ComplianceFile")
 	hasher.WriteInt(len(r.filesContained))
-	for val4 := 0; val4 < len(r.filesContained); val4++ {
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.filesContained[val4])
+	for val1 := 0; val1 < len(r.filesContained); val1++ {
+		if err := r.filesContained[val1].CustomHash(hasher); err != nil {
+			return err
+		}
 	}
-	hasher.WriteString(":.[]string")
-	hasher.WriteInt(len(r.buildOutputPathsOfFilesContained))
-	for val5 := 0; val5 < len(r.buildOutputPathsOfFilesContained); val5++ {
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.buildOutputPathsOfFilesContained[val5])
-	}
-	hasher.WriteString(":.[]string")
+	hasher.WriteString(":.[]CompliancePrebuiltCopy")
 	hasher.WriteInt(len(r.prebuiltFilesCopied))
-	for val6 := 0; val6 < len(r.prebuiltFilesCopied); val6++ {
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.prebuiltFilesCopied[val6])
+	for val2 := 0; val2 < len(r.prebuiltFilesCopied); val2++ {
+		if err := r.prebuiltFilesCopied[val2].CustomHash(hasher); err != nil {
+			return err
+		}
 	}
-	hasher.WriteString(":.[]string")
+	hasher.WriteString(":android.Paths")
+	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.platformGeneratedFiles))
-	for val7 := 0; val7 < len(r.platformGeneratedFiles); val7++ {
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.platformGeneratedFiles[val7])
+	for val3 := 0; val3 < len(r.platformGeneratedFiles); val3++ {
+		hasher.WriteString(":android.Path")
+		val4 := r.platformGeneratedFiles[val3] == nil
+		if val4 {
+			hasher.WriteByte(0)
+		} else {
+			if v := reflect.ValueOf(r.platformGeneratedFiles[val3]); v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					panic(fmt.Errorf("nil pointer is not supported in interface"))
+				} else {
+					val5 := r.platformGeneratedFiles[val3] == nil
+					if val5 {
+						hasher.WriteByte(0)
+					} else {
+						val6 := func(hasher *proptools.Hasher) error {
+							return r.platformGeneratedFiles[val3].(proptools.CustomHash).CustomHash(hasher)
+						}
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val6); err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				r.platformGeneratedFiles[val3].(proptools.CustomHash).CustomHash(hasher)
+			}
+		}
 	}
-	hasher.WriteString(":.[]string")
+	hasher.WriteString(":.[]ComplianceProductCopy")
 	hasher.WriteInt(len(r.productCopyFiles))
-	for val8 := 0; val8 < len(r.productCopyFiles); val8++ {
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.productCopyFiles[val8])
+	for val7 := 0; val7 < len(r.productCopyFiles); val7++ {
+		if err := r.productCopyFiles[val7].CustomHash(hasher); err != nil {
+			return err
+		}
 	}
-	hasher.WriteString(":.[]string")
+	hasher.WriteString(":.[]ComplianceKernelModuleCopy")
 	hasher.WriteInt(len(r.kernelModuleCopyFiles))
-	for val9 := 0; val9 < len(r.kernelModuleCopyFiles); val9++ {
-		hasher.WriteString(":.string")
-		hasher.WriteString(r.kernelModuleCopyFiles[val9])
+	for val8 := 0; val8 < len(r.kernelModuleCopyFiles); val8++ {
+		if err := r.kernelModuleCopyFiles[val8].CustomHash(hasher); err != nil {
+			return err
+		}
 	}
 	return nil
 }
 
-func (r *ComplianceMetadataInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+func (r *ComplianceFilesInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 	var err error
 
-	var val1 int
-	err = gobtools.DecodeInt(buf, &val1)
+	var val2 int
+	err = gobtools.DecodeInt(buf, &val2)
 	if err != nil {
 		return err
 	}
-	if val1 != -1 {
-		r.properties = make(map[string]string, val1)
-		for val2 := 0; val2 < int(val1); val2++ {
-			var val3 string
-			var val4 string
-			err = gobtools.DecodeString(buf, &val3)
-			if err != nil {
-				return err
-			}
-			err = gobtools.DecodeString(buf, &val4)
-			if err != nil {
-				return err
-			}
-			r.properties[val3] = val4
-		}
-	}
-
-	var val8 int
-	err = gobtools.DecodeInt(buf, &val8)
-	if err != nil {
-		return err
-	}
-	if val8 != -1 {
-		r.filesContained = make([]string, val8)
-		for val9 := 0; val9 < int(val8); val9++ {
-			err = gobtools.DecodeString(buf, &r.filesContained[val9])
-			if err != nil {
+	if val2 != -1 {
+		r.filesContained = make([]ComplianceFile, val2)
+		for val3 := 0; val3 < int(val2); val3++ {
+			if err = r.filesContained[val3].Decode(ctx, buf); err != nil {
 				return err
 			}
 		}
 	}
 
-	var val12 int
-	err = gobtools.DecodeInt(buf, &val12)
+	var val6 int
+	err = gobtools.DecodeInt(buf, &val6)
 	if err != nil {
 		return err
 	}
-	if val12 != -1 {
-		r.buildOutputPathsOfFilesContained = make([]string, val12)
-		for val13 := 0; val13 < int(val12); val13++ {
-			err = gobtools.DecodeString(buf, &r.buildOutputPathsOfFilesContained[val13])
-			if err != nil {
+	if val6 != -1 {
+		r.prebuiltFilesCopied = make([]CompliancePrebuiltCopy, val6)
+		for val7 := 0; val7 < int(val6); val7++ {
+			if err = r.prebuiltFilesCopied[val7].Decode(ctx, buf); err != nil {
 				return err
+			}
+		}
+	}
+
+	var val11 int
+	err = gobtools.DecodeInt(buf, &val11)
+	if err != nil {
+		return err
+	}
+	if val11 != -1 {
+		r.platformGeneratedFiles = make([]Path, val11)
+		for val12 := 0; val12 < int(val11); val12++ {
+			if val14, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+				return err
+			} else if val14 == nil {
+				r.platformGeneratedFiles[val12] = nil
+			} else {
+				r.platformGeneratedFiles[val12] = val14.(Path)
 			}
 		}
 	}
@@ -3268,10 +3242,9 @@ func (r *ComplianceMetadataInfo) Decode(ctx gobtools.EncContext, buf *bytes.Read
 		return err
 	}
 	if val16 != -1 {
-		r.prebuiltFilesCopied = make([]string, val16)
+		r.productCopyFiles = make([]ComplianceProductCopy, val16)
 		for val17 := 0; val17 < int(val16); val17++ {
-			err = gobtools.DecodeString(buf, &r.prebuiltFilesCopied[val17])
-			if err != nil {
+			if err = r.productCopyFiles[val17].Decode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -3283,40 +3256,9 @@ func (r *ComplianceMetadataInfo) Decode(ctx gobtools.EncContext, buf *bytes.Read
 		return err
 	}
 	if val20 != -1 {
-		r.platformGeneratedFiles = make([]string, val20)
+		r.kernelModuleCopyFiles = make([]ComplianceKernelModuleCopy, val20)
 		for val21 := 0; val21 < int(val20); val21++ {
-			err = gobtools.DecodeString(buf, &r.platformGeneratedFiles[val21])
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	var val24 int
-	err = gobtools.DecodeInt(buf, &val24)
-	if err != nil {
-		return err
-	}
-	if val24 != -1 {
-		r.productCopyFiles = make([]string, val24)
-		for val25 := 0; val25 < int(val24); val25++ {
-			err = gobtools.DecodeString(buf, &r.productCopyFiles[val25])
-			if err != nil {
-				return err
-			}
-		}
-	}
-
-	var val28 int
-	err = gobtools.DecodeInt(buf, &val28)
-	if err != nil {
-		return err
-	}
-	if val28 != -1 {
-		r.kernelModuleCopyFiles = make([]string, val28)
-		for val29 := 0; val29 < int(val28); val29++ {
-			err = gobtools.DecodeString(buf, &r.kernelModuleCopyFiles[val29])
-			if err != nil {
+			if err = r.kernelModuleCopyFiles[val21].Decode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -3325,10 +3267,262 @@ func (r *ComplianceMetadataInfo) Decode(ctx gobtools.EncContext, buf *bytes.Read
 	return err
 }
 
-var ComplianceMetadataInfoGobRegId int16
+var ComplianceFilesInfoGobRegId int16
 
-func (r ComplianceMetadataInfo) GetTypeId() int16 {
-	return ComplianceMetadataInfoGobRegId
+func (r ComplianceFilesInfo) GetTypeId() int16 {
+	return ComplianceFilesInfoGobRegId
+}
+
+func (r ComplianceFile) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.path); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.inImage); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r ComplianceFile) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ComplianceFile")
+	hasher.WriteInt(2)
+	hasher.WriteString(":android.Path")
+	val1 := r.path == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.path); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.path == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.path.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.path.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.inImage)
+	return nil
+}
+
+func (r *ComplianceFile) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if val2, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val2 == nil {
+		r.path = nil
+	} else {
+		r.path = val2.(Path)
+	}
+
+	err = gobtools.DecodeString(buf, &r.inImage)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var ComplianceFileGobRegId int16
+
+func (r ComplianceFile) GetTypeId() int16 {
+	return ComplianceFileGobRegId
+}
+
+func (r CompliancePrebuiltCopy) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Src); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Dest); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r CompliancePrebuiltCopy) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.CompliancePrebuiltCopy")
+	hasher.WriteInt(2)
+	hasher.WriteString(":android.Path")
+	val1 := r.Src == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Src); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.Src == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.Src.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Src.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Dest)
+	return nil
+}
+
+func (r *CompliancePrebuiltCopy) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if val2, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val2 == nil {
+		r.Src = nil
+	} else {
+		r.Src = val2.(Path)
+	}
+
+	err = gobtools.DecodeString(buf, &r.Dest)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var CompliancePrebuiltCopyGobRegId int16
+
+func (r CompliancePrebuiltCopy) GetTypeId() int16 {
+	return CompliancePrebuiltCopyGobRegId
+}
+
+func (r ComplianceProductCopy) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Src); err != nil {
+		return err
+	}
+
+	if err = r.Dest.Encode(ctx, buf); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r ComplianceProductCopy) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ComplianceProductCopy")
+	hasher.WriteInt(2)
+	hasher.WriteString(":android.Path")
+	val1 := r.Src == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Src); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.Src == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.Src.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Src.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	if err := r.Dest.CustomHash(hasher); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *ComplianceProductCopy) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if val2, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val2 == nil {
+		r.Src = nil
+	} else {
+		r.Src = val2.(Path)
+	}
+
+	if err = r.Dest.Decode(ctx, buf); err != nil {
+		return err
+	}
+
+	return err
+}
+
+var ComplianceProductCopyGobRegId int16
+
+func (r ComplianceProductCopy) GetTypeId() int16 {
+	return ComplianceProductCopyGobRegId
+}
+
+func (r ComplianceKernelModuleCopy) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Src); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Dest); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r ComplianceKernelModuleCopy) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ComplianceKernelModuleCopy")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Src)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Dest)
+	return nil
+}
+
+func (r *ComplianceKernelModuleCopy) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Src)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.Dest)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var ComplianceKernelModuleCopyGobRegId int16
+
+func (r ComplianceKernelModuleCopy) GetTypeId() int16 {
+	return ComplianceKernelModuleCopyGobRegId
 }
 
 // end of compliance_metadata.go
@@ -4211,6 +4405,140 @@ func (r GenNoticeInfo) GetTypeId() int16 {
 }
 
 // end of gen_notice.go
+
+// begin of keys_dir.go
+func init() {
+	keysDirLinkGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(keysDirLink) })
+	keysDirLinksInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(keysDirLinksInfo) })
+}
+
+func (r keysDirLink) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Name); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Src); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r keysDirLink) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.keysDirLink")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Name)
+	hasher.WriteString(":android.Path")
+	val1 := r.Src == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Src); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.Src == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.Src.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Src.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	return nil
+}
+
+func (r *keysDirLink) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Name)
+	if err != nil {
+		return err
+	}
+
+	if val3, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val3 == nil {
+		r.Src = nil
+	} else {
+		r.Src = val3.(Path)
+	}
+
+	return err
+}
+
+var keysDirLinkGobRegId int16
+
+func (r keysDirLink) GetTypeId() int16 {
+	return keysDirLinkGobRegId
+}
+
+func (r keysDirLinksInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if r == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r)); err != nil {
+			return err
+		}
+		for val1 := 0; val1 < len(r); val1++ {
+			if err = r[val1].Encode(ctx, buf); err != nil {
+				return err
+			}
+		}
+	}
+	return err
+}
+
+func (r keysDirLinksInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":.[]keysDirLink")
+	hasher.WriteInt(len(r))
+	for val1 := 0; val1 < len(r); val1++ {
+		if err := r[val1].CustomHash(hasher); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *keysDirLinksInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	var val2 int
+	err = gobtools.DecodeInt(buf, &val2)
+	if err != nil {
+		return err
+	}
+	if val2 != -1 {
+		(*r) = make([]keysDirLink, val2)
+		for val3 := 0; val3 < int(val2); val3++ {
+			if err = (*r)[val3].Decode(ctx, buf); err != nil {
+				return err
+			}
+		}
+	}
+
+	return err
+}
+
+var keysDirLinksInfoGobRegId int16
+
+func (r keysDirLinksInfo) GetTypeId() int16 {
+	return keysDirLinksInfoGobRegId
+}
+
+// end of keys_dir.go
 
 // begin of license.go
 func init() {
@@ -6959,12 +7287,12 @@ func (r CommonModuleInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) err
 		return err
 	}
 
-	val8 := r.ComplianceMetadata == nil
+	val8 := r.ComplianceFiles == nil
 	if err = gobtools.EncodeBool(buf, val8); err != nil {
 		return err
 	}
 	if !val8 {
-		if err = (*r.ComplianceMetadata).Encode(ctx, buf); err != nil {
+		if err = (*r.ComplianceFiles).Encode(ctx, buf); err != nil {
 			return err
 		}
 	}
@@ -7460,18 +7788,18 @@ func (r CommonModuleInfo) CustomHash(hasher *proptools.Hasher) error {
 	} else {
 		hasher.WriteByte(0)
 	}
-	hasher.WriteString(":.*ComplianceMetadataInfo")
-	val8 := r.ComplianceMetadata == nil
+	hasher.WriteString(":.*ComplianceFilesInfo")
+	val8 := r.ComplianceFiles == nil
 	if val8 {
 		hasher.WriteByte(0)
 	} else {
 		val9 := func(hasher *proptools.Hasher) error {
-			if err := (*r.ComplianceMetadata).CustomHash(hasher); err != nil {
+			if err := (*r.ComplianceFiles).CustomHash(hasher); err != nil {
 				return err
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ComplianceMetadata)), val9); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ComplianceFiles)), val9); err != nil {
 			return err
 		}
 	}
@@ -8138,11 +8466,11 @@ func (r *CommonModuleInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) er
 		return err
 	}
 	if !val64 {
-		var val63 ComplianceMetadataInfo
+		var val63 ComplianceFilesInfo
 		if err = val63.Decode(ctx, buf); err != nil {
 			return err
 		}
-		r.ComplianceMetadata = &val63
+		r.ComplianceFiles = &val63
 	}
 
 	var val67 bool

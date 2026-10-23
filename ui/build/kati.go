@@ -34,6 +34,20 @@ const katiCleanspecSuffix = "-cleanspec"
 const katiPackageSuffix = "-package"
 const katiSoongOnlyPackageSuffix = "-soong-only-package"
 
+// checkKatiJsonLines fails the start of a build that runs Kati when the ckati cannot write the JSON
+// lines of the compliance metadata. A ckati without the Make functions expands them to nothing, and
+// the build would fail much later, at the import of a file that Kati did not write.
+func checkKatiJsonLines(ctx Context, config Config) {
+	if config.SkipKati() {
+		return
+	}
+	if kati := config.katiTool(); !kati.supports(katiJsonLines) {
+		ctx.Fatalf("Make writes the compliance metadata with the Make functions KATI_json_quote and "+
+			"KATI_file_stream, and the ckati at %s does not have them. Put a ckati built from build/kati on "+
+			"PATH, whose version shows +%s.", kati.path, katiJsonLines.name)
+	}
+}
+
 // genKatiSuffix creates a filename suffix for kati-generated files so that we
 // can cache them based on their inputs. Such files include the generated Ninja
 // files and env.sh environment variable setup files.

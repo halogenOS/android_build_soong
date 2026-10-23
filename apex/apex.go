@@ -2348,29 +2348,32 @@ func (a *apexBundle) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 	// Build compliance metadata
 	if a.installable() && slices.Contains(ctx.Config().UnbundledBuildApps(), a.Name()) {
-		builtFiles := []string{}
+		builtFiles := android.Paths{}
 		for _, file := range aconfigFiles {
-			builtFiles = append(builtFiles, file.builtFile.String())
+			builtFiles = append(builtFiles, file.builtFile)
 		}
 
-		filesContained := []string{}
-		buildOutputPaths := []string{}
-		filesContained = append(filesContained, a.installedFile.String())
-		buildOutputPaths = append(buildOutputPaths, a.outputFile.String())
+		files := []android.UnbundledAppFile{{
+			Installed:   android.ComplianceFileOfPath(a.installedFile),
+			BuildOutput: a.outputFile,
+		}}
 		for _, f := range a.filesInfo {
-			filesContained = append(filesContained, f.path())
-			buildOutputPaths = append(buildOutputPaths, f.builtFile.String())
-			imageDir := android.PathForModuleOut(ctx, "image"+imageApexSuffix).String()
+			files = append(files, android.UnbundledAppFile{
+				Installed:   android.ComplianceFileInImage(f.path()),
+				BuildOutput: f.builtFile,
+			})
+			imageDir := android.PathForModuleOut(ctx, "image"+imageApexSuffix)
 			for _, symlinkPath := range f.symlinkPaths() {
-				filesContained = append(filesContained, symlinkPath)
-				buildOutputPaths = append(buildOutputPaths, filepath.Join(imageDir, symlinkPath))
-				builtFiles = append(builtFiles, filepath.Join(imageDir, symlinkPath))
+				symlink := imageDir.Join(ctx, symlinkPath)
+				files = append(files, android.UnbundledAppFile{
+					Installed:   android.ComplianceFileInImage(symlinkPath),
+					BuildOutput: symlink,
+				})
+				builtFiles = append(builtFiles, symlink)
 			}
 		}
-		complianceMetadataInfo := ctx.ComplianceMetadataInfo()
-		complianceMetadataInfo.SetFilesContained(filesContained)
-		complianceMetadataInfo.SetBuildOutputPathsOfFilesContained(buildOutputPaths)
-		complianceMetadataInfo.AddBuiltFiles(builtFiles...)
+		android.SetUnbundledAppFiles(ctx, a.Name(), files)
+		ctx.ComplianceMetadataInfo().AddBuiltFiles(builtFiles...)
 	}
 }
 
@@ -2454,7 +2457,7 @@ func apexBootclasspathFragmentFiles(ctx android.ModuleContext, module android.Mo
 				Input:  pathOnHost,
 				Output: tempPath,
 			})
-			ctx.ComplianceMetadataInfo().AddBuiltFiles(tempPath.String())
+			ctx.ComplianceMetadataInfo().AddBuiltFiles(tempPath)
 		} else {
 			// At this point, the boot image profile cannot be generated. It is probably because the boot
 			// image profile source file does not exist on the branch, or it is not available for the

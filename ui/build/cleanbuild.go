@@ -17,7 +17,9 @@ package build
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -360,36 +362,26 @@ func cleanOldFiles(ctx Context, basePath, newFile string) {
 	os.Rename(newFile, oldFile)
 }
 
-// replacedInstallDir is one entry of the file that soong_build writes for the install directories
-// that modules replace as a whole: the primary file of the install and the directory, both
-// relative to the product out directory.
-type replacedInstallDir struct {
-	Primary string `json:"primary"`
-	Dir     string `json:"dir"`
-}
-
 // cleanReplacedInstallDirs deletes, with everything in it, each install directory that a module
 // replaced as a whole in the previous build and whose primary file the current build no longer
 // installs. cleanOldFiles removes a directory only when it is empty, and the files that an install
 // zip extracted there are named in no list of installed files, so they would stay behind.
 //
 // listFile is the current build's list of installed files below basePath; its ".previous" copy
-// holds the previous build's list until cleanOldFiles replaces it. replacedDirsFile, which
-// soong_build writes, is a JSON array of replacedInstallDir entries. Since soong_build has
-// rewritten it for the current build by the time this runs, the previous build's version is kept
-// as copyFile below basePath. Without replacedDirsFile nothing is removed or written. The current
-// file and the copy are each parsed with parseReplacedInstallDirs, the current file first, and one
-// that fails stops the build before anything is deleted or the copy is replaced, so a file that
-// soong_build wrote wrongly stops the build that wrote it and never becomes the copy.
+// holds the previous build's list until cleanOldFiles replaces it. replacedDirsFile is the list of
+// replaced install directories that soong_build writes. Since soong_build has rewritten it for the
+// current build by the time this runs, the previous build's version is kept as copyFile below
+// basePath. Without replacedDirsFile nothing is removed or written. The current file and the copy
+// are each read with readReplacedInstallDirs, the current file first, and one that fails stops the
+// build before anything is deleted or the copy is replaced, so a file that soong_build wrote
+// wrongly stops the build that wrote it and never becomes the copy.
 func cleanReplacedInstallDirs(ctx Context, basePath, listFile, copyFile, replacedDirsFile string) {
-	current, err := os.ReadFile(replacedDirsFile)
-	if os.IsNotExist(err) {
+	current, err := readReplacedInstallDirs(replacedDirsFile)
+	if errors.Is(err, fs.ErrNotExist) {
 		return
 	} else if err != nil {
-		ctx.Fatalf("Failed to read list of replaced install directories (%q): %v", replacedDirsFile, err)
-	}
-	if _, err := parseReplacedInstallDirs(current); err != nil {
-		ctx.Fatalf("List of replaced install directories (%q): %v", replacedDirsFile, err)
+		ctx.Fatalf("%s", describeInstallZipListError(replacedDirsFile, err,
+			"Run the build again, so soong_build writes the list anew."))
 	}
 
 	copyFile = filepath.Join(basePath, copyFile)
@@ -405,14 +397,15 @@ func cleanReplacedInstallDirs(ctx Context, basePath, listFile, copyFile, replace
 		}
 		return data, true
 	}
-	previous, copyOk := read(copyFile)
+	previous, err := readReplacedInstallDirs(copyFile)
+	copyOk := !errors.Is(err, fs.ErrNotExist)
+	if copyOk && err != nil {
+		ctx.Fatalf("%s", describeInstallZipListError(copyFile, err,
+			"Delete it, which skips the removal of directories that are no longer installed in this build."))
+	}
 	newList, newOk := read(listFile)
 	oldList, oldOk := read(listFile + ".previous")
 	if copyOk && newOk && oldOk {
-		entries, err := parseReplacedInstallDirs(previous)
-		if err != nil {
-			ctx.Fatalf("List of replaced install directories (%q): %v", copyFile, err)
-		}
 		installed := make(map[string]bool)
 		for _, path := range strings.Fields(string(newList)) {
 			installed[path] = true
@@ -421,7 +414,7 @@ func cleanReplacedInstallDirs(ctx Context, basePath, listFile, copyFile, replace
 		for _, path := range strings.Fields(string(oldList)) {
 			wasInstalled[path] = true
 		}
-		for _, entry := range entries {
+		for _, entry := range previous {
 			if !wasInstalled[entry.Primary] || installed[entry.Primary] {
 				continue
 			}
@@ -433,48 +426,17 @@ func cleanReplacedInstallDirs(ctx Context, basePath, listFile, copyFile, replace
 		}
 	}
 
+	data, err := json.Marshal(current)
+	if err != nil {
+		ctx.Fatalf("Failed to encode list of replaced install directories: %v", err)
+	}
 	tmpFile := copyFile + ".tmp"
-	if err := os.WriteFile(tmpFile, current, 0666); err != nil {
+	if err := os.WriteFile(tmpFile, data, 0666); err != nil {
 		ctx.Fatalf("Failed to write list of replaced install directories (%q): %v", tmpFile, err)
 	}
 	if err := os.Rename(tmpFile, copyFile); err != nil {
 		ctx.Fatalf("Failed to rename list of replaced install directories (%q->%q): %v", tmpFile, copyFile, err)
 	}
-}
-
-// parseReplacedInstallDirs decodes a list of replaced install directories and checks each entry
-// with checkReplacedInstallDir. Anything but a JSON array of such entries is an error, null
-// included, which json.Unmarshal takes for a nil slice without an error.
-func parseReplacedInstallDirs(data []byte) ([]replacedInstallDir, error) {
-	var entries []replacedInstallDir
-	if err := json.Unmarshal(data, &entries); err != nil {
-		return nil, fmt.Errorf("failed to parse it: %v", err)
-	}
-	if entries == nil {
-		return nil, fmt.Errorf("it is no JSON array")
-	}
-	for _, entry := range entries {
-		if err := checkReplacedInstallDir(entry); err != nil {
-			return nil, err
-		}
-	}
-	return entries, nil
-}
-
-// checkReplacedInstallDir reports an entry whose primary file or directory is not a clean
-// relative path below the product out directory, or whose primary file does not lie directly in
-// its directory, the only shape soong_build writes. The last check keeps an edited or corrupted
-// entry from deleting a directory that held no replacing install.
-func checkReplacedInstallDir(entry replacedInstallDir) error {
-	for _, p := range []string{entry.Primary, entry.Dir} {
-		if p == "" || p == "." || p == ".." || filepath.IsAbs(p) || filepath.Clean(p) != p || strings.HasPrefix(p, "../") {
-			return fmt.Errorf("entry %+v does not name a clean relative path below the product out directory", entry)
-		}
-	}
-	if filepath.Dir(entry.Primary) != entry.Dir {
-		return fmt.Errorf("entry %+v names a primary file that does not lie directly in its directory", entry)
-	}
-	return nil
 }
 
 // cleanEmptyDirs will delete a directory if it contains no files.
