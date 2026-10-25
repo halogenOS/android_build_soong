@@ -45,6 +45,9 @@ func readdir(path string) ([]DirEntryInfo, error) {
 
 	for {
 		n, errno := syscall.ReadDirent(fd, buf)
+		if errno == syscall.EINTR {
+			continue
+		}
 		if errno != nil {
 			err = os.NewSyscallError("readdirent", errno)
 			break
