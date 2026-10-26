@@ -172,10 +172,11 @@ func (r *RuleBuilder) Rewrapper(params *remoteexec.REParams) *RuleBuilder {
 }
 
 // Sbox marks the rule as needing to be wrapped by sbox. The outputDir should point to the output
-// directory that sbox will wipe. It should not be written to by any other rule. manifestPath should
+// directory that sbox owns. It should not be written to by any other rule. manifestPath should
 // point to a location where sbox's manifest will be written and must be outside outputDir. sbox
 // will ensure that all outputs have been written, and will discard any output files that were not
-// specified.
+// specified. The rule is a restat rule: sbox leaves an output whose content did not change
+// untouched, so the steps that read it do not run again.
 func (r *RuleBuilder) Sbox(outputDir WritablePath, manifestPath WritablePath) *RuleBuilder {
 	if r.sbox {
 		panic("Sbox() may not be called more than once")
@@ -192,6 +193,7 @@ func (r *RuleBuilder) Sbox(outputDir WritablePath, manifestPath WritablePath) *R
 	// 	panic("Sbox() may not be called for rules that call SandboxDisabled()")
 	// }
 	r.sbox = true
+	r.restat = true
 	r.outDir = outputDir
 	r.sboxManifestPath = manifestPath
 	return r

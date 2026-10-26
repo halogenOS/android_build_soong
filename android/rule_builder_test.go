@@ -595,10 +595,10 @@ func TestRuleBuilder_Build(t *testing.T) {
 		sbox := filepath.Join("out", "host", result.Config.PrebuiltOS(), "bin/sbox")
 		sandboxPath := shared.TempDirForOutDir("out/soong")
 
-		cmd := sbox + ` --sandbox-path ` + sandboxPath + ` --output-dir ` + sboxOutDir + ` --manifest ` + manifest
+		cmd := sbox + ` --sandbox-path ` + sandboxPath + ` --output-dir ` + sboxOutDir + ` --manifest ` + manifest + ` --write-if-changed`
 		module := result.ModuleForTests(t, "foo_sbox", "")
 		check(t, module.Output("gen/foo_sbox"), module.Output(rspFile2),
-			cmd, outFile, depFile, rspFile, rspFile2, false, []string{manifest}, []string{sbox})
+			cmd, outFile, depFile, rspFile, rspFile2, true, []string{manifest}, []string{sbox})
 	})
 	t.Run("singleton", func(t *testing.T) {
 		outFile := filepath.Join("out/soong/singleton/gen/baz")
