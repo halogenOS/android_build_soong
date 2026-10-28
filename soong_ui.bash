@@ -35,17 +35,17 @@ export ORIGINAL_PWD=${PWD}
 export TOP=$(gettop)
 source ${TOP}/build/soong/scripts/microfactory.bash
 
-# --build-date starts the signing run, which writes nothing into the output
+# --signing-run starts the signing run, which writes nothing into the output
 # directory of the regular build, so it runs the soong_ui of the regular build.
 # Any other spelling of the option fails here, before a soong_ui is built.
 signing_run=
 for arg in "$@"; do
   case "${arg}" in
-    --build-date=*)
+    --signing-run)
       signing_run=true
       ;;
-    *--build-date*)
-      echo "The signing run needs --build-date=YYYYMMDD-hhmmss as one argument, got \"${arg}\"." >&2
+    *--signing-run*)
+      echo "The signing run starts with --signing-run, which takes no value, got \"${arg}\"." >&2
       exit 1
       ;;
   esac

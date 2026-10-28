@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"android/soong/shared"
@@ -63,9 +64,12 @@ func BuildSigningRun(ctx Context, config Config) {
 	// signed directory the steps that refer to the signing variables and the
 	// steps that read their outputs. Every other step that the goals need has
 	// to be current in the regular build. The goals in the product
-	// configuration of the regular build do not apply.
+	// configuration of the regular build do not apply. siso sets the date to
+	// the newest modification time of the files that those steps read and
+	// that none of them writes, so a run on unchanged files runs no step.
 	args := []string{
 		deltaVariablesArg(variables),
+		deltaInputTimeArg(),
 		"-delta_base_dir", absPath(ctx, config.OutDir()),
 		"-delta_dir", absPath(ctx, config.WriteDir()),
 	}
@@ -87,11 +91,8 @@ func wholeDirOutputsArgs(ctx Context, config Config) []string {
 	if len(primaries) == 0 {
 		return nil
 	}
-	if siso := config.sisoTool(); !siso.supports(sisoDeltaWholeDirOutputs) {
-		ctx.Fatalf("The regular build has installs that extract an extra files zip next to the one file they declare, "+
-			"and the siso at %s cannot copy their directories as a whole for the signing run. "+
-			"Put a siso built from build/siso on PATH, whose version shows +%s.", siso.path, sisoDeltaWholeDirOutputs.name)
-	}
+	requireSisoCapabilities(ctx, config, "The regular build has installs that extract an extra files zip next to "+
+		"the one file they declare, and the signing run copies their directories as a whole.", sisoDeltaWholeDirOutputs)
 	productOut := absPath(ctx, config.ProductOut())
 	var args []string
 	for _, primary := range primaries {
@@ -114,7 +115,7 @@ func readRegularBuildList[T any](ctx Context, config Config, file string, read f
 // signingVariables links the keys of this build and returns the signing
 // variables with their values in this build.
 func signingVariables(ctx Context, config Config) []shared.NinjaVariable {
-	return shared.SigningValues{KeysDir: linkSigningKeys(ctx, config), Date: config.signingDate()}.Variables()
+	return shared.SigningVariables(linkSigningKeys(ctx, config))
 }
 
 // deltaVariablesArg returns the siso argument that passes the names of
@@ -125,6 +126,13 @@ func deltaVariablesArg(variables []shared.NinjaVariable) string {
 		names[i] = variable.Name
 	}
 	return "-delta_variables=" + strings.Join(names, ",")
+}
+
+// deltaInputTimeArg returns the siso argument that makes siso set the date of
+// the signing run to the newest modification time of the files that its steps
+// read.
+func deltaInputTimeArg() string {
+	return "-delta_input_time=" + shared.SigningDateVariable + ":" + shared.SigningDateLayout
 }
 
 // lockRegularOutDir locks OUT_DIR with the lock file of the regular build,
@@ -141,8 +149,8 @@ func lockRegularOutDir(ctx Context, config Config) *fileLock {
 }
 
 // checkSigningRunConfig fails the start of the signing run when its
-// configuration would make it write into OUT_DIR, or when it cannot build with
-// the delta builds of siso.
+// configuration would make it write into OUT_DIR, or when siso cannot build the
+// delta builds or set the date of the signing run.
 func checkSigningRunConfig(ctx Context, config Config) {
 	if config.Dist() {
 		ctx.Fatalf("The signing run writes nothing into OUT_DIR, and dist writes there. Leave out dist.")
@@ -152,6 +160,8 @@ func checkSigningRunConfig(ctx Context, config Config) {
 			"Unset SOONG_ACTION_SANDBOXING.", config.SoongOutDir())
 	}
 	checkSisoDeltaVariables(ctx, config)
+	requireSisoCapabilities(ctx, config, "The date of the signing run comes from the newest file that the steps of "+
+		"the run read, and siso sets it.", sisoDeltaInputTime)
 }
 
 // checkSisoDeltaVariables fails the start of the signing run and of a regular
@@ -162,12 +172,24 @@ func checkSisoDeltaVariables(ctx Context, config Config) {
 		ctx.Fatalf("The signing run and the regular build with --signing-goals build with siso, "+
 			"and SOONG_NINJA selects %s. Leave SOONG_NINJA unset, or set it to siso.", config.ninjaCommand)
 	}
-	if siso := config.sisoTool(); !siso.supports(sisoDeltaVariables) {
-		ctx.Fatalf("The signing run and the regular build with --signing-goals need a siso that selects the steps of "+
-			"the signing run by the signing variables, and the siso at %s does not. "+
-			"Put a siso built from build/siso on PATH, whose version shows +%s and +%s.",
-			siso.path, sisoAbsoluteOutputs.name, sisoDeltaVariables.name)
+	requireSisoCapabilities(ctx, config, "The signing run and the regular build with --signing-goals need a siso "+
+		"that selects the steps of the signing run by the signing variables.", sisoAbsoluteOutputs, sisoDeltaVariables)
+}
+
+// requireSisoCapabilities fails the build when the siso that it runs does not
+// show every one of capabilities in its version answer. need is the sentence
+// that tells what the build needs them for.
+func requireSisoCapabilities(ctx Context, config Config, need string, capabilities ...toolCapability) {
+	siso := config.sisoTool()
+	if !slices.ContainsFunc(capabilities, func(capability toolCapability) bool { return !siso.supports(capability) }) {
+		return
 	}
+	shown := make([]string, len(capabilities))
+	for i, capability := range capabilities {
+		shown[i] = "+" + capability.name
+	}
+	ctx.Fatalf("%s The siso at %s cannot do that. Put a siso built from build/siso on PATH, whose version shows %s.",
+		need, siso.path, strings.Join(shown, " and "))
 }
 
 // checkBuildInfo fails the signing run when the information about the build

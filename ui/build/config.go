@@ -104,6 +104,7 @@ type configImpl struct {
 
 	// From the arguments
 	parallel        int
+	parallelChosen  bool // whether -j set parallel. Otherwise parallel is the CPU count.
 	keepGoing       int
 	verbose         bool
 	checkbuild      bool
@@ -132,7 +133,7 @@ type configImpl struct {
 	ensureAllowlistIntegrity            bool // For CI builds - make sure modules are mixed-built
 	runCIPDProxyServer                  bool
 	runCIPDProxyServerControlledByFlags bool
-	signing                             *signingRun // nil in a regular build, one without --build-date
+	signing                             *signingRun // nil in a regular build, one without --signing-run
 	signingGoals                        *string     // the value of --signing-goals, nil without it
 
 	// From the product config
@@ -1163,7 +1164,8 @@ func (c *configImpl) EnforceNoReanalysis() bool {
 }
 
 func (c *configImpl) parseArgs(ctx Context, args []string) {
-	var signingKeysDir, signingDate, signingGoals, weightListFile *string
+	var signingKeysDir, signingGoals, weightListFile *string
+	var signingRunRequested bool
 	for i := 0; i < len(args); i++ {
 		arg := strings.TrimSpace(args[i])
 		if arg == "showcommands" {
@@ -1244,8 +1246,8 @@ func (c *configImpl) parseArgs(ctx Context, args []string) {
 			}
 		} else if value, ok := strings.CutPrefix(arg, "--signing-keys-dir="); ok {
 			signingKeysDir = &value
-		} else if value, ok := strings.CutPrefix(arg, "--build-date="); ok {
-			signingDate = &value
+		} else if arg == "--signing-run" {
+			signingRunRequested = true
 		} else if value, ok := strings.CutPrefix(arg, "--signing-goals="); ok {
 			signingGoals = &value
 		} else if arg == "--ensure-allowlist-integrity" {
@@ -1260,25 +1262,34 @@ func (c *configImpl) parseArgs(ctx Context, args []string) {
 			c.runCIPDProxyServerControlledByFlags = true
 			ctx.Verbosef("Disabling CIPD proxy due to --no-run-cipd-proxy-server")
 		} else if len(arg) > 0 && arg[0] == '-' {
-			parseArgNum := func(def int) int {
+			parseOptionalArgNum := func() (int, bool) {
 				if len(arg) > 2 {
 					p, err := strconv.ParseUint(arg[2:], 10, 31)
 					if err != nil {
 						ctx.Fatalf("Failed to parse %q: %v", arg, err)
 					}
-					return int(p)
+					return int(p), true
 				} else if i+1 < len(args) {
 					p, err := strconv.ParseUint(args[i+1], 10, 31)
 					if err == nil {
 						i++
-						return int(p)
+						return int(p), true
 					}
+				}
+				return 0, false
+			}
+			parseArgNum := func(def int) int {
+				if p, ok := parseOptionalArgNum(); ok {
+					return p
 				}
 				return def
 			}
 
 			if len(arg) > 1 && arg[1] == 'j' {
-				c.parallel = parseArgNum(c.parallel)
+				if p, ok := parseOptionalArgNum(); ok {
+					c.parallel = p
+					c.parallelChosen = true
+				}
 			} else if len(arg) > 1 && arg[1] == 'k' {
 				c.keepGoing = parseArgNum(0)
 			} else {
@@ -1302,11 +1313,17 @@ func (c *configImpl) parseArgs(ctx Context, args []string) {
 			c.arguments = append(c.arguments, arg)
 		}
 	}
-	if signingKeysDir != nil || signingDate != nil {
-		c.signing = newSigningRun(ctx, signingKeysDir, signingDate)
+	// --signing-keys-dir alone is an error, since release keys with the
+	// placeholder date would write a build that is neither a release nor a
+	// regular build.
+	switch {
+	case signingRunRequested:
+		c.signing = newSigningRun(ctx, signingKeysDir)
+	case signingKeysDir != nil:
+		ctx.Fatalf("--signing-keys-dir needs --signing-run, which starts the signing run")
 	}
 	if signingGoals != nil && c.SigningRun() {
-		ctx.Fatalf("--signing-goals is an option of the regular build, and --build-date starts the signing run")
+		ctx.Fatalf("--signing-goals is an option of the regular build, and --signing-run starts the signing run")
 	}
 	c.signingGoals = signingGoals
 	// The copy goes into the directory that the build writes into, which
@@ -1318,33 +1335,21 @@ func (c *configImpl) parseArgs(ctx Context, args []string) {
 	}
 }
 
-// signingDateLayout is the form of --build-date, as a layout for time.Parse.
-const signingDateLayout = "20060102-150405"
-
 // signingRun has the options of the signing run, the build of the goals that
 // need signing on top of the regular build.
 type signingRun struct {
-	keysDir *string   // The release key directory, an absolute path, or nil to sign with the test keys
-	date    time.Time // The date written into the build properties
+	keysDir *string // The release key directory, an absolute path, or nil to sign with the test keys
 }
 
-// newSigningRun checks the values of --signing-keys-dir and --build-date.
-// --build-date starts the signing run, which signs with the release keys in
-// --signing-keys-dir, or with the test keys without that option.
-// --signing-keys-dir alone is an error, since release keys with the placeholder
-// date would write a build that is neither a release nor a regular build.
-func newSigningRun(ctx Context, keysDir, date *string) *signingRun {
-	if date == nil {
-		ctx.Fatalf("--signing-keys-dir needs --build-date, which starts the signing run")
-	}
+// newSigningRun returns the options of the signing run, which --signing-run
+// starts, and checks the value of --signing-keys-dir. The signing run signs
+// with the release keys in --signing-keys-dir, or with the test keys without
+// that option.
+func newSigningRun(ctx Context, keysDir *string) *signingRun {
 	if keysDir != nil && !filepath.IsAbs(*keysDir) {
 		ctx.Fatalf("--signing-keys-dir needs an absolute path, got %q", *keysDir)
 	}
-	parsedDate, err := time.Parse(signingDateLayout, *date)
-	if err != nil {
-		ctx.Fatalf("--build-date needs the form YYYYMMDD-hhmmss, got %q", *date)
-	}
-	return &signingRun{keysDir: keysDir, date: parsedDate}
+	return &signingRun{keysDir: keysDir}
 }
 
 // SigningRun reports whether this build is the signing run.
@@ -1652,6 +1657,12 @@ func (c *configImpl) KatiArgs() []string {
 
 func (c *configImpl) Parallel() int {
 	return c.parallel
+}
+
+// ParallelChosen returns whether -j set Parallel. Otherwise Parallel is the
+// CPU count.
+func (c *configImpl) ParallelChosen() bool {
+	return c.parallelChosen
 }
 
 func (c *configImpl) GetSourceRootDirs() []string {
@@ -2063,15 +2074,6 @@ func (c *configImpl) CombinedNinjaFile() string {
 	return filepath.Join(c.WriteDir(), "combined"+c.KatiSuffix()+".ninja")
 }
 
-// signingDate returns the value of the build_date Ninja variable: the date
-// given with --build-date, or the placeholder of a regular build.
-func (c *configImpl) signingDate() string {
-	if !c.SigningRun() {
-		return shared.SigningDatePlaceholder
-	}
-	return c.signing.date.Format(signingDateLayout)
-}
-
 func (c *configImpl) SoongAndroidMk() string {
 	return filepath.Join(c.SoongOutDir(), "Android-"+c.TargetProduct()+c.CoverageSuffix()+".mk")
 }
@@ -2201,6 +2203,9 @@ var (
 	// delta builds. The signing run passes this flag once for each primary file
 	// of an install that extracts an extra files zip next to it.
 	sisoDeltaWholeDirOutputs = toolCapability{"delta-whole-dir-outputs"}
+	// sisoDeltaInputTime is the support for -delta_input_time in delta
+	// builds. The signing run sets the date of the build with it.
+	sisoDeltaInputTime = toolCapability{"delta-input-time"}
 )
 
 // SisoBin returns the siso on PATH when its version answer shows support for build outputs outside

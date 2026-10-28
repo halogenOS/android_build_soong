@@ -98,9 +98,9 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 			"-d", "keeprsp",
 			//"-d", "stats",
 			"--frontend_file", fifo,
-			"--local_jobs", strconv.Itoa(config.Parallel()),
 			"--log_dir", config.LogsDir(),
 		}
+		args = append(args, sisoLocalJobsArgs(config)...)
 		if value := config.SisoConfigDir(); value != "" {
 			value = createSisoConfigDir(ctx, config, value)
 			args = append(args, fmt.Sprintf("--config_repo_dir=%s", value))
@@ -466,4 +466,14 @@ func (c *ninjaStucknessChecker) check(ctx Context, config Config) {
 		ctx.Verbosef("done\n")
 	}
 	c.prevModTime = newModTime
+}
+
+// sisoLocalJobsArgs returns the siso arguments for the number of local jobs.
+// Only a number given with -j is passed. Without one, siso sizes its local
+// jobs while it builds, from spare CPU time and free memory.
+func sisoLocalJobsArgs(config Config) []string {
+	if !config.ParallelChosen() {
+		return nil
+	}
+	return []string{"--local_jobs", strconv.Itoa(config.Parallel())}
 }

@@ -27,9 +27,10 @@ func init() {
 	registerBuildPropComponents(InitRegistrationContext)
 }
 
-// SigningDate is the date of the signing build in the form 20261023-143000, which gen_build_prop
-// writes into the product properties in the place of shared.SigningDatePlaceholder. soong_ui sets it
-// in combined-<product>.ninja, to the placeholder itself in a regular build.
+// SigningDate is the date of the signing build in the form shared.SigningDateLayout, which
+// gen_build_prop writes into the product properties in the place of shared.SigningDatePlaceholder.
+// soong_ui sets it to the placeholder in combined-<product>.ninja. In the signing run, siso replaces
+// it with the newest modification time of the files that the steps of the signing run read.
 var SigningDate = blueprint.NewExternalVariable(shared.SigningDateVariable)
 
 func registerBuildPropComponents(ctx RegistrationContext) {

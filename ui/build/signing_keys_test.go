@@ -8,7 +8,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"testing"
-	"time"
 
 	"android/soong/shared"
 	"android/soong/ui/logger"
@@ -111,7 +110,6 @@ func TestLinkSigningKeys(t *testing.T) {
 }
 
 func TestConfigParseArgsSigning(t *testing.T) {
-	signingDate := time.Date(2026, time.October, 23, 14, 30, 0, 0, time.UTC)
 	releaseKeysDir := "/keys"
 	for _, test := range []struct {
 		name    string
@@ -124,28 +122,23 @@ func TestConfigParseArgsSigning(t *testing.T) {
 		},
 		{
 			name:    "signing build",
-			args:    []string{"--signing-keys-dir=/keys", "--build-date=20261023-143000"},
-			signing: &signingRun{keysDir: &releaseKeysDir, date: signingDate},
+			args:    []string{"--signing-keys-dir=/keys", "--signing-run"},
+			signing: &signingRun{keysDir: &releaseKeysDir},
 		},
 		{
-			name: "keys without a date",
+			name: "keys without the signing run",
 			args: []string{"--signing-keys-dir=/keys"},
-			err:  "--signing-keys-dir needs --build-date, which starts the signing run",
+			err:  "--signing-keys-dir needs --signing-run, which starts the signing run",
 		},
 		{
-			name:    "date without keys",
-			args:    []string{"--build-date=20261023-143000"},
-			signing: &signingRun{date: signingDate},
+			name:    "signing run without keys",
+			args:    []string{"--signing-run"},
+			signing: &signingRun{},
 		},
 		{
 			name: "relative key directory",
-			args: []string{"--signing-keys-dir=keys", "--build-date=20261023-143000"},
+			args: []string{"--signing-keys-dir=keys", "--signing-run"},
 			err:  `--signing-keys-dir needs an absolute path, got "keys"`,
-		},
-		{
-			name: "date in another form",
-			args: []string{"--signing-keys-dir=/keys", "--build-date=2026-10-23"},
-			err:  `--build-date needs the form YYYYMMDD-hhmmss, got "2026-10-23"`,
 		},
 	} {
 		t.Run(test.name, func(t *testing.T) {
@@ -168,16 +161,5 @@ func TestConfigParseArgsSigning(t *testing.T) {
 				t.Errorf("signing run: want %+v, got %+v", test.signing, c.signing)
 			}
 		})
-	}
-}
-
-func TestSigningDate(t *testing.T) {
-	c := &configImpl{}
-	if got := c.signingDate(); got != shared.SigningDatePlaceholder {
-		t.Errorf("build_date of a regular build: want %q, got %q", shared.SigningDatePlaceholder, got)
-	}
-	c.signing = &signingRun{date: time.Date(2026, time.October, 23, 14, 30, 0, 0, time.UTC)}
-	if got, want := c.signingDate(), "20261023-143000"; got != want {
-		t.Errorf("build_date of a signing build: want %q, got %q", want, got)
 	}
 }

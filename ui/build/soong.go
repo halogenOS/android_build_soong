@@ -320,7 +320,7 @@ func bootstrapBlueprint(ctx Context, config Config) {
 	if totalRAM := config.TotalRAM(); totalRAM != 0 {
 		// Without a limit, the garbage collector lets the heap of soong_build
 		// grow to twice its live size, more than many machines can hold.
-		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, fmt.Sprintf("--memory_limit=%d", totalRAM/4*3))
+		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, fmt.Sprintf("--memory_limit=%d", totalRAM/2))
 	}
 	if len(config.partialAnalysisTargets) > 0 {
 		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, fmt.Sprintf("%s=\"%s\"", "--partial-analysis-targets", config.partialAnalysisTargets))
@@ -696,11 +696,11 @@ func runSoong(ctx Context, config Config, enforceNoSoongOutput bool) {
 					//"-w", "dupbuild=err",
 					//"-w", "outputdir=err",
 					//"-w", "missingoutfile=err",
-					"--local_jobs", strconv.Itoa(config.Parallel()),
 					//"--remote_jobs", strconv.Itoa(config.RemoteParallel()),
 					"--frontend_file", fifo,
 					"-f", filepath.Join(config.SoongOutDir(), "bootstrap.ninja"),
 				}
+				ninjaArgs = append(ninjaArgs, sisoLocalJobsArgs(config)...)
 				if value := config.SisoConfigDir(); value != "" {
 					value = createSisoConfigDir(ctx, config, value)
 					ninjaArgs = append(ninjaArgs, fmt.Sprintf("--config_repo_dir=%s", value))
