@@ -635,11 +635,6 @@ type Module struct {
 
 	stubsLinkType StubsLinkType
 
-	// Paths to the aconfig intermediate cache files that are provided by the
-	// java_aconfig_library or java_library modules that are statically linked
-	// to this module. Does not contain cache files from all transitive dependencies.
-	aconfigCacheFiles android.Paths
-
 	// List of soong module dependencies required to compile the current module.
 	// This information is printed out to `Dependencies` field in module_bp_java_deps.json
 	compileDepNames []string
@@ -1391,7 +1386,10 @@ func (j *Module) compile(ctx android.ModuleContext) *JavaInfo {
 	// final R classes from the app.
 	flags.classpath = append(android.CopyOf(j.extraClasspathJars), flags.classpath...)
 
-	j.aconfigCacheFiles = append(deps.aconfigProtoFiles, j.properties.Aconfig_Cache_files...)
+	// The aconfig intermediate cache files that are provided by the
+	// java_aconfig_library or java_library modules in static_libs, directly or
+	// through their own static_libs, and by Aconfig_Cache_files.
+	aconfigCacheFiles := depset.New(depset.PREORDER, j.properties.Aconfig_Cache_files, deps.aconfigCacheFiles)
 
 	var localImplementationJars android.Paths
 	var localImplementationJarsContainsDependencies bool
@@ -1462,7 +1460,7 @@ func (j *Module) compile(ctx android.ModuleContext) *JavaInfo {
 			ExportedPluginClasses:               j.exportedPluginClasses,
 			ExportedPluginDisableTurbine:        j.exportedDisableTurbine,
 			StubsLinkType:                       j.stubsLinkType,
-			AconfigIntermediateCacheOutputPaths: deps.aconfigProtoFiles,
+			TransitiveAconfigCacheFiles:         deps.aconfigCacheFiles.merge(),
 			SdkVersion:                          j.SdkVersion(ctx),
 			HasOverrideMinSdkVersion:            overridableMinSdkVersion.IsPresent(),
 			Installable:                         BoolDefault(j.properties.Installable, true),
@@ -2295,7 +2293,7 @@ func (j *Module) compile(ctx android.ModuleContext) *JavaInfo {
 		ExportedPluginDisableTurbine:        j.exportedDisableTurbine,
 		JacocoInfo:                          j.jacocoInfo,
 		StubsLinkType:                       j.stubsLinkType,
-		AconfigIntermediateCacheOutputPaths: j.aconfigCacheFiles,
+		TransitiveAconfigCacheFiles:         aconfigCacheFiles,
 		SdkVersion:                          j.SdkVersion(ctx),
 		OutputFile:                          j.outputFile,
 		HasOverrideMinSdkVersion:            overridableMinSdkVersion.IsPresent(),
@@ -2970,7 +2968,7 @@ func (j *Module) collectDeps(ctx android.ModuleContext) deps {
 				// annotation processor that generates API is incompatible with the turbine
 				// optimization.
 				deps.disableTurbine = !ctx.Config().GetBuildFlagBool("RELEASE_USE_TURBINE_APT_JAVAC") && (deps.disableTurbine || dep.ExportedPluginDisableTurbine)
-				deps.aconfigProtoFiles = append(deps.aconfigProtoFiles, dep.AconfigIntermediateCacheOutputPaths...)
+				deps.aconfigCacheFiles.addSet(dep.TransitiveAconfigCacheFiles)
 
 				transitiveClasspathHeaderJars = append(transitiveClasspathHeaderJars, dep.TransitiveStaticLibsHeaderJars)
 				transitiveStaticJarsHeaderLibs = append(transitiveStaticJarsHeaderLibs, dep.TransitiveStaticLibsHeaderJars)
@@ -3069,10 +3067,10 @@ func (j *Module) collectDeps(ctx android.ModuleContext) deps {
 		} else if dep, ok := android.OtherModuleProvider(ctx, module, android.CodegenInfoProvider); ok {
 			switch tag {
 			case staticLibTag:
-				deps.aconfigProtoFiles = append(deps.aconfigProtoFiles, dep.IntermediateCacheOutputPaths...)
+				deps.aconfigCacheFiles.addFiles(dep.IntermediateCacheOutputPaths...)
 			}
 		} else if dep, ok := android.OtherModuleProvider(ctx, module, DroidStubsInfoProvider); ok {
-			deps.aconfigProtoFiles = append(deps.aconfigProtoFiles, dep.AconfigProtoFiles...)
+			deps.aconfigCacheFiles.addSet(dep.AconfigCacheFiles)
 		} else {
 			switch tag {
 			case bootClasspathTag:

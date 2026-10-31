@@ -379,9 +379,10 @@ type JavaInfo struct {
 	// and selection between the stub jar vs implementation jar is deferred to SdkLibrary.sdkJars(...)
 	StubsLinkType StubsLinkType
 
-	// AconfigIntermediateCacheOutputPaths is a path to the cache files collected from the
-	// java_aconfig_library modules that are statically linked to this module.
-	AconfigIntermediateCacheOutputPaths android.Paths
+	// TransitiveAconfigCacheFiles are the aconfig cache files provided by this module and
+	// by the java_aconfig_library modules in static_libs, directly or through their own
+	// static_libs.
+	TransitiveAconfigCacheFiles depset.DepSet[android.Path]
 
 	SdkVersion android.SdkSpec
 
@@ -823,7 +824,7 @@ type deps struct {
 	composePlugin           android.OptionalPath
 	kSnapshotFiles          map[string]android.Path
 	kotlinPlugins           android.Paths
-	aconfigProtoFiles       android.Paths
+	aconfigCacheFiles       aconfigCacheFileSets
 
 	headerJarOverride          android.OptionalPath
 	headerJarOverridePreJarjar android.OptionalPath
@@ -836,6 +837,22 @@ type deps struct {
 	transitiveStaticLibsHeaderJars         []depset.DepSet[android.Path]
 	transitiveStaticLibsImplementationJars []depset.DepSet[android.Path]
 	transitiveStaticLibsResourceJars       []depset.DepSet[android.Path]
+}
+
+// aconfigCacheFileSets are the aconfig cache files provided by the dependencies of a module,
+// one set per dependency, in the order in which the dependencies are visited.
+type aconfigCacheFileSets []depset.DepSet[android.Path]
+
+func (s *aconfigCacheFileSets) addFiles(files ...android.Path) {
+	*s = append(*s, depset.New(depset.PREORDER, files, nil))
+}
+
+func (s *aconfigCacheFileSets) addSet(set depset.DepSet[android.Path]) {
+	*s = append(*s, set)
+}
+
+func (s aconfigCacheFileSets) merge() depset.DepSet[android.Path] {
+	return depset.New(depset.PREORDER, nil, s)
 }
 
 func checkProducesJars(ctx android.ModuleContext, dep android.SourceFilesInfo, module android.ModuleProxy) {
@@ -2547,8 +2564,6 @@ type ApiLibrary struct {
 
 	stubsType StubsType
 
-	aconfigProtoFiles android.Paths
-
 	kSnapshotFiles map[string]android.Path
 }
 
@@ -2801,6 +2816,7 @@ func (al *ApiLibrary) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	al.validateProperties(ctx)
 
 	al.kSnapshotFiles = make(map[string]android.Path)
+	var aconfigCacheFiles aconfigCacheFileSets
 
 	rule := android.NewRuleBuilder(pctx, ctx).SandboxDisabled()
 
@@ -2830,19 +2846,19 @@ func (al *ApiLibrary) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		case libTag:
 			if provider, ok := android.OtherModuleProvider(ctx, dep, JavaInfoProvider); ok {
 				classPaths = append(classPaths, provider.HeaderJars...)
-				al.aconfigProtoFiles = append(al.aconfigProtoFiles, provider.AconfigIntermediateCacheOutputPaths...)
+				aconfigCacheFiles.addSet(provider.TransitiveAconfigCacheFiles)
 				maps.Copy(al.kSnapshotFiles, provider.KSnapshotFiles)
 			}
 		case bootClasspathTag:
 			if provider, ok := android.OtherModuleProvider(ctx, dep, JavaInfoProvider); ok {
 				bootclassPaths = append(bootclassPaths, provider.HeaderJars...)
-				al.aconfigProtoFiles = append(al.aconfigProtoFiles, provider.AconfigIntermediateCacheOutputPaths...)
+				aconfigCacheFiles.addSet(provider.TransitiveAconfigCacheFiles)
 				maps.Copy(al.kSnapshotFiles, provider.KSnapshotFiles)
 			}
 		case staticLibTag:
 			if provider, ok := android.OtherModuleProvider(ctx, dep, JavaInfoProvider); ok {
 				staticLibs = append(staticLibs, provider.HeaderJars...)
-				al.aconfigProtoFiles = append(al.aconfigProtoFiles, provider.AconfigIntermediateCacheOutputPaths...)
+				aconfigCacheFiles.addSet(provider.TransitiveAconfigCacheFiles)
 				maps.Copy(al.kSnapshotFiles, provider.KSnapshotFiles)
 			}
 		case systemModulesTag:
@@ -2855,9 +2871,9 @@ func (al *ApiLibrary) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 			}
 		case aconfigDeclarationTag:
 			if provider, ok := android.OtherModuleProvider(ctx, dep, android.AconfigDeclarationsProviderKey); ok {
-				al.aconfigProtoFiles = append(al.aconfigProtoFiles, provider.IntermediateCacheOutputPath)
+				aconfigCacheFiles.addFiles(provider.IntermediateCacheOutputPath)
 			} else if provider, ok := android.OtherModuleProvider(ctx, dep, android.CodegenInfoProvider); ok {
-				al.aconfigProtoFiles = append(al.aconfigProtoFiles, provider.IntermediateCacheOutputPaths...)
+				aconfigCacheFiles.addFiles(provider.IntermediateCacheOutputPaths...)
 			} else {
 				ctx.ModuleErrorf("Only aconfig_declarations and aconfig_declarations_group "+
 					"module type is allowed for flags_packages property, but %s is neither "+
@@ -2903,7 +2919,7 @@ func (al *ApiLibrary) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		al.addValidation(ctx, cmd, al.validationPaths)
 	}
 
-	generateMetalavaFlagConfigArgs(ctx, cmd, al.stubsType, al.aconfigProtoFiles)
+	generateMetalavaFlagConfigArgs(ctx, cmd, al.stubsType, aconfigCacheFiles.merge().ToList())
 
 	al.stubsSrcJar = android.PathForModuleOut(ctx, "metalava", ctx.ModuleName()+"-"+"stubs.srcjar")
 	// The metalava rule deletes every file in its sbox output directory that
@@ -4139,17 +4155,18 @@ func setExtraJavaInfo(ctx android.ModuleContext, module android.Module, javaInfo
 }
 
 func getCombinedAconfigProtoFile(ctx android.ModuleContext) android.Path {
-	var aconfigProtoFiles android.Paths
+	var aconfigCacheFiles aconfigCacheFileSets
 	ctx.VisitDirectDepsProxyWithTag(staticLibTag, func(dep android.ModuleProxy) {
 		if provider, ok := android.OtherModuleProvider(ctx, dep, JavaInfoProvider); ok {
-			aconfigProtoFiles = append(aconfigProtoFiles, provider.AconfigIntermediateCacheOutputPaths...)
+			aconfigCacheFiles.addSet(provider.TransitiveAconfigCacheFiles)
 		}
 	})
 	ctx.VisitDirectDepsProxyWithTag(libTag, func(dep android.ModuleProxy) {
 		if provider, ok := android.OtherModuleProvider(ctx, dep, JavaInfoProvider); ok {
-			aconfigProtoFiles = append(aconfigProtoFiles, provider.AconfigIntermediateCacheOutputPaths...)
+			aconfigCacheFiles.addSet(provider.TransitiveAconfigCacheFiles)
 		}
 	})
+	aconfigProtoFiles := aconfigCacheFiles.merge().ToList()
 
 	if len(aconfigProtoFiles) > 0 {
 		combinedAconfigProtoFile := android.PathForModuleOut(ctx, "aconfig.pb")

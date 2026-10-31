@@ -2977,7 +2977,7 @@ func TestDroidstubsAconfigPropagation(t *testing.T) {
 
 	bazModule := result.ModuleForTests(t, "baz", "android_common").Module()
 	javaInfo, _ := android.OtherModuleProvider(result, bazModule, JavaInfoProvider)
-	aconfigProtos := javaInfo.AconfigIntermediateCacheOutputPaths
+	aconfigProtos := android.Paths(javaInfo.TransitiveAconfigCacheFiles.ToList())
 
 	android.AssertIntEquals(t, "Expected to provide one aconfig proto file", 1, len(aconfigProtos))
 	android.AssertStringDoesContain(

@@ -32,7 +32,6 @@ type GenruleCombiner struct {
 	implementationJars            android.Paths
 	implementationAndResourceJars android.Paths
 	resourceJars                  android.Paths
-	aconfigProtoFiles             android.Paths
 
 	srcJarArgs []string
 	srcJarDeps android.Paths
@@ -89,6 +88,7 @@ func (j *GenruleCombiner) GenerateAndroidBuildActions(ctx android.ModuleContext)
 	var sdkVersion android.SdkSpec
 	kSnapshotFiles := make(map[string]android.Path)
 	var stubsLinkType StubsLinkType
+	var aconfigCacheFiles aconfigCacheFileSets
 	moduleWithSdkDepInfo := &ModuleWithSdkDepInfo{}
 
 	// Collect the headers first, so that aconfig flag values for the libraries will override
@@ -99,7 +99,7 @@ func (j *GenruleCombiner) GenerateAndroidBuildActions(ctx android.ModuleContext)
 
 			j.srcJarArgs = append(j.srcJarArgs, dep.SrcJarArgs...)
 			j.srcJarDeps = append(j.srcJarDeps, dep.SrcJarDeps...)
-			j.aconfigProtoFiles = append(j.aconfigProtoFiles, dep.AconfigIntermediateCacheOutputPaths...)
+			aconfigCacheFiles.addSet(dep.TransitiveAconfigCacheFiles)
 			sdkVersion = dep.SdkVersion
 			stubsLinkType = dep.StubsLinkType
 			*moduleWithSdkDepInfo = *dep.ModuleWithSdkDepInfo
@@ -109,7 +109,7 @@ func (j *GenruleCombiner) GenerateAndroidBuildActions(ctx android.ModuleContext)
 				kSnapshotFiles[k] = v
 			}
 		} else if dep, ok := android.OtherModuleProvider(ctx, m, android.CodegenInfoProvider); ok {
-			j.aconfigProtoFiles = append(j.aconfigProtoFiles, dep.IntermediateCacheOutputPaths...)
+			aconfigCacheFiles.addFiles(dep.IntermediateCacheOutputPaths...)
 		} else {
 			ctx.PropertyErrorf("headers", "module %q cannot be used as a dependency", ctx.OtherModuleName(m))
 		}
@@ -122,7 +122,7 @@ func (j *GenruleCombiner) GenerateAndroidBuildActions(ctx android.ModuleContext)
 
 			transitiveImplementationJars = append(transitiveImplementationJars, dep.TransitiveStaticLibsImplementationJars)
 			transitiveResourceJars = append(transitiveResourceJars, dep.TransitiveStaticLibsResourceJars)
-			j.aconfigProtoFiles = append(j.aconfigProtoFiles, dep.AconfigIntermediateCacheOutputPaths...)
+			aconfigCacheFiles.addSet(dep.TransitiveAconfigCacheFiles)
 			for k, v := range dep.KSnapshotFiles {
 				kSnapshotFiles[k] = v
 			}
@@ -173,7 +173,7 @@ func (j *GenruleCombiner) GenerateAndroidBuildActions(ctx android.ModuleContext)
 		SrcJarArgs:                             j.srcJarArgs,
 		SrcJarDeps:                             j.srcJarDeps,
 		StubsLinkType:                          stubsLinkType,
-		AconfigIntermediateCacheOutputPaths:    j.aconfigProtoFiles,
+		TransitiveAconfigCacheFiles:            aconfigCacheFiles.merge(),
 		KSnapshotFiles:                         kSnapshotFiles,
 	}
 	setExtraJavaInfo(ctx, j, javaInfo)

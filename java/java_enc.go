@@ -3279,19 +3279,8 @@ func (r DroidStubsInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error
 		return err
 	}
 
-	if r.AconfigProtoFiles == nil {
-		if err = gobtools.EncodeInt(buf, -1); err != nil {
-			return err
-		}
-	} else {
-		if err = gobtools.EncodeInt(buf, len(r.AconfigProtoFiles)); err != nil {
-			return err
-		}
-		for val1 := 0; val1 < len(r.AconfigProtoFiles); val1++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.AconfigProtoFiles[val1]); err != nil {
-				return err
-			}
-		}
+	if err = r.AconfigCacheFiles.EncodeInterface(ctx, buf); err != nil {
+		return err
 	}
 
 	if err = gobtools.EncodeInterface(ctx, buf, r.CurrentApiTimestamp); err != nil {
@@ -3361,53 +3350,52 @@ func (r DroidStubsInfo) CustomHash(hasher *proptools.Hasher) error {
 			r.CheckedInRemovedApiFile.(proptools.CustomHash).CustomHash(hasher)
 		}
 	}
-	hasher.WriteString(":java.android.Paths")
-	hasher.WriteString(":.[]Path")
-	hasher.WriteInt(len(r.AconfigProtoFiles))
-	for val7 := 0; val7 < len(r.AconfigProtoFiles); val7++ {
-		hasher.WriteString("android/soong/android:android.Path")
-		val8 := r.AconfigProtoFiles[val7] == nil
+	val11 := func(hasher *proptools.Hasher, val7 android.Path) error {
+		hasher.WriteString(":java.android.Path")
+		val8 := val7 == nil
 		if val8 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.AconfigProtoFiles[val7]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(val7); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val9 := r.AconfigProtoFiles[val7] == nil
+					val9 := val7 == nil
 					if val9 {
 						hasher.WriteByte(0)
 					} else {
-						val10 := func(hasher *proptools.Hasher) error {
-							return r.AconfigProtoFiles[val7].(proptools.CustomHash).CustomHash(hasher)
-						}
+						val10 := func(hasher *proptools.Hasher) error { return val7.(proptools.CustomHash).CustomHash(hasher) }
 						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val10); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.AconfigProtoFiles[val7].(proptools.CustomHash).CustomHash(hasher)
+				val7.(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
+		return nil
+	}
+	if err := r.AconfigCacheFiles.Hash(hasher, "android.Path", val11); err != nil {
+		return err
 	}
 	hasher.WriteString(":java.android.Path")
-	val11 := r.CurrentApiTimestamp == nil
-	if val11 {
+	val12 := r.CurrentApiTimestamp == nil
+	if val12 {
 		hasher.WriteByte(0)
 	} else {
 		if v := reflect.ValueOf(r.CurrentApiTimestamp); v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				panic(fmt.Errorf("nil pointer is not supported in interface"))
 			} else {
-				val12 := r.CurrentApiTimestamp == nil
-				if val12 {
+				val13 := r.CurrentApiTimestamp == nil
+				if val13 {
 					hasher.WriteByte(0)
 				} else {
-					val13 := func(hasher *proptools.Hasher) error {
+					val14 := func(hasher *proptools.Hasher) error {
 						return r.CurrentApiTimestamp.(proptools.CustomHash).CustomHash(hasher)
 					}
-					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val13); err != nil {
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val14); err != nil {
 						return err
 					}
 				}
@@ -3444,30 +3432,16 @@ func (r *DroidStubsInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) erro
 		r.CheckedInRemovedApiFile = val4.(android.Path)
 	}
 
-	var val7 int
-	err = gobtools.DecodeInt(buf, &val7)
-	if err != nil {
+	if err = r.AconfigCacheFiles.DecodeInterface(ctx, buf); err != nil {
 		return err
-	}
-	if val7 != -1 {
-		r.AconfigProtoFiles = make([]android.Path, val7)
-		for val8 := 0; val8 < int(val7); val8++ {
-			if val10, err := gobtools.DecodeInterface(ctx, buf); err != nil {
-				return err
-			} else if val10 == nil {
-				r.AconfigProtoFiles[val8] = nil
-			} else {
-				r.AconfigProtoFiles[val8] = val10.(android.Path)
-			}
-		}
 	}
 
-	if val12, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val7, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 		return err
-	} else if val12 == nil {
+	} else if val7 == nil {
 		r.CurrentApiTimestamp = nil
 	} else {
-		r.CurrentApiTimestamp = val12.(android.Path)
+		r.CurrentApiTimestamp = val7.(android.Path)
 	}
 
 	if err = r.EverythingStubsInfo.Decode(ctx, buf); err != nil {
@@ -6927,19 +6901,8 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		return err
 	}
 
-	if r.AconfigIntermediateCacheOutputPaths == nil {
-		if err = gobtools.EncodeInt(buf, -1); err != nil {
-			return err
-		}
-	} else {
-		if err = gobtools.EncodeInt(buf, len(r.AconfigIntermediateCacheOutputPaths)); err != nil {
-			return err
-		}
-		for val16 := 0; val16 < len(r.AconfigIntermediateCacheOutputPaths); val16++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.AconfigIntermediateCacheOutputPaths[val16]); err != nil {
-				return err
-			}
-		}
+	if err = r.TransitiveAconfigCacheFiles.EncodeInterface(ctx, buf); err != nil {
+		return err
 	}
 
 	if err = r.SdkVersion.Encode(ctx, buf); err != nil {
@@ -6958,38 +6921,38 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.ExtraOutputFiles)); err != nil {
 			return err
 		}
-		for val17 := 0; val17 < len(r.ExtraOutputFiles); val17++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.ExtraOutputFiles[val17]); err != nil {
+		for val16 := 0; val16 < len(r.ExtraOutputFiles); val16++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.ExtraOutputFiles[val16]); err != nil {
 				return err
 			}
 		}
 	}
 
-	val18 := r.AndroidLibraryDependencyInfo == nil
-	if err = gobtools.EncodeBool(buf, val18); err != nil {
+	val17 := r.AndroidLibraryDependencyInfo == nil
+	if err = gobtools.EncodeBool(buf, val17); err != nil {
 		return err
 	}
-	if !val18 {
+	if !val17 {
 		if err = (*r.AndroidLibraryDependencyInfo).Encode(ctx, buf); err != nil {
 			return err
 		}
 	}
 
-	val19 := r.UsesLibraryDependencyInfo == nil
-	if err = gobtools.EncodeBool(buf, val19); err != nil {
+	val18 := r.UsesLibraryDependencyInfo == nil
+	if err = gobtools.EncodeBool(buf, val18); err != nil {
 		return err
 	}
-	if !val19 {
+	if !val18 {
 		if err = (*r.UsesLibraryDependencyInfo).Encode(ctx, buf); err != nil {
 			return err
 		}
 	}
 
-	val20 := r.ProvidesUsesLibInfo == nil
-	if err = gobtools.EncodeBool(buf, val20); err != nil {
+	val19 := r.ProvidesUsesLibInfo == nil
+	if err = gobtools.EncodeBool(buf, val19); err != nil {
 		return err
 	}
-	if !val20 {
+	if !val19 {
 		if err = (*r.ProvidesUsesLibInfo).Encode(ctx, buf); err != nil {
 			return err
 		}
@@ -7003,18 +6966,18 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.MissingOptionalUsesLibs)); err != nil {
 			return err
 		}
-		for val21 := 0; val21 < len(r.MissingOptionalUsesLibs); val21++ {
-			if err = gobtools.EncodeString(buf, r.MissingOptionalUsesLibs[val21]); err != nil {
+		for val20 := 0; val20 < len(r.MissingOptionalUsesLibs); val20++ {
+			if err = gobtools.EncodeString(buf, r.MissingOptionalUsesLibs[val20]); err != nil {
 				return err
 			}
 		}
 	}
 
-	val22 := r.ModuleWithSdkDepInfo == nil
-	if err = gobtools.EncodeBool(buf, val22); err != nil {
+	val21 := r.ModuleWithSdkDepInfo == nil
+	if err = gobtools.EncodeBool(buf, val21); err != nil {
 		return err
 	}
-	if !val22 {
+	if !val21 {
 		if err = (*r.ModuleWithSdkDepInfo).Encode(ctx, buf); err != nil {
 			return err
 		}
@@ -7040,18 +7003,18 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.HiddenapiClassesJarPaths)); err != nil {
 			return err
 		}
-		for val23 := 0; val23 < len(r.HiddenapiClassesJarPaths); val23++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.HiddenapiClassesJarPaths[val23]); err != nil {
+		for val22 := 0; val22 < len(r.HiddenapiClassesJarPaths); val22++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.HiddenapiClassesJarPaths[val22]); err != nil {
 				return err
 			}
 		}
 	}
 
-	val24 := r.UncompressDexState == nil
-	if err = gobtools.EncodeBool(buf, val24); err != nil {
+	val23 := r.UncompressDexState == nil
+	if err = gobtools.EncodeBool(buf, val23); err != nil {
 		return err
 	}
-	if !val24 {
+	if !val23 {
 		if err = gobtools.EncodeBool(buf, (*r.UncompressDexState)); err != nil {
 			return err
 		}
@@ -7077,8 +7040,8 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.LogtagsSrcs)); err != nil {
 			return err
 		}
-		for val25 := 0; val25 < len(r.LogtagsSrcs); val25++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.LogtagsSrcs[val25]); err != nil {
+		for val24 := 0; val24 < len(r.LogtagsSrcs); val24++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.LogtagsSrcs[val24]); err != nil {
 				return err
 			}
 		}
@@ -7100,8 +7063,8 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.LinterReports)); err != nil {
 			return err
 		}
-		for val26 := 0; val26 < len(r.LinterReports); val26++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.LinterReports[val26]); err != nil {
+		for val25 := 0; val25 < len(r.LinterReports); val25++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.LinterReports[val25]); err != nil {
 				return err
 			}
 		}
@@ -7119,8 +7082,8 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.GeneratedSrcjars)); err != nil {
 			return err
 		}
-		for val27 := 0; val27 < len(r.GeneratedSrcjars); val27++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.GeneratedSrcjars[val27]); err != nil {
+		for val26 := 0; val26 < len(r.GeneratedSrcjars); val26++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.GeneratedSrcjars[val26]); err != nil {
 				return err
 			}
 		}
@@ -7138,11 +7101,11 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		return err
 	}
 
-	val28 := r.DexpreopterInfo == nil
-	if err = gobtools.EncodeBool(buf, val28); err != nil {
+	val27 := r.DexpreopterInfo == nil
+	if err = gobtools.EncodeBool(buf, val27); err != nil {
 		return err
 	}
-	if !val28 {
+	if !val27 {
 		if err = (*r.DexpreopterInfo).Encode(ctx, buf); err != nil {
 			return err
 		}
@@ -7156,8 +7119,8 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.XrefJavaFiles)); err != nil {
 			return err
 		}
-		for val29 := 0; val29 < len(r.XrefJavaFiles); val29++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.XrefJavaFiles[val29]); err != nil {
+		for val28 := 0; val28 < len(r.XrefJavaFiles); val28++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.XrefJavaFiles[val28]); err != nil {
 				return err
 			}
 		}
@@ -7171,8 +7134,8 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		if err = gobtools.EncodeInt(buf, len(r.XrefKotlinFiles)); err != nil {
 			return err
 		}
-		for val30 := 0; val30 < len(r.XrefKotlinFiles); val30++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.XrefKotlinFiles[val30]); err != nil {
+		for val29 := 0; val29 < len(r.XrefKotlinFiles); val29++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.XrefKotlinFiles[val29]); err != nil {
 				return err
 			}
 		}
@@ -7182,11 +7145,11 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		return err
 	}
 
-	val31 := r.CompileDex == nil
-	if err = gobtools.EncodeBool(buf, val31); err != nil {
+	val30 := r.CompileDex == nil
+	if err = gobtools.EncodeBool(buf, val30); err != nil {
 		return err
 	}
-	if !val31 {
+	if !val30 {
 		if err = gobtools.EncodeBool(buf, (*r.CompileDex)); err != nil {
 			return err
 		}
@@ -7200,11 +7163,11 @@ func (r JavaInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 		return err
 	}
 
-	val32 := r.ApexDependencyInfo == nil
-	if err = gobtools.EncodeBool(buf, val32); err != nil {
+	val31 := r.ApexDependencyInfo == nil
+	if err = gobtools.EncodeBool(buf, val31); err != nil {
 		return err
 	}
-	if !val32 {
+	if !val31 {
 		if err = (*r.ApexDependencyInfo).Encode(ctx, buf); err != nil {
 			return err
 		}
@@ -7783,54 +7746,53 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":java.StubsLinkType")
 	hasher.WriteString(":.int")
 	hasher.WriteUint64(uint64(int(r.StubsLinkType)))
-	hasher.WriteString(":java.android.Paths")
-	hasher.WriteString(":.[]Path")
-	hasher.WriteInt(len(r.AconfigIntermediateCacheOutputPaths))
-	for val83 := 0; val83 < len(r.AconfigIntermediateCacheOutputPaths); val83++ {
-		hasher.WriteString("android/soong/android:android.Path")
-		val84 := r.AconfigIntermediateCacheOutputPaths[val83] == nil
+	val87 := func(hasher *proptools.Hasher, val83 android.Path) error {
+		hasher.WriteString(":java.android.Path")
+		val84 := val83 == nil
 		if val84 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.AconfigIntermediateCacheOutputPaths[val83]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(val83); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val85 := r.AconfigIntermediateCacheOutputPaths[val83] == nil
+					val85 := val83 == nil
 					if val85 {
 						hasher.WriteByte(0)
 					} else {
-						val86 := func(hasher *proptools.Hasher) error {
-							return r.AconfigIntermediateCacheOutputPaths[val83].(proptools.CustomHash).CustomHash(hasher)
-						}
+						val86 := func(hasher *proptools.Hasher) error { return val83.(proptools.CustomHash).CustomHash(hasher) }
 						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val86); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.AconfigIntermediateCacheOutputPaths[val83].(proptools.CustomHash).CustomHash(hasher)
+				val83.(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
+		return nil
+	}
+	if err := r.TransitiveAconfigCacheFiles.Hash(hasher, "android.Path", val87); err != nil {
+		return err
 	}
 	if err := r.SdkVersion.CustomHash(hasher); err != nil {
 		return err
 	}
 	hasher.WriteString(":java.android.Path")
-	val87 := r.OutputFile == nil
-	if val87 {
+	val88 := r.OutputFile == nil
+	if val88 {
 		hasher.WriteByte(0)
 	} else {
 		if v := reflect.ValueOf(r.OutputFile); v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				panic(fmt.Errorf("nil pointer is not supported in interface"))
 			} else {
-				val88 := r.OutputFile == nil
-				if val88 {
+				val89 := r.OutputFile == nil
+				if val89 {
 					hasher.WriteByte(0)
 				} else {
-					val89 := func(hasher *proptools.Hasher) error { return r.OutputFile.(proptools.CustomHash).CustomHash(hasher) }
-					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val89); err != nil {
+					val90 := func(hasher *proptools.Hasher) error { return r.OutputFile.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val90); err != nil {
 						return err
 					}
 				}
@@ -7842,96 +7804,96 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":java.android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.ExtraOutputFiles))
-	for val90 := 0; val90 < len(r.ExtraOutputFiles); val90++ {
+	for val91 := 0; val91 < len(r.ExtraOutputFiles); val91++ {
 		hasher.WriteString("android/soong/android:android.Path")
-		val91 := r.ExtraOutputFiles[val90] == nil
-		if val91 {
+		val92 := r.ExtraOutputFiles[val91] == nil
+		if val92 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.ExtraOutputFiles[val90]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(r.ExtraOutputFiles[val91]); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val92 := r.ExtraOutputFiles[val90] == nil
-					if val92 {
+					val93 := r.ExtraOutputFiles[val91] == nil
+					if val93 {
 						hasher.WriteByte(0)
 					} else {
-						val93 := func(hasher *proptools.Hasher) error {
-							return r.ExtraOutputFiles[val90].(proptools.CustomHash).CustomHash(hasher)
+						val94 := func(hasher *proptools.Hasher) error {
+							return r.ExtraOutputFiles[val91].(proptools.CustomHash).CustomHash(hasher)
 						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val93); err != nil {
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val94); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.ExtraOutputFiles[val90].(proptools.CustomHash).CustomHash(hasher)
+				r.ExtraOutputFiles[val91].(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
 	}
 	hasher.WriteString(":.*AndroidLibraryDependencyInfo")
-	val94 := r.AndroidLibraryDependencyInfo == nil
-	if val94 {
+	val95 := r.AndroidLibraryDependencyInfo == nil
+	if val95 {
 		hasher.WriteByte(0)
 	} else {
-		val95 := func(hasher *proptools.Hasher) error {
+		val96 := func(hasher *proptools.Hasher) error {
 			if err := (*r.AndroidLibraryDependencyInfo).CustomHash(hasher); err != nil {
 				return err
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.AndroidLibraryDependencyInfo)), val95); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.AndroidLibraryDependencyInfo)), val96); err != nil {
 			return err
 		}
 	}
 	hasher.WriteString(":.*UsesLibraryDependencyInfo")
-	val96 := r.UsesLibraryDependencyInfo == nil
-	if val96 {
+	val97 := r.UsesLibraryDependencyInfo == nil
+	if val97 {
 		hasher.WriteByte(0)
 	} else {
-		val97 := func(hasher *proptools.Hasher) error {
+		val98 := func(hasher *proptools.Hasher) error {
 			if err := (*r.UsesLibraryDependencyInfo).CustomHash(hasher); err != nil {
 				return err
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.UsesLibraryDependencyInfo)), val97); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.UsesLibraryDependencyInfo)), val98); err != nil {
 			return err
 		}
 	}
 	hasher.WriteString(":.*ProvidesUsesLibInfo")
-	val98 := r.ProvidesUsesLibInfo == nil
-	if val98 {
+	val99 := r.ProvidesUsesLibInfo == nil
+	if val99 {
 		hasher.WriteByte(0)
 	} else {
-		val99 := func(hasher *proptools.Hasher) error {
+		val100 := func(hasher *proptools.Hasher) error {
 			if err := (*r.ProvidesUsesLibInfo).CustomHash(hasher); err != nil {
 				return err
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ProvidesUsesLibInfo)), val99); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ProvidesUsesLibInfo)), val100); err != nil {
 			return err
 		}
 	}
 	hasher.WriteString(":.[]string")
 	hasher.WriteInt(len(r.MissingOptionalUsesLibs))
-	for val100 := 0; val100 < len(r.MissingOptionalUsesLibs); val100++ {
+	for val101 := 0; val101 < len(r.MissingOptionalUsesLibs); val101++ {
 		hasher.WriteString(":.string")
-		hasher.WriteString(r.MissingOptionalUsesLibs[val100])
+		hasher.WriteString(r.MissingOptionalUsesLibs[val101])
 	}
 	hasher.WriteString(":.*ModuleWithSdkDepInfo")
-	val101 := r.ModuleWithSdkDepInfo == nil
-	if val101 {
+	val102 := r.ModuleWithSdkDepInfo == nil
+	if val102 {
 		hasher.WriteByte(0)
 	} else {
-		val102 := func(hasher *proptools.Hasher) error {
+		val103 := func(hasher *proptools.Hasher) error {
 			if err := (*r.ModuleWithSdkDepInfo).CustomHash(hasher); err != nil {
 				return err
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ModuleWithSdkDepInfo)), val102); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ModuleWithSdkDepInfo)), val103); err != nil {
 			return err
 		}
 	}
@@ -7939,20 +7901,20 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 		return err
 	}
 	hasher.WriteString(":java.android.Path")
-	val103 := r.InstallFile == nil
-	if val103 {
+	val104 := r.InstallFile == nil
+	if val104 {
 		hasher.WriteByte(0)
 	} else {
 		if v := reflect.ValueOf(r.InstallFile); v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				panic(fmt.Errorf("nil pointer is not supported in interface"))
 			} else {
-				val104 := r.InstallFile == nil
-				if val104 {
+				val105 := r.InstallFile == nil
+				if val105 {
 					hasher.WriteByte(0)
 				} else {
-					val105 := func(hasher *proptools.Hasher) error { return r.InstallFile.(proptools.CustomHash).CustomHash(hasher) }
-					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val105); err != nil {
+					val106 := func(hasher *proptools.Hasher) error { return r.InstallFile.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val106); err != nil {
 						return err
 					}
 				}
@@ -7967,39 +7929,39 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":java.android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.HiddenapiClassesJarPaths))
-	for val106 := 0; val106 < len(r.HiddenapiClassesJarPaths); val106++ {
+	for val107 := 0; val107 < len(r.HiddenapiClassesJarPaths); val107++ {
 		hasher.WriteString("android/soong/android:android.Path")
-		val107 := r.HiddenapiClassesJarPaths[val106] == nil
-		if val107 {
+		val108 := r.HiddenapiClassesJarPaths[val107] == nil
+		if val108 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.HiddenapiClassesJarPaths[val106]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(r.HiddenapiClassesJarPaths[val107]); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val108 := r.HiddenapiClassesJarPaths[val106] == nil
-					if val108 {
+					val109 := r.HiddenapiClassesJarPaths[val107] == nil
+					if val109 {
 						hasher.WriteByte(0)
 					} else {
-						val109 := func(hasher *proptools.Hasher) error {
-							return r.HiddenapiClassesJarPaths[val106].(proptools.CustomHash).CustomHash(hasher)
+						val110 := func(hasher *proptools.Hasher) error {
+							return r.HiddenapiClassesJarPaths[val107].(proptools.CustomHash).CustomHash(hasher)
 						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val109); err != nil {
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val110); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.HiddenapiClassesJarPaths[val106].(proptools.CustomHash).CustomHash(hasher)
+				r.HiddenapiClassesJarPaths[val107].(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
 	}
 	hasher.WriteString(":.*bool")
-	val110 := r.UncompressDexState == nil
-	if val110 {
+	val111 := r.UncompressDexState == nil
+	if val111 {
 		hasher.WriteByte(0)
 	} else {
-		val111 := func(hasher *proptools.Hasher) error {
+		val112 := func(hasher *proptools.Hasher) error {
 			hasher.WriteString(":.bool")
 			if *r.UncompressDexState {
 				hasher.WriteByte(1)
@@ -8008,7 +7970,7 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.UncompressDexState)), val111); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.UncompressDexState)), val112); err != nil {
 			return err
 		}
 	}
@@ -8021,20 +7983,20 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":.string")
 	hasher.WriteString(r.BuiltInstalled)
 	hasher.WriteString(":java.android.WritablePath")
-	val112 := r.ConfigPath == nil
-	if val112 {
+	val113 := r.ConfigPath == nil
+	if val113 {
 		hasher.WriteByte(0)
 	} else {
 		if v := reflect.ValueOf(r.ConfigPath); v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				panic(fmt.Errorf("nil pointer is not supported in interface"))
 			} else {
-				val113 := r.ConfigPath == nil
-				if val113 {
+				val114 := r.ConfigPath == nil
+				if val114 {
 					hasher.WriteByte(0)
 				} else {
-					val114 := func(hasher *proptools.Hasher) error { return r.ConfigPath.(proptools.CustomHash).CustomHash(hasher) }
-					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val114); err != nil {
+					val115 := func(hasher *proptools.Hasher) error { return r.ConfigPath.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val115); err != nil {
 						return err
 					}
 				}
@@ -8046,30 +8008,30 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":java.android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.LogtagsSrcs))
-	for val115 := 0; val115 < len(r.LogtagsSrcs); val115++ {
+	for val116 := 0; val116 < len(r.LogtagsSrcs); val116++ {
 		hasher.WriteString("android/soong/android:android.Path")
-		val116 := r.LogtagsSrcs[val115] == nil
-		if val116 {
+		val117 := r.LogtagsSrcs[val116] == nil
+		if val117 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.LogtagsSrcs[val115]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(r.LogtagsSrcs[val116]); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val117 := r.LogtagsSrcs[val115] == nil
-					if val117 {
+					val118 := r.LogtagsSrcs[val116] == nil
+					if val118 {
 						hasher.WriteByte(0)
 					} else {
-						val118 := func(hasher *proptools.Hasher) error {
-							return r.LogtagsSrcs[val115].(proptools.CustomHash).CustomHash(hasher)
+						val119 := func(hasher *proptools.Hasher) error {
+							return r.LogtagsSrcs[val116].(proptools.CustomHash).CustomHash(hasher)
 						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val118); err != nil {
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val119); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.LogtagsSrcs[val115].(proptools.CustomHash).CustomHash(hasher)
+				r.LogtagsSrcs[val116].(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
 	}
@@ -8082,30 +8044,30 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":java.android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.LinterReports))
-	for val119 := 0; val119 < len(r.LinterReports); val119++ {
+	for val120 := 0; val120 < len(r.LinterReports); val120++ {
 		hasher.WriteString("android/soong/android:android.Path")
-		val120 := r.LinterReports[val119] == nil
-		if val120 {
+		val121 := r.LinterReports[val120] == nil
+		if val121 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.LinterReports[val119]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(r.LinterReports[val120]); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val121 := r.LinterReports[val119] == nil
-					if val121 {
+					val122 := r.LinterReports[val120] == nil
+					if val122 {
 						hasher.WriteByte(0)
 					} else {
-						val122 := func(hasher *proptools.Hasher) error {
-							return r.LinterReports[val119].(proptools.CustomHash).CustomHash(hasher)
+						val123 := func(hasher *proptools.Hasher) error {
+							return r.LinterReports[val120].(proptools.CustomHash).CustomHash(hasher)
 						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val122); err != nil {
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val123); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.LinterReports[val119].(proptools.CustomHash).CustomHash(hasher)
+				r.LinterReports[val120].(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
 	}
@@ -8114,30 +8076,30 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 	}
 	hasher.WriteString(":.[]android.Path")
 	hasher.WriteInt(len(r.GeneratedSrcjars))
-	for val123 := 0; val123 < len(r.GeneratedSrcjars); val123++ {
+	for val124 := 0; val124 < len(r.GeneratedSrcjars); val124++ {
 		hasher.WriteString(":java.android.Path")
-		val124 := r.GeneratedSrcjars[val123] == nil
-		if val124 {
+		val125 := r.GeneratedSrcjars[val124] == nil
+		if val125 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.GeneratedSrcjars[val123]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(r.GeneratedSrcjars[val124]); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val125 := r.GeneratedSrcjars[val123] == nil
-					if val125 {
+					val126 := r.GeneratedSrcjars[val124] == nil
+					if val126 {
 						hasher.WriteByte(0)
 					} else {
-						val126 := func(hasher *proptools.Hasher) error {
-							return r.GeneratedSrcjars[val123].(proptools.CustomHash).CustomHash(hasher)
+						val127 := func(hasher *proptools.Hasher) error {
+							return r.GeneratedSrcjars[val124].(proptools.CustomHash).CustomHash(hasher)
 						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val126); err != nil {
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val127); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.GeneratedSrcjars[val123].(proptools.CustomHash).CustomHash(hasher)
+				r.GeneratedSrcjars[val124].(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
 	}
@@ -8153,77 +8115,77 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 		return err
 	}
 	hasher.WriteString(":.*DexpreopterInfo")
-	val127 := r.DexpreopterInfo == nil
-	if val127 {
+	val128 := r.DexpreopterInfo == nil
+	if val128 {
 		hasher.WriteByte(0)
 	} else {
-		val128 := func(hasher *proptools.Hasher) error {
+		val129 := func(hasher *proptools.Hasher) error {
 			if err := (*r.DexpreopterInfo).CustomHash(hasher); err != nil {
 				return err
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.DexpreopterInfo)), val128); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.DexpreopterInfo)), val129); err != nil {
 			return err
 		}
 	}
 	hasher.WriteString(":java.android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.XrefJavaFiles))
-	for val129 := 0; val129 < len(r.XrefJavaFiles); val129++ {
+	for val130 := 0; val130 < len(r.XrefJavaFiles); val130++ {
 		hasher.WriteString("android/soong/android:android.Path")
-		val130 := r.XrefJavaFiles[val129] == nil
-		if val130 {
+		val131 := r.XrefJavaFiles[val130] == nil
+		if val131 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.XrefJavaFiles[val129]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(r.XrefJavaFiles[val130]); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val131 := r.XrefJavaFiles[val129] == nil
-					if val131 {
+					val132 := r.XrefJavaFiles[val130] == nil
+					if val132 {
 						hasher.WriteByte(0)
 					} else {
-						val132 := func(hasher *proptools.Hasher) error {
-							return r.XrefJavaFiles[val129].(proptools.CustomHash).CustomHash(hasher)
+						val133 := func(hasher *proptools.Hasher) error {
+							return r.XrefJavaFiles[val130].(proptools.CustomHash).CustomHash(hasher)
 						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val132); err != nil {
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val133); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.XrefJavaFiles[val129].(proptools.CustomHash).CustomHash(hasher)
+				r.XrefJavaFiles[val130].(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
 	}
 	hasher.WriteString(":java.android.Paths")
 	hasher.WriteString(":.[]Path")
 	hasher.WriteInt(len(r.XrefKotlinFiles))
-	for val133 := 0; val133 < len(r.XrefKotlinFiles); val133++ {
+	for val134 := 0; val134 < len(r.XrefKotlinFiles); val134++ {
 		hasher.WriteString("android/soong/android:android.Path")
-		val134 := r.XrefKotlinFiles[val133] == nil
-		if val134 {
+		val135 := r.XrefKotlinFiles[val134] == nil
+		if val135 {
 			hasher.WriteByte(0)
 		} else {
-			if v := reflect.ValueOf(r.XrefKotlinFiles[val133]); v.Kind() == reflect.Ptr {
+			if v := reflect.ValueOf(r.XrefKotlinFiles[val134]); v.Kind() == reflect.Ptr {
 				if v.IsNil() {
 					panic(fmt.Errorf("nil pointer is not supported in interface"))
 				} else {
-					val135 := r.XrefKotlinFiles[val133] == nil
-					if val135 {
+					val136 := r.XrefKotlinFiles[val134] == nil
+					if val136 {
 						hasher.WriteByte(0)
 					} else {
-						val136 := func(hasher *proptools.Hasher) error {
-							return r.XrefKotlinFiles[val133].(proptools.CustomHash).CustomHash(hasher)
+						val137 := func(hasher *proptools.Hasher) error {
+							return r.XrefKotlinFiles[val134].(proptools.CustomHash).CustomHash(hasher)
 						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val136); err != nil {
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val137); err != nil {
 							return err
 						}
 					}
 				}
 			} else {
-				r.XrefKotlinFiles[val133].(proptools.CustomHash).CustomHash(hasher)
+				r.XrefKotlinFiles[val134].(proptools.CustomHash).CustomHash(hasher)
 			}
 		}
 	}
@@ -8234,11 +8196,11 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 		hasher.WriteByte(0)
 	}
 	hasher.WriteString(":.*bool")
-	val137 := r.CompileDex == nil
-	if val137 {
+	val138 := r.CompileDex == nil
+	if val138 {
 		hasher.WriteByte(0)
 	} else {
-		val138 := func(hasher *proptools.Hasher) error {
+		val139 := func(hasher *proptools.Hasher) error {
 			hasher.WriteString(":.bool")
 			if *r.CompileDex {
 				hasher.WriteByte(1)
@@ -8247,7 +8209,7 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.CompileDex)), val138); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.CompileDex)), val139); err != nil {
 			return err
 		}
 	}
@@ -8260,17 +8222,17 @@ func (r JavaInfo) CustomHash(hasher *proptools.Hasher) error {
 		hasher.WriteByte(0)
 	}
 	hasher.WriteString(":.*ApexDependencyInfo")
-	val139 := r.ApexDependencyInfo == nil
-	if val139 {
+	val140 := r.ApexDependencyInfo == nil
+	if val140 {
 		hasher.WriteByte(0)
 	} else {
-		val140 := func(hasher *proptools.Hasher) error {
+		val141 := func(hasher *proptools.Hasher) error {
 			if err := (*r.ApexDependencyInfo).CustomHash(hasher); err != nil {
 				return err
 			}
 			return nil
 		}
-		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ApexDependencyInfo)), val140); err != nil {
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.ApexDependencyInfo)), val141); err != nil {
 			return err
 		}
 	}
@@ -8576,162 +8538,148 @@ func (r *JavaInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 	}
 	r.StubsLinkType = StubsLinkType(val91)
 
-	var val95 int
-	err = gobtools.DecodeInt(buf, &val95)
-	if err != nil {
+	if err = r.TransitiveAconfigCacheFiles.DecodeInterface(ctx, buf); err != nil {
 		return err
-	}
-	if val95 != -1 {
-		r.AconfigIntermediateCacheOutputPaths = make([]android.Path, val95)
-		for val96 := 0; val96 < int(val95); val96++ {
-			if val98, err := gobtools.DecodeInterface(ctx, buf); err != nil {
-				return err
-			} else if val98 == nil {
-				r.AconfigIntermediateCacheOutputPaths[val96] = nil
-			} else {
-				r.AconfigIntermediateCacheOutputPaths[val96] = val98.(android.Path)
-			}
-		}
 	}
 
 	if err = r.SdkVersion.Decode(ctx, buf); err != nil {
 		return err
 	}
 
-	if val101, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val96, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 		return err
-	} else if val101 == nil {
+	} else if val96 == nil {
 		r.OutputFile = nil
 	} else {
-		r.OutputFile = val101.(android.Path)
+		r.OutputFile = val96.(android.Path)
 	}
 
-	var val104 int
-	err = gobtools.DecodeInt(buf, &val104)
+	var val99 int
+	err = gobtools.DecodeInt(buf, &val99)
 	if err != nil {
 		return err
 	}
-	if val104 != -1 {
-		r.ExtraOutputFiles = make([]android.Path, val104)
-		for val105 := 0; val105 < int(val104); val105++ {
-			if val107, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val99 != -1 {
+		r.ExtraOutputFiles = make([]android.Path, val99)
+		for val100 := 0; val100 < int(val99); val100++ {
+			if val102, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 				return err
-			} else if val107 == nil {
-				r.ExtraOutputFiles[val105] = nil
+			} else if val102 == nil {
+				r.ExtraOutputFiles[val100] = nil
 			} else {
-				r.ExtraOutputFiles[val105] = val107.(android.Path)
+				r.ExtraOutputFiles[val100] = val102.(android.Path)
 			}
 		}
 	}
 
-	var val109 bool
-	if err = gobtools.DecodeBool(buf, &val109); err != nil {
+	var val104 bool
+	if err = gobtools.DecodeBool(buf, &val104); err != nil {
 		return err
 	}
-	if !val109 {
-		var val108 AndroidLibraryDependencyInfo
-		if err = val108.Decode(ctx, buf); err != nil {
+	if !val104 {
+		var val103 AndroidLibraryDependencyInfo
+		if err = val103.Decode(ctx, buf); err != nil {
 			return err
 		}
-		r.AndroidLibraryDependencyInfo = &val108
+		r.AndroidLibraryDependencyInfo = &val103
 	}
 
-	var val112 bool
-	if err = gobtools.DecodeBool(buf, &val112); err != nil {
+	var val107 bool
+	if err = gobtools.DecodeBool(buf, &val107); err != nil {
 		return err
 	}
-	if !val112 {
-		var val111 UsesLibraryDependencyInfo
-		if err = val111.Decode(ctx, buf); err != nil {
+	if !val107 {
+		var val106 UsesLibraryDependencyInfo
+		if err = val106.Decode(ctx, buf); err != nil {
 			return err
 		}
-		r.UsesLibraryDependencyInfo = &val111
+		r.UsesLibraryDependencyInfo = &val106
 	}
 
-	var val115 bool
-	if err = gobtools.DecodeBool(buf, &val115); err != nil {
+	var val110 bool
+	if err = gobtools.DecodeBool(buf, &val110); err != nil {
 		return err
 	}
-	if !val115 {
-		var val114 ProvidesUsesLibInfo
-		if err = val114.Decode(ctx, buf); err != nil {
+	if !val110 {
+		var val109 ProvidesUsesLibInfo
+		if err = val109.Decode(ctx, buf); err != nil {
 			return err
 		}
-		r.ProvidesUsesLibInfo = &val114
+		r.ProvidesUsesLibInfo = &val109
 	}
 
-	var val118 int
-	err = gobtools.DecodeInt(buf, &val118)
+	var val113 int
+	err = gobtools.DecodeInt(buf, &val113)
 	if err != nil {
 		return err
 	}
-	if val118 != -1 {
-		r.MissingOptionalUsesLibs = make([]string, val118)
-		for val119 := 0; val119 < int(val118); val119++ {
-			err = gobtools.DecodeString(buf, &r.MissingOptionalUsesLibs[val119])
+	if val113 != -1 {
+		r.MissingOptionalUsesLibs = make([]string, val113)
+		for val114 := 0; val114 < int(val113); val114++ {
+			err = gobtools.DecodeString(buf, &r.MissingOptionalUsesLibs[val114])
 			if err != nil {
 				return err
 			}
 		}
 	}
 
-	var val122 bool
-	if err = gobtools.DecodeBool(buf, &val122); err != nil {
+	var val117 bool
+	if err = gobtools.DecodeBool(buf, &val117); err != nil {
 		return err
 	}
-	if !val122 {
-		var val121 ModuleWithSdkDepInfo
-		if err = val121.Decode(ctx, buf); err != nil {
+	if !val117 {
+		var val116 ModuleWithSdkDepInfo
+		if err = val116.Decode(ctx, buf); err != nil {
 			return err
 		}
-		r.ModuleWithSdkDepInfo = &val121
+		r.ModuleWithSdkDepInfo = &val116
 	}
 
 	if err = r.DexJarFile.Decode(ctx, buf); err != nil {
 		return err
 	}
 
-	if val126, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val121, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 		return err
-	} else if val126 == nil {
+	} else if val121 == nil {
 		r.InstallFile = nil
 	} else {
-		r.InstallFile = val126.(android.Path)
+		r.InstallFile = val121.(android.Path)
 	}
 
 	if err = r.BootDexJarPath.Decode(ctx, buf); err != nil {
 		return err
 	}
 
-	var val130 int
-	err = gobtools.DecodeInt(buf, &val130)
+	var val125 int
+	err = gobtools.DecodeInt(buf, &val125)
 	if err != nil {
 		return err
 	}
-	if val130 != -1 {
-		r.HiddenapiClassesJarPaths = make([]android.Path, val130)
-		for val131 := 0; val131 < int(val130); val131++ {
-			if val133, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val125 != -1 {
+		r.HiddenapiClassesJarPaths = make([]android.Path, val125)
+		for val126 := 0; val126 < int(val125); val126++ {
+			if val128, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 				return err
-			} else if val133 == nil {
-				r.HiddenapiClassesJarPaths[val131] = nil
+			} else if val128 == nil {
+				r.HiddenapiClassesJarPaths[val126] = nil
 			} else {
-				r.HiddenapiClassesJarPaths[val131] = val133.(android.Path)
+				r.HiddenapiClassesJarPaths[val126] = val128.(android.Path)
 			}
 		}
 	}
 
-	var val135 bool
-	if err = gobtools.DecodeBool(buf, &val135); err != nil {
+	var val130 bool
+	if err = gobtools.DecodeBool(buf, &val130); err != nil {
 		return err
 	}
-	if !val135 {
-		var val134 bool
-		err = gobtools.DecodeBool(buf, &val134)
+	if !val130 {
+		var val129 bool
+		err = gobtools.DecodeBool(buf, &val129)
 		if err != nil {
 			return err
 		}
-		r.UncompressDexState = &val134
+		r.UncompressDexState = &val129
 	}
 
 	err = gobtools.DecodeBool(buf, &r.Active)
@@ -8744,28 +8692,28 @@ func (r *JavaInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 		return err
 	}
 
-	if val140, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val135, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 		return err
-	} else if val140 == nil {
+	} else if val135 == nil {
 		r.ConfigPath = nil
 	} else {
-		r.ConfigPath = val140.(android.WritablePath)
+		r.ConfigPath = val135.(android.WritablePath)
 	}
 
-	var val143 int
-	err = gobtools.DecodeInt(buf, &val143)
+	var val138 int
+	err = gobtools.DecodeInt(buf, &val138)
 	if err != nil {
 		return err
 	}
-	if val143 != -1 {
-		r.LogtagsSrcs = make([]android.Path, val143)
-		for val144 := 0; val144 < int(val143); val144++ {
-			if val146, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val138 != -1 {
+		r.LogtagsSrcs = make([]android.Path, val138)
+		for val139 := 0; val139 < int(val138); val139++ {
+			if val141, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 				return err
-			} else if val146 == nil {
-				r.LogtagsSrcs[val144] = nil
+			} else if val141 == nil {
+				r.LogtagsSrcs[val139] = nil
 			} else {
-				r.LogtagsSrcs[val144] = val146.(android.Path)
+				r.LogtagsSrcs[val139] = val141.(android.Path)
 			}
 		}
 	}
@@ -8778,20 +8726,20 @@ func (r *JavaInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 		return err
 	}
 
-	var val151 int
-	err = gobtools.DecodeInt(buf, &val151)
+	var val146 int
+	err = gobtools.DecodeInt(buf, &val146)
 	if err != nil {
 		return err
 	}
-	if val151 != -1 {
-		r.LinterReports = make([]android.Path, val151)
-		for val152 := 0; val152 < int(val151); val152++ {
-			if val154, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val146 != -1 {
+		r.LinterReports = make([]android.Path, val146)
+		for val147 := 0; val147 < int(val146); val147++ {
+			if val149, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 				return err
-			} else if val154 == nil {
-				r.LinterReports[val152] = nil
+			} else if val149 == nil {
+				r.LinterReports[val147] = nil
 			} else {
-				r.LinterReports[val152] = val154.(android.Path)
+				r.LinterReports[val147] = val149.(android.Path)
 			}
 		}
 	}
@@ -8800,20 +8748,20 @@ func (r *JavaInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 		return err
 	}
 
-	var val157 int
-	err = gobtools.DecodeInt(buf, &val157)
+	var val152 int
+	err = gobtools.DecodeInt(buf, &val152)
 	if err != nil {
 		return err
 	}
-	if val157 != -1 {
-		r.GeneratedSrcjars = make([]android.Path, val157)
-		for val158 := 0; val158 < int(val157); val158++ {
-			if val160, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val152 != -1 {
+		r.GeneratedSrcjars = make([]android.Path, val152)
+		for val153 := 0; val153 < int(val152); val153++ {
+			if val155, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 				return err
-			} else if val160 == nil {
-				r.GeneratedSrcjars[val158] = nil
+			} else if val155 == nil {
+				r.GeneratedSrcjars[val153] = nil
 			} else {
-				r.GeneratedSrcjars[val158] = val160.(android.Path)
+				r.GeneratedSrcjars[val153] = val155.(android.Path)
 			}
 		}
 	}
@@ -8832,50 +8780,50 @@ func (r *JavaInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 		return err
 	}
 
-	var val165 bool
-	if err = gobtools.DecodeBool(buf, &val165); err != nil {
+	var val160 bool
+	if err = gobtools.DecodeBool(buf, &val160); err != nil {
 		return err
 	}
-	if !val165 {
-		var val164 DexpreopterInfo
-		if err = val164.Decode(ctx, buf); err != nil {
+	if !val160 {
+		var val159 DexpreopterInfo
+		if err = val159.Decode(ctx, buf); err != nil {
 			return err
 		}
-		r.DexpreopterInfo = &val164
+		r.DexpreopterInfo = &val159
 	}
 
-	var val169 int
-	err = gobtools.DecodeInt(buf, &val169)
+	var val164 int
+	err = gobtools.DecodeInt(buf, &val164)
 	if err != nil {
 		return err
 	}
-	if val169 != -1 {
-		r.XrefJavaFiles = make([]android.Path, val169)
-		for val170 := 0; val170 < int(val169); val170++ {
-			if val172, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val164 != -1 {
+		r.XrefJavaFiles = make([]android.Path, val164)
+		for val165 := 0; val165 < int(val164); val165++ {
+			if val167, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 				return err
-			} else if val172 == nil {
-				r.XrefJavaFiles[val170] = nil
+			} else if val167 == nil {
+				r.XrefJavaFiles[val165] = nil
 			} else {
-				r.XrefJavaFiles[val170] = val172.(android.Path)
+				r.XrefJavaFiles[val165] = val167.(android.Path)
 			}
 		}
 	}
 
-	var val175 int
-	err = gobtools.DecodeInt(buf, &val175)
+	var val170 int
+	err = gobtools.DecodeInt(buf, &val170)
 	if err != nil {
 		return err
 	}
-	if val175 != -1 {
-		r.XrefKotlinFiles = make([]android.Path, val175)
-		for val176 := 0; val176 < int(val175); val176++ {
-			if val178, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val170 != -1 {
+		r.XrefKotlinFiles = make([]android.Path, val170)
+		for val171 := 0; val171 < int(val170); val171++ {
+			if val173, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 				return err
-			} else if val178 == nil {
-				r.XrefKotlinFiles[val176] = nil
+			} else if val173 == nil {
+				r.XrefKotlinFiles[val171] = nil
 			} else {
-				r.XrefKotlinFiles[val176] = val178.(android.Path)
+				r.XrefKotlinFiles[val171] = val173.(android.Path)
 			}
 		}
 	}
@@ -8885,17 +8833,17 @@ func (r *JavaInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 		return err
 	}
 
-	var val181 bool
-	if err = gobtools.DecodeBool(buf, &val181); err != nil {
+	var val176 bool
+	if err = gobtools.DecodeBool(buf, &val176); err != nil {
 		return err
 	}
-	if !val181 {
-		var val180 bool
-		err = gobtools.DecodeBool(buf, &val180)
+	if !val176 {
+		var val175 bool
+		err = gobtools.DecodeBool(buf, &val175)
 		if err != nil {
 			return err
 		}
-		r.CompileDex = &val180
+		r.CompileDex = &val175
 	}
 
 	err = gobtools.DecodeString(buf, &r.SystemModules)
@@ -8908,16 +8856,16 @@ func (r *JavaInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 		return err
 	}
 
-	var val186 bool
-	if err = gobtools.DecodeBool(buf, &val186); err != nil {
+	var val181 bool
+	if err = gobtools.DecodeBool(buf, &val181); err != nil {
 		return err
 	}
-	if !val186 {
-		var val185 ApexDependencyInfo
-		if err = val185.Decode(ctx, buf); err != nil {
+	if !val181 {
+		var val180 ApexDependencyInfo
+		if err = val180.Decode(ctx, buf); err != nil {
 			return err
 		}
-		r.ApexDependencyInfo = &val185
+		r.ApexDependencyInfo = &val180
 	}
 
 	if err = r.MaxSdkVersion.Decode(ctx, buf); err != nil {

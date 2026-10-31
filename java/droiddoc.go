@@ -391,7 +391,7 @@ func (j *Javadoc) collectDeps(ctx android.ModuleContext) deps {
 			} else if dep, ok := android.OtherModuleProvider(ctx, module, JavaInfoProvider); ok {
 				deps.classpath = append(deps.classpath, dep.HeaderJars...)
 				deps.aidlIncludeDirs = append(deps.aidlIncludeDirs, dep.AidlIncludeDirs...)
-				deps.aconfigProtoFiles = append(deps.aconfigProtoFiles, dep.AconfigIntermediateCacheOutputPaths...)
+				deps.aconfigCacheFiles.addSet(dep.TransitiveAconfigCacheFiles)
 			} else if commonInfo, ok := android.OtherModuleProvider(ctx, module, android.CommonModuleInfoProvider); ok && commonInfo.SourceFiles != nil {
 				dep := commonInfo.SourceFiles
 				checkProducesJars(ctx, *dep, module)
@@ -418,9 +418,9 @@ func (j *Javadoc) collectDeps(ctx android.ModuleContext) deps {
 			}
 		case aconfigDeclarationTag:
 			if dep, ok := android.OtherModuleProvider(ctx, module, android.AconfigDeclarationsProviderKey); ok {
-				deps.aconfigProtoFiles = append(deps.aconfigProtoFiles, dep.IntermediateCacheOutputPath)
+				deps.aconfigCacheFiles.addFiles(dep.IntermediateCacheOutputPath)
 			} else if dep, ok := android.OtherModuleProvider(ctx, module, android.CodegenInfoProvider); ok {
-				deps.aconfigProtoFiles = append(deps.aconfigProtoFiles, dep.IntermediateCacheOutputPaths...)
+				deps.aconfigCacheFiles.addFiles(dep.IntermediateCacheOutputPaths...)
 			} else {
 				ctx.ModuleErrorf("Only aconfig_declarations and aconfig_declarations_group "+
 					"module type is allowed for flags_packages property, but %s is neither "+
@@ -442,7 +442,7 @@ func (j *Javadoc) collectDeps(ctx android.ModuleContext) deps {
 			otherModule := android.GetModuleProxyFromPathDep(ctx, moduleName, tag)
 			if !otherModule.IsNil() {
 				if dep, ok := android.OtherModuleProvider(ctx, otherModule, android.CodegenInfoProvider); ok {
-					deps.aconfigProtoFiles = append(deps.aconfigProtoFiles, dep.IntermediateCacheOutputPaths...)
+					deps.aconfigCacheFiles.addFiles(dep.IntermediateCacheOutputPaths...)
 				}
 			}
 		}

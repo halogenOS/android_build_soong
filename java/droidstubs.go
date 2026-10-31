@@ -22,6 +22,7 @@ import (
 	"strings"
 
 	"github.com/google/blueprint"
+	"github.com/google/blueprint/depset"
 	"github.com/google/blueprint/proptools"
 
 	"android/soong/android"
@@ -43,7 +44,7 @@ type StubsInfo struct {
 type DroidStubsInfo struct {
 	CheckedInApiFile        android.Path
 	CheckedInRemovedApiFile android.Path
-	AconfigProtoFiles       android.Paths
+	AconfigCacheFiles       depset.DepSet[android.Path]
 	CurrentApiTimestamp     android.Path
 	EverythingStubsInfo     StubsInfo
 	ExportableStubsInfo     StubsInfo
@@ -294,6 +295,7 @@ type stubsCommandConfigParams struct {
 	stubsType             StubsType
 	javaVersion           javaVersion
 	deps                  deps
+	aconfigCacheFiles     android.Paths
 	checkApi              bool
 	generateStubs         bool
 	doApiLint             bool
@@ -1028,7 +1030,7 @@ func (d *Droidstubs) commonMetalavaStubCmd(ctx android.ModuleContext, rule *andr
 		cmd.ImplicitOutput(android.PathForModuleGen(ctx, o))
 	}
 
-	generateMetalavaFlagConfigArgs(ctx, cmd, params.stubConfig.stubsType, params.stubConfig.deps.aconfigProtoFiles)
+	generateMetalavaFlagConfigArgs(ctx, cmd, params.stubConfig.stubsType, params.stubConfig.aconfigCacheFiles)
 
 	return cmd
 }
@@ -1401,9 +1403,12 @@ func (d *Droidstubs) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	checkApi := apiCheckEnabled(ctx, d.properties.Check_api.Current, "current") ||
 		apiCheckEnabled(ctx, d.properties.Check_api.Last_released, "last_released")
 
+	aconfigCacheFiles := deps.aconfigCacheFiles.merge()
+
 	stubCmdParams := stubsCommandConfigParams{
 		javaVersion:           javaVersion,
 		deps:                  deps,
+		aconfigCacheFiles:     aconfigCacheFiles.ToList(),
 		checkApi:              checkApi,
 		generateStubs:         generateStubs,
 		doApiLint:             doApiLint,
@@ -1538,7 +1543,7 @@ func (d *Droidstubs) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	}
 
 	droidInfo := DroidStubsInfo{
-		AconfigProtoFiles:   deps.aconfigProtoFiles,
+		AconfigCacheFiles:   aconfigCacheFiles,
 		CurrentApiTimestamp: d.CurrentApiTimestamp(),
 		EverythingStubsInfo: StubsInfo{},
 		ExportableStubsInfo: StubsInfo{},
