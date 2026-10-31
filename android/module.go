@@ -2725,12 +2725,12 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 	}
 	SetProvider(ctx, CommonModuleInfoProvider, &commonData)
 
-	var hasAndroidMkProvider bool
+	var hasAndroidMkInfo bool
 	if ctx.Config().KatiEnabled() {
 		if p, ok := m.module.(AndroidMkProviderInfoProducer); ok && !commonData.SkipAndroidMkProcessing {
-			hasAndroidMkProvider = true
 			if info := p.PrepareAndroidMKProviderInfo(ctx.Config()); info != nil {
 				SetProvider(ctx, AndroidMkInfoProvider, info)
+				hasAndroidMkInfo = true
 			}
 		}
 	}
@@ -2779,9 +2779,10 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 		}
 	}
 
-	if !ctx.Config().KatiEnabled() || hasAndroidMkProvider {
-		// If building in Soong-only mode or the Android.mk generation has been converted to a provider
-		// then there are no references directly to the Module and it can be freed.
+	if !ctx.Config().KatiEnabled() ||
+		!androidMkReadsModuleFields(m.module, hasAndroidMkInfo, commonData.SkipAndroidMkProcessing) {
+		// If building in Soong-only mode or androidmk writes the Make data of the module without its Go
+		// object then there are no references directly to the Module and it can be freed.
 		ctx.bp.FreeModuleAfterGenerateBuildActions()
 	}
 }

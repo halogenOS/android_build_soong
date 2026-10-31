@@ -75,6 +75,7 @@ func (p *packageModule) GenerateBuildActions(ctx blueprint.ModuleContext) {
 		},
 	})
 	writePackageComplianceRecord(ctx, primaryLicenses)
+	ctx.FreeModuleAfterGenerateBuildActions()
 }
 
 func (p *packageModule) qualifiedModuleId(ctx BaseModuleContext) qualifiedModuleName {

@@ -703,6 +703,21 @@ func translateAndroidMkModule(ctx SingletonContext, w io.Writer, moduleInfoJSONs
 	return err
 }
 
+// androidMkReadsModuleFields returns whether translateAndroidMkModule writes the Make data of module from
+// its Go object, which then must stay after GenerateBuildActions. hasAndroidMkInfo is whether the module
+// set AndroidMkInfoProvider.
+func androidMkReadsModuleFields(module Module, hasAndroidMkInfo, skipAndroidMkProcessing bool) bool {
+	if hasAndroidMkInfo || skipAndroidMkProcessing {
+		return false
+	}
+	switch module.(type) {
+	case AndroidMkDataProvider, AndroidMkEntriesProvider:
+		return true
+	default:
+		return false
+	}
+}
+
 func (data *AndroidMkData) fillInData(ctx fillInEntriesContext, mod Module) {
 	// Get the preamble content through AndroidMkEntries logic.
 	data.Entries = AndroidMkEntries{
