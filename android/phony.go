@@ -171,10 +171,6 @@ func phonySingletonFactory() Singleton {
 	return &phonySingleton{}
 }
 
-func (p *phonySingleton) IncrementalSupported() bool {
-	return true
-}
-
 // writeSoongPhonyNinja writes a ninja file containing phony rules for each phony target requested in Soong-only builds.
 func (p *phonySingleton) writeSoongPhonyNinja(w io.StringWriter) error {
 	var err error

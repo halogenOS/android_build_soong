@@ -169,8 +169,8 @@ type SingletonContext interface {
 type singletonAdaptor struct {
 	Singleton
 
-	// readByMake is set where makevars calls MakeVars of the singleton,
-	// which reads fields that GenerateBuildActions sets.
+	// readByMake is the result of makeVarsReadsSingletonFields for the
+	// singleton. It takes precedence over IncrementalSupported of the singleton.
 	readByMake bool
 
 	buildParams []BuildParams
@@ -186,7 +186,6 @@ type incrementalSingleton interface {
 
 func (s *singletonAdaptor) IncrementalSupported() bool {
 	if s.readByMake {
-		// A restored singleton would leave those fields empty.
 		return false
 	}
 	if im, ok := s.Singleton.(incrementalSingleton); ok {

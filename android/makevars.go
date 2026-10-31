@@ -186,9 +186,24 @@ type makeVarsSingleton struct {
 }
 
 func (s *makeVarsSingleton) IncrementalSupported() bool {
-	// The .mk files are written outside the Ninja file, so a restored
-	// singleton would leave them as they were.
+	// The .mk files depend on the fields of singletons that their MakeVars
+	// methods read and on the Go objects of modules that are not freed, which
+	// the provider hashes of this singleton do not cover.
 	return false
+}
+
+// makeVarsRuns returns whether the makevars singleton writes Make variables,
+// which it does only in builds that run Kati.
+func makeVarsRuns(config Config) bool {
+	return config.KatiEnabled()
+}
+
+// makeVarsReadsSingletonFields returns whether the makevars singleton calls the
+// MakeVars method of singleton. MakeVars reads fields that GenerateBuildActions
+// of the singleton sets, which a singleton restored from the cache leaves empty.
+func makeVarsReadsSingletonFields(config Config, singleton Singleton) bool {
+	_, ok := singleton.(SingletonMakeVarsProvider)
+	return ok && makeVarsRuns(config)
 }
 
 type makeVarsProvider struct {
@@ -229,7 +244,7 @@ type dist struct {
 var SingletonDistInfoProvider = blueprint.NewSingletonProvider[DistInfo]()
 
 func (s *makeVarsSingleton) GenerateBuildActions(ctx SingletonContext) {
-	if !ctx.Config().KatiEnabled() {
+	if !makeVarsRuns(ctx.Config()) {
 		return
 	}
 

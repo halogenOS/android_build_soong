@@ -557,8 +557,8 @@ func AndroidMkSingleton() Singleton {
 type androidMkSingleton struct{}
 
 func (c *androidMkSingleton) IncrementalSupported() bool {
-	// The .mk and module-info files are written outside the Ninja file, so a
-	// restored singleton would leave them as they were.
+	// The .mk and module-info files depend on the Go objects of modules that are
+	// not freed, which the provider hashes of the singleton do not cover.
 	return false
 }
 
