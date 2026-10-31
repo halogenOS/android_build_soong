@@ -384,6 +384,12 @@ func main() {
 	if ctx.GetIncrementalEnabled() {
 		configCache, incremental = incrementalValid(ctx.Config(), ctx.GetSplitAllVariants(), configFile)
 		ctx.SetIncrementalProviderTest(incremental && cmdlineArgs.IncrementalProviderTest)
+		// Every analysis writes to the cache, a full one after resetting it, and a stopped one can
+		// leave it half written. The config cache of an earlier analysis must then not match, so
+		// only an analysis that succeeds writes a new one.
+		if err := os.Remove(configFile); !os.IsNotExist(err) {
+			maybeQuit(err, "error removing config cache '%s'", configFile)
+		}
 	}
 	ctx.SetIncrementalAnalysis(incremental)
 	ctx.SetPartialAnalysisTargets(cmdlineArgs.PartialAnalysisTargets)
