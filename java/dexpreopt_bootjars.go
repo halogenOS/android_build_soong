@@ -618,6 +618,9 @@ func (d *dexpreoptBootJars) GenerateAndroidBuildActions(ctx android.ModuleContex
 	if ctx.ModuleName() != "dex_bootjars" || ctx.Namespace().Path != "." {
 		ctx.ModuleErrorf(`dex_bootjars can only be used by a single module named "dex_bootjars" in the root namespace.`)
 	}
+	if dexpreopt.IsDex2oatNeeded(ctx) {
+		android.SetProvider(ctx, dexpreopt.GlobalSoongConfigProvider, dexpreopt.GetGlobalSoongConfig(ctx))
+	}
 
 	imageConfigs := genBootImageConfigs(ctx)
 	d.defaultBootImage = defaultBootImageConfig(ctx)

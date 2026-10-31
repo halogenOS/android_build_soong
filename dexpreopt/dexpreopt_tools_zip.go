@@ -21,7 +21,7 @@ func (s *dexpreoptToolsZipSingleton) GenerateBuildActions(ctx android.SingletonC
 	if global.DisablePreopt {
 		return
 	}
-	config := GetCachedGlobalSoongConfig(ctx)
+	config := globalSoongConfigFromModules(ctx)
 	if config == nil {
 		return
 	}

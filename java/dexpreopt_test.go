@@ -293,8 +293,9 @@ func TestDex2oatToolDeps(t *testing.T) {
 						name: "myjavalib",
 					}
 				`, sourceEnabled, prebuiltEnabled, prebuiltPreferred))
-			pathContext := android.PathContextForTesting(result.Config)
-			dex2oatPath := dexpreopt.GetCachedGlobalSoongConfig(pathContext).Dex2oat
+			dexBootJars := result.ModuleForTests(t, "dex_bootjars", "android_common").Module()
+			globalSoong, _ := android.OtherModuleProvider(result, dexBootJars, dexpreopt.GlobalSoongConfigProvider)
+			dex2oatPath := globalSoong.Dex2oat
 			android.AssertStringEquals(t, "Testing "+name, expectedDex2oatPath, android.NormalizePathForTesting(dex2oatPath))
 		})
 	}

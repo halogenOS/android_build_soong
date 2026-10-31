@@ -25,6 +25,8 @@ import (
 	"android/soong/android"
 )
 
+//go:generate go run ../../blueprint/gobtools/codegen
+
 // GlobalConfig stores the configuration for dex preopting. The fields are set
 // from product variables via dex_preopt_config.mk.
 type GlobalConfig struct {
@@ -159,6 +161,7 @@ func (g *GlobalConfig) AllSystemServerJars(ctx android.PathContext) *android.Con
 
 // GlobalSoongConfig contains the global config that is generated from Soong,
 // stored in dexpreopt_soong.config.
+// @auto-generate: gob
 type GlobalSoongConfig struct {
 	// Paths to tools possibly used by the generated commands.
 	Profman          android.Path
@@ -573,16 +576,23 @@ func createGlobalSoongConfig(ctx android.ModuleContext) *GlobalSoongConfig {
 	}
 }
 
-// The main reason for this Once cache for GlobalSoongConfig is to make the
-// dex2oat path available to singletons. In ordinary modules we get it through a
+// The Once cache for GlobalSoongConfig gives every module of one analysis the
+// same instance, and GetGlobalSoongConfig checks that the dex2oat path of each
+// module matches it.
+var globalSoongConfigOnceKey = android.NewOnceKey("DexpreoptGlobalSoongConfig")
+
+// GlobalSoongConfigProvider makes the GlobalSoongConfig available to
+// singletons. In ordinary modules we get the dex2oat path through a
 // Dex2oatDepTag dependency, but in singletons there's no simple way to do the
-// same thing and ensure the right variant is selected, hence this cache to make
-// the resolved path available to singletons. This means we depend on there
-// being at least one ordinary module with a Dex2oatDepTag dependency.
+// same thing and ensure the right variant is selected. The dex_bootjars module,
+// which exists once in the root namespace and depends on dex2oat wherever
+// dex2oat is needed, sets it. A provider is restored with its module where
+// incremental analysis restores the module, unlike a value that module code
+// puts into the config.
 //
 // TODO(b/147613152): Implement a way to deal with dependencies from singletons,
-// and then possibly remove this cache altogether.
-var globalSoongConfigOnceKey = android.NewOnceKey("DexpreoptGlobalSoongConfig")
+// and then possibly remove this provider altogether.
+var GlobalSoongConfigProvider = blueprint.NewProvider[*GlobalSoongConfig]()
 
 // GetGlobalSoongConfig creates a GlobalSoongConfig the first time it's called,
 // and later returns the same cached instance.
@@ -601,16 +611,24 @@ func GetGlobalSoongConfig(ctx android.ModuleContext) *GlobalSoongConfig {
 	return globalSoong
 }
 
-// GetCachedGlobalSoongConfig returns a cached GlobalSoongConfig created by an
-// earlier GetGlobalSoongConfig call. This function works with any context
-// compatible with a basic PathContext, since it doesn't try to create a
-// GlobalSoongConfig with the proper paths (which requires a full
-// ModuleContext). If there has been no prior call to GetGlobalSoongConfig, nil
-// is returned.
-func GetCachedGlobalSoongConfig(ctx android.PathContext) *GlobalSoongConfig {
-	return ctx.Config().Once(globalSoongConfigOnceKey, func() interface{} {
-		return (*GlobalSoongConfig)(nil)
-	}).(*GlobalSoongConfig)
+// moduleProviderVisitor is a context that visits all modules and reads their
+// providers, such as a SingletonContext or a MakeVarsContext.
+type moduleProviderVisitor interface {
+	android.OtherModuleProviderContext
+	VisitAllModuleProxies(visit func(proxy android.ModuleProxy))
+}
+
+// globalSoongConfigFromModules returns the GlobalSoongConfig that the
+// dex_bootjars module set in GlobalSoongConfigProvider, or nil where it set
+// none because dex2oat is not needed.
+func globalSoongConfigFromModules(ctx moduleProviderVisitor) *GlobalSoongConfig {
+	var config *GlobalSoongConfig
+	ctx.VisitAllModuleProxies(func(module android.ModuleProxy) {
+		if config == nil {
+			config, _ = android.OtherModuleProvider(ctx, module, GlobalSoongConfigProvider)
+		}
+	})
+	return config
 }
 
 type globalJsonSoongConfig struct {
@@ -681,10 +699,10 @@ func (s *globalSoongConfigSingleton) GenerateBuildActions(ctx android.SingletonC
 
 	buildUffdGcFlag(ctx, global)
 
-	config := GetCachedGlobalSoongConfig(ctx)
+	config := globalSoongConfigFromModules(ctx)
 	if config == nil {
-		// No module has enabled dexpreopting, so we assume there will be no calls
-		// to dexpreopt_gen.
+		// dex2oat is not needed, so we assume there will be no calls to
+		// dexpreopt_gen.
 		return
 	}
 
@@ -719,7 +737,7 @@ func (s *globalSoongConfigSingleton) MakeVars(ctx android.MakeVarsContext) {
 		return
 	}
 
-	config := GetCachedGlobalSoongConfig(ctx)
+	config := globalSoongConfigFromModules(ctx)
 	if config == nil {
 		return
 	}

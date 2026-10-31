@@ -175,3 +175,389 @@ func (r ClassLoaderContext) GetTypeId() int16 {
 }
 
 // end of class_loader_context.go
+
+// begin of config.go
+func init() {
+	GlobalSoongConfigGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(GlobalSoongConfig) })
+}
+
+func (r GlobalSoongConfig) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Profman); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Dex2oat); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Aapt); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.SoongZip); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Zip2zip); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.ManifestCheck); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.ConstructContext); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.UffdGcFlag); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.AssumeValueFlags); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.ProfileCodeFlag); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r GlobalSoongConfig) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":dexpreopt.GlobalSoongConfig")
+	hasher.WriteInt(10)
+	hasher.WriteString(":dexpreopt.android.Path")
+	val1 := r.Profman == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Profman); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.Profman == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.Profman.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Profman.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.Path")
+	val4 := r.Dex2oat == nil
+	if val4 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Dex2oat); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val5 := r.Dex2oat == nil
+				if val5 {
+					hasher.WriteByte(0)
+				} else {
+					val6 := func(hasher *proptools.Hasher) error { return r.Dex2oat.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val6); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Dex2oat.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.Path")
+	val7 := r.Aapt == nil
+	if val7 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Aapt); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val8 := r.Aapt == nil
+				if val8 {
+					hasher.WriteByte(0)
+				} else {
+					val9 := func(hasher *proptools.Hasher) error { return r.Aapt.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val9); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Aapt.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.Path")
+	val10 := r.SoongZip == nil
+	if val10 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.SoongZip); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val11 := r.SoongZip == nil
+				if val11 {
+					hasher.WriteByte(0)
+				} else {
+					val12 := func(hasher *proptools.Hasher) error { return r.SoongZip.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val12); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.SoongZip.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.Path")
+	val13 := r.Zip2zip == nil
+	if val13 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Zip2zip); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val14 := r.Zip2zip == nil
+				if val14 {
+					hasher.WriteByte(0)
+				} else {
+					val15 := func(hasher *proptools.Hasher) error { return r.Zip2zip.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val15); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Zip2zip.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.Path")
+	val16 := r.ManifestCheck == nil
+	if val16 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.ManifestCheck); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val17 := r.ManifestCheck == nil
+				if val17 {
+					hasher.WriteByte(0)
+				} else {
+					val18 := func(hasher *proptools.Hasher) error { return r.ManifestCheck.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val18); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.ManifestCheck.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.Path")
+	val19 := r.ConstructContext == nil
+	if val19 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.ConstructContext); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val20 := r.ConstructContext == nil
+				if val20 {
+					hasher.WriteByte(0)
+				} else {
+					val21 := func(hasher *proptools.Hasher) error {
+						return r.ConstructContext.(proptools.CustomHash).CustomHash(hasher)
+					}
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val21); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.ConstructContext.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.WritablePath")
+	val22 := r.UffdGcFlag == nil
+	if val22 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.UffdGcFlag); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val23 := r.UffdGcFlag == nil
+				if val23 {
+					hasher.WriteByte(0)
+				} else {
+					val24 := func(hasher *proptools.Hasher) error { return r.UffdGcFlag.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val24); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.UffdGcFlag.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.WritablePath")
+	val25 := r.AssumeValueFlags == nil
+	if val25 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.AssumeValueFlags); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val26 := r.AssumeValueFlags == nil
+				if val26 {
+					hasher.WriteByte(0)
+				} else {
+					val27 := func(hasher *proptools.Hasher) error {
+						return r.AssumeValueFlags.(proptools.CustomHash).CustomHash(hasher)
+					}
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val27); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.AssumeValueFlags.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":dexpreopt.android.WritablePath")
+	val28 := r.ProfileCodeFlag == nil
+	if val28 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.ProfileCodeFlag); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val29 := r.ProfileCodeFlag == nil
+				if val29 {
+					hasher.WriteByte(0)
+				} else {
+					val30 := func(hasher *proptools.Hasher) error {
+						return r.ProfileCodeFlag.(proptools.CustomHash).CustomHash(hasher)
+					}
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val30); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.ProfileCodeFlag.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	return nil
+}
+
+func (r *GlobalSoongConfig) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if val2, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val2 == nil {
+		r.Profman = nil
+	} else {
+		r.Profman = val2.(android.Path)
+	}
+
+	if val4, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val4 == nil {
+		r.Dex2oat = nil
+	} else {
+		r.Dex2oat = val4.(android.Path)
+	}
+
+	if val6, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val6 == nil {
+		r.Aapt = nil
+	} else {
+		r.Aapt = val6.(android.Path)
+	}
+
+	if val8, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val8 == nil {
+		r.SoongZip = nil
+	} else {
+		r.SoongZip = val8.(android.Path)
+	}
+
+	if val10, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val10 == nil {
+		r.Zip2zip = nil
+	} else {
+		r.Zip2zip = val10.(android.Path)
+	}
+
+	if val12, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val12 == nil {
+		r.ManifestCheck = nil
+	} else {
+		r.ManifestCheck = val12.(android.Path)
+	}
+
+	if val14, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val14 == nil {
+		r.ConstructContext = nil
+	} else {
+		r.ConstructContext = val14.(android.Path)
+	}
+
+	if val16, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val16 == nil {
+		r.UffdGcFlag = nil
+	} else {
+		r.UffdGcFlag = val16.(android.WritablePath)
+	}
+
+	if val18, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val18 == nil {
+		r.AssumeValueFlags = nil
+	} else {
+		r.AssumeValueFlags = val18.(android.WritablePath)
+	}
+
+	if val20, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val20 == nil {
+		r.ProfileCodeFlag = nil
+	} else {
+		r.ProfileCodeFlag = val20.(android.WritablePath)
+	}
+
+	return err
+}
+
+var GlobalSoongConfigGobRegId int16
+
+func (r GlobalSoongConfig) GetTypeId() int16 {
+	return GlobalSoongConfigGobRegId
+}
+
+// end of config.go
