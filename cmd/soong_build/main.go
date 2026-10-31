@@ -130,7 +130,7 @@ func needToWriteNinjaHint(ctx *android.Context) bool {
 	case "always":
 		return true
 	case "depend":
-		if _, err := os.Stat(filepath.Join(topDir, ctx.Config().OutDir(), ".ninja_log")); errors.Is(err, os.ErrNotExist) {
+		if _, err := os.Stat(shared.JoinPath(topDir, ctx.Config().OutDir(), ".ninja_log")); errors.Is(err, os.ErrNotExist) {
 			return true
 		}
 	}
@@ -175,7 +175,7 @@ func writeNinjaHint(ctx *android.Context) error {
 	for output, weight := range outputsMap {
 		outputBuilder.WriteString(fmt.Sprintf("%s,%d\n", output, weight))
 	}
-	weightListFile := filepath.Join(topDir, ctx.Config().OutDir(), ".ninja_weight_list")
+	weightListFile := shared.JoinPath(topDir, ctx.Config().OutDir(), ".ninja_weight_list")
 
 	err := os.WriteFile(weightListFile, []byte(outputBuilder.String()), 0644)
 	if err != nil {
@@ -229,7 +229,7 @@ func incrementalValid(config android.Config, splitAllVariants bool, configCacheF
 	if hash, ok := config.DexpreoptGlobalConfigHash(); ok {
 		newConfigCache.DexpreoptConfigHash = hash
 	}
-	newConfigCache.SoongBuildFileTimestamp = getFileTimestamp(filepath.Join(topDir, config.HostToolDir(), "soong_build"))
+	newConfigCache.SoongBuildFileTimestamp = getFileTimestamp(shared.JoinPath(topDir, config.HostToolDir(), "soong_build"))
 	newConfigCache.KatiEnabled = cmdlineArgs.KatiEnabled
 	newConfigCache.KatiSuffix = cmdlineArgs.KatiSuffix
 	newConfigCache.SplitAllVariants = splitAllVariants
@@ -378,7 +378,7 @@ func main() {
 	}
 
 	var configCache *ConfigCache
-	configFile := filepath.Join(topDir, ctx.Config().OutDir(), configCacheFile)
+	configFile := shared.JoinPath(topDir, ctx.Config().OutDir(), configCacheFile)
 	incremental := false
 	ctx.SetIncrementalEnabled(cmdlineArgs.IncrementalBuildActions)
 	if ctx.GetIncrementalEnabled() {
