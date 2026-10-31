@@ -97,7 +97,7 @@ func verifyProductVariableMarshaling(t *testing.T, v ProductVariables) {
 	}
 
 	var v2 ProductVariables
-	err = loadFromConfigFile(&v2, path)
+	_, err = loadFromConfigFile(&v2, path)
 	if err != nil {
 		t.Errorf("Couldn't load default product config: %q", err)
 	}

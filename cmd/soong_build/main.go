@@ -56,7 +56,9 @@ type ConfigCache struct {
 	EnvDepsHash proptools.Hash
 	// ProductVariablesHash and DexpreoptConfigHash are the hashes of the
 	// contents of the files that Kati writes for Soong during the product
-	// configuration. Kati replaces each file only when its contents change.
+	// configuration. They are hashed from the bytes that the analysis decodes,
+	// so the key follows the contents that the analysis used, whatever the
+	// times of the files are.
 	ProductVariablesHash    proptools.Hash
 	DexpreoptConfigHash     proptools.Hash
 	SoongBuildFileTimestamp int64
@@ -201,17 +203,15 @@ func writeDepFile(outputFile string, eventHandler *metrics.EventHandler, ninjaDe
 }
 
 // Check if there are changes to the environment file, the files written by Kati
-// for Soong, the build mode and the soong_build binary, in which case no
-// incremental will be performed. For env
-// variables we check the used env file, which will be removed in soong ui if
-// there is any changes to the env variables used last time, in which case the
-// check below will fail and a full build will be attempted. If any new env
-// variables are added in the new run, soong ui won't be able to detect it, the
-// used env file check below will pass. But unless there is a soong build code
-// change, in which case the soong build binary check will fail, otherwise the
-// new env variables shouldn't have any affect.
-func incrementalValid(ctx *android.Context, configCacheFile string) (*ConfigCache, bool) {
-	config := ctx.Config()
+// for Soong, the build mode and the soong_build binary, in which case the
+// analysis runs in full. For env variables we check the used env file, which
+// will be removed in soong ui if there is any changes to the env variables used
+// last time, in which case the check below will fail and a full build will be
+// attempted. If any new env variables are added in the new run, soong ui won't
+// be able to detect it, the used env file check below will pass. But unless
+// there is a soong build code change, in which case the soong build binary
+// check will fail, otherwise the new env variables shouldn't have any affect.
+func incrementalValid(config android.Config, splitAllVariants bool, configCacheFile string) (*ConfigCache, bool) {
 	var newConfigCache ConfigCache
 	data, err := os.ReadFile(shared.JoinPath(topDir, usedEnvFile))
 	if err != nil {
@@ -225,14 +225,14 @@ func incrementalValid(ctx *android.Context, configCacheFile string) (*ConfigCach
 
 	newConfigCache.EnvDepsHash, err = proptools.CalculateHashReflection(data)
 	maybeQuit(err, "")
-	newConfigCache.ProductVariablesHash = hashFileContents(cmdlineArgs.SoongVariables)
-	if dexpreoptConfig, ok := config.DexpreoptGlobalConfigFileName(); ok {
-		newConfigCache.DexpreoptConfigHash = hashFileContents(dexpreoptConfig)
+	newConfigCache.ProductVariablesHash = config.ProductVariablesHash()
+	if hash, ok := config.DexpreoptGlobalConfigHash(); ok {
+		newConfigCache.DexpreoptConfigHash = hash
 	}
 	newConfigCache.SoongBuildFileTimestamp = getFileTimestamp(filepath.Join(topDir, config.HostToolDir(), "soong_build"))
 	newConfigCache.KatiEnabled = cmdlineArgs.KatiEnabled
 	newConfigCache.KatiSuffix = cmdlineArgs.KatiSuffix
-	newConfigCache.SplitAllVariants = ctx.GetSplitAllVariants()
+	newConfigCache.SplitAllVariants = splitAllVariants
 
 	file, err := os.Open(configCacheFile)
 	if err != nil && os.IsNotExist(err) {
@@ -250,20 +250,6 @@ func incrementalValid(ctx *android.Context, configCacheFile string) (*ConfigCach
 	}
 
 	return &newConfigCache, newConfigCache == configCache
-}
-
-// hashFileContents returns the hash of the contents of file, which is absolute
-// or relative to the top of the source tree, or proptools.ZeroHash where the
-// file does not exist.
-func hashFileContents(file string) proptools.Hash {
-	data, err := os.ReadFile(shared.JoinPath(topDir, file))
-	if os.IsNotExist(err) {
-		return proptools.ZeroHash
-	}
-	maybeQuit(err, "")
-	hash, err := proptools.CalculateHashReflection(data)
-	maybeQuit(err, "")
-	return hash
 }
 
 func getFileTimestamp(file string) int64 {
@@ -396,7 +382,7 @@ func main() {
 	incremental := false
 	ctx.SetIncrementalEnabled(cmdlineArgs.IncrementalBuildActions)
 	if ctx.GetIncrementalEnabled() {
-		configCache, incremental = incrementalValid(ctx, configFile)
+		configCache, incremental = incrementalValid(ctx.Config(), ctx.GetSplitAllVariants(), configFile)
 		ctx.SetIncrementalProviderTest(incremental && cmdlineArgs.IncrementalProviderTest)
 	}
 	ctx.SetIncrementalAnalysis(incremental)

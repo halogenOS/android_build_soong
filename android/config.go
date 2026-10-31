@@ -18,6 +18,7 @@ package android
 // product variables necessary for soong_build's operation.
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -379,6 +380,14 @@ type config struct {
 	TestProductVariables *ProductVariables
 
 	ProductVariablesFileName string
+	// productVariablesHash is the hash of the contents of the product variables file.
+	productVariablesHash proptools.Hash
+
+	// dexpreoptGlobalConfig is the contents of the dexpreopt.config file that the product variables
+	// name, and dexpreoptGlobalConfigHash its hash. Both are unset where the product variables name
+	// no dexpreopt.config file.
+	dexpreoptGlobalConfig     []byte
+	dexpreoptGlobalConfigHash proptools.Hash
 
 	// BuildOS stores the OsType for the OS that the build is running on.
 	BuildOS OsType
@@ -643,7 +652,30 @@ func (c *config) parsePartialCompileFlags(isEngBuild bool) (partialCompileFlags,
 }
 
 func loadConfig(config *config) error {
-	return loadFromConfigFile(&config.productVariables, absolutePath(config.ProductVariablesFileName))
+	data, err := loadFromConfigFile(&config.productVariables, absolutePath(config.ProductVariablesFileName))
+	if err != nil {
+		return err
+	}
+	if config.productVariablesHash, err = hashFileContents(data); err != nil {
+		return fmt.Errorf("could not hash the product variables file %s: %w", config.ProductVariablesFileName, err)
+	}
+
+	name := config.productVariables.DexpreoptGlobalConfig
+	if name == nil {
+		return nil
+	}
+	if config.dexpreoptGlobalConfig, err = os.ReadFile(absolutePath(*name)); err != nil {
+		return fmt.Errorf("could not read the dexpreopt config file %s: %w", *name, err)
+	}
+	if config.dexpreoptGlobalConfigHash, err = hashFileContents(config.dexpreoptGlobalConfig); err != nil {
+		return fmt.Errorf("could not hash the dexpreopt config file %s: %w", *name, err)
+	}
+	return nil
+}
+
+// hashFileContents returns the hash of the contents of a file.
+func hashFileContents(data []byte) (proptools.Hash, error) {
+	return proptools.CalculateHashReflection(string(data))
 }
 
 // Checks if the string is a valid go identifier. This is equivalent to blueprint's definition
@@ -659,11 +691,9 @@ func isGoIdentifier(ident string) bool {
 }
 
 // loadFromConfigFile loads and decodes configuration options from a JSON file
-// in the current working directory.
-func loadFromConfigFile(configurable *ProductVariables, filename string) error {
-	// Try to open the file
-	configFileReader, err := os.Open(filename)
-	defer configFileReader.Close()
+// in the current working directory. It returns the contents of the file.
+func loadFromConfigFile(configurable *ProductVariables, filename string) ([]byte, error) {
+	data, err := os.ReadFile(filename)
 	if os.IsNotExist(err) {
 		// Need to create a file, so that blueprint & ninja don't get in
 		// a dependency tracking loop.
@@ -672,22 +702,26 @@ func loadFromConfigFile(configurable *ProductVariables, filename string) error {
 		configurable.SetDefaultConfig()
 		err = saveToConfigFile(configurable, filename)
 		if err != nil {
-			return err
+			return nil, err
+		}
+		data, err = os.ReadFile(filename)
+		if err != nil {
+			return nil, fmt.Errorf("config file: could not read the default config %s: %w", filename, err)
 		}
 	} else if err != nil {
-		return fmt.Errorf("config file: could not open %s: %s", filename, err.Error())
+		return nil, fmt.Errorf("config file: could not open %s: %s", filename, err.Error())
 	} else {
 		// Make a decoder for it
-		jsonDecoder := json.NewDecoder(configFileReader)
+		jsonDecoder := json.NewDecoder(bytes.NewReader(data))
 		jsonDecoder.DisallowUnknownFields()
 		err = jsonDecoder.Decode(configurable)
 		if err != nil {
-			return fmt.Errorf("config file: %s did not parse correctly: %s", filename, err.Error())
+			return nil, fmt.Errorf("config file: %s did not parse correctly: %s", filename, err.Error())
 		}
 	}
 
 	if Bool(configurable.GcovCoverage) && Bool(configurable.ClangCoverage) {
-		return fmt.Errorf("GcovCoverage and ClangCoverage cannot both be set")
+		return nil, fmt.Errorf("GcovCoverage and ClangCoverage cannot both be set")
 	}
 
 	configurable.Native_coverage = proptools.BoolPtr(
@@ -699,11 +733,11 @@ func loadFromConfigFile(configurable *ProductVariables, filename string) error {
 	// will allow the same identifiers as are valid in bp files.
 	for namespace := range configurable.VendorVars {
 		if !isGoIdentifier(namespace) {
-			return fmt.Errorf("soong config namespaces must be valid identifiers: %q", namespace)
+			return nil, fmt.Errorf("soong config namespaces must be valid identifiers: %q", namespace)
 		}
 		for variable := range configurable.VendorVars[namespace] {
 			if !isGoIdentifier(variable) {
-				return fmt.Errorf("soong config variables must be valid identifiers: %q", variable)
+				return nil, fmt.Errorf("soong config variables must be valid identifiers: %q", variable)
 			}
 		}
 	}
@@ -715,14 +749,14 @@ func loadFromConfigFile(configurable *ProductVariables, filename string) error {
 			configurable.Platform_sdk_version_or_codename =
 				proptools.StringPtr(strconv.Itoa(*(configurable.Platform_sdk_version)))
 		} else {
-			return fmt.Errorf("Platform_sdk_version cannot be pointed by a NULL pointer")
+			return nil, fmt.Errorf("Platform_sdk_version cannot be pointed by a NULL pointer")
 		}
 	} else {
 		configurable.Platform_sdk_version_or_codename =
 			proptools.StringPtr(String(configurable.Platform_sdk_codename))
 	}
 
-	return nil
+	return data, nil
 }
 
 // atomically writes the config file in case two copies of soong_build are running simultaneously
@@ -1833,21 +1867,24 @@ func (c *config) ModulesLoadedByPrivilegedModules() []string {
 // the output directory, if it was created during the product configuration
 // phase by Kati.
 func (c *config) DexpreoptGlobalConfigPath(ctx PathContext) OptionalPath {
-	name, ok := c.DexpreoptGlobalConfigFileName()
-	if !ok {
+	if c.productVariables.DexpreoptGlobalConfig == nil {
 		return OptionalPathForPath(nil)
 	}
-	return OptionalPathForPath(pathForBuildToolDep(ctx, name))
+	return OptionalPathForPath(
+		pathForBuildToolDep(ctx, *c.productVariables.DexpreoptGlobalConfig))
 }
 
-// DexpreoptGlobalConfigFileName returns the name of the dexpreopt.config file
-// that Kati writes during the product configuration phase, or false where the
-// product configuration names none.
-func (c *config) DexpreoptGlobalConfigFileName() (string, bool) {
-	if c.productVariables.DexpreoptGlobalConfig == nil {
-		return "", false
-	}
-	return *c.productVariables.DexpreoptGlobalConfig, true
+// ProductVariablesHash returns the hash of the contents of the product variables file that Kati
+// writes during the product configuration phase.
+func (c *config) ProductVariablesHash() proptools.Hash {
+	return c.productVariablesHash
+}
+
+// DexpreoptGlobalConfigHash returns the hash of the contents of the dexpreopt.config file that Kati
+// writes during the product configuration phase, or false where the product configuration leaves
+// the file name unset.
+func (c *config) DexpreoptGlobalConfigHash() (proptools.Hash, bool) {
+	return c.dexpreoptGlobalConfigHash, c.productVariables.DexpreoptGlobalConfig != nil
 }
 
 // DexpreoptGlobalConfig returns the raw byte contents of the dexpreopt global
@@ -1856,13 +1893,13 @@ func (c *config) DexpreoptGlobalConfigFileName() (string, bool) {
 // also manually add a Ninja file dependency on the configuration file to the
 // rule that creates the main build.ninja file. This ensures that build.ninja is
 // regenerated correctly if dexpreopt.config changes.
-func (c *config) DexpreoptGlobalConfig(ctx PathContext) ([]byte, error) {
+func (c *config) DexpreoptGlobalConfig(ctx PathContext) []byte {
 	path := c.DexpreoptGlobalConfigPath(ctx)
 	if !path.Valid() {
-		return nil, nil
+		return nil
 	}
 	ctx.AddNinjaFileDeps(path.String())
-	return os.ReadFile(absolutePath(path.String()))
+	return c.dexpreoptGlobalConfig
 }
 
 func (c *deviceConfig) WithDexpreopt() bool {

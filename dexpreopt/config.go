@@ -306,9 +306,7 @@ func (p *pathContextErrorCollector) Errorf(format string, args ...interface{}) {
 
 func getGlobalConfigRaw(ctx android.PathContext) globalConfigAndRaw {
 	config := ctx.Config().Once(globalConfigOnceKey, func() interface{} {
-		if data, err := ctx.Config().DexpreoptGlobalConfig(ctx); err != nil {
-			panic(err)
-		} else if data != nil {
+		if data := ctx.Config().DexpreoptGlobalConfig(ctx); data != nil {
 			pathErrorCollectorCtx := &pathContextErrorCollector{PathContext: ctx}
 			globalConfig, err := ParseGlobalConfig(pathErrorCollectorCtx, data)
 			if err != nil {
