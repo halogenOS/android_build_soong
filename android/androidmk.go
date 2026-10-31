@@ -33,6 +33,7 @@ import (
 	"strings"
 
 	"github.com/google/blueprint"
+	"github.com/google/blueprint/parallel"
 	"github.com/google/blueprint/pathtools"
 	"github.com/google/blueprint/proptools"
 )
@@ -610,13 +611,16 @@ func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPa
 
 	fmt.Fprintln(buf, "LOCAL_MODULE_MAKEFILE := $(lastword $(MAKEFILE_LIST))")
 
+	renderings, err := renderAndroidMkModules(ctx, mods)
+	if err != nil {
+		os.Remove(absMkFile)
+		return err
+	}
 	typeStats := make(map[string]int)
-	for _, mod := range mods {
-		err := translateAndroidMkModule(ctx, buf, &moduleInfoJSONs, mod)
-		if err != nil {
-			os.Remove(absMkFile)
-			return err
-		}
+	for i, mod := range mods {
+		renderings[i].appendTo(buf, &moduleInfoJSONs)
+		// buf now contains the text, so the rendering is freed.
+		renderings[i] = androidMkRendering{}
 
 		if ctx.IsPrimaryModule(mod) {
 			typeStats[ctx.ModuleType(mod)] += 1
@@ -635,12 +639,35 @@ func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPa
 		fmt.Fprintf(buf, "STATS.SOONG_MODULE_TYPE.%s := %d\n", mod_type, typeStats[mod_type])
 	}
 
-	err := pathtools.WriteFileIfChanged(absMkFile, buf.Bytes(), 0666)
+	err = pathtools.WriteFileIfChanged(absMkFile, buf.Bytes(), 0666)
 	if err != nil {
 		return err
 	}
 
 	return writeModuleInfoJSON(ctx, moduleInfoJSONs, moduleInfoJSONPath)
+}
+
+// androidMkRendering is what translateAndroidMkModule rendered for one module: its Make text and
+// its module-info.json entries.
+type androidMkRendering struct {
+	mk              bytes.Buffer
+	moduleInfoJSONs []*ModuleInfoJSON
+}
+
+// renderAndroidMkModules renders every module on all cores. It returns the renderings in the
+// order of mods, or the error of the first module in that order that failed.
+func renderAndroidMkModules(ctx SingletonContext, mods []ModuleOrProxy) ([]androidMkRendering, error) {
+	renderings := make([]androidMkRendering, len(mods))
+	err := parallel.Run(len(mods), func(i int) error {
+		return translateAndroidMkModule(ctx, &renderings[i].mk, &renderings[i].moduleInfoJSONs, mods[i])
+	})
+	return renderings, err
+}
+
+// appendTo appends the Make text to buf and the module-info.json entries to moduleInfoJSONs.
+func (r *androidMkRendering) appendTo(buf *bytes.Buffer, moduleInfoJSONs *[]*ModuleInfoJSON) {
+	buf.Write(r.mk.Bytes())
+	*moduleInfoJSONs = append(*moduleInfoJSONs, r.moduleInfoJSONs...)
 }
 
 // writeReplacedNames writes a phony Make module for each definition replaced by mod. Make then

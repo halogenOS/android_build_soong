@@ -11,6 +11,7 @@ bootstrap_go_package {
         "blueprint-depset",
         "blueprint-gobtools",
         "blueprint-metrics",
+        "blueprint-parallel",
         "blueprint-parser",
         "blueprint-pathtools",
         "blueprint-pool",
