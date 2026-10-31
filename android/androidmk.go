@@ -556,6 +556,12 @@ func AndroidMkSingleton() Singleton {
 
 type androidMkSingleton struct{}
 
+func (c *androidMkSingleton) IncrementalSupported() bool {
+	// The .mk and module-info files are written outside the Ninja file, so a
+	// restored singleton would leave them as they were.
+	return false
+}
+
 func allModulesSorted(ctx SingletonContext) []ModuleOrProxy {
 	var allModules []ModuleOrProxy
 

@@ -1833,11 +1833,21 @@ func (c *config) ModulesLoadedByPrivilegedModules() []string {
 // the output directory, if it was created during the product configuration
 // phase by Kati.
 func (c *config) DexpreoptGlobalConfigPath(ctx PathContext) OptionalPath {
-	if c.productVariables.DexpreoptGlobalConfig == nil {
+	name, ok := c.DexpreoptGlobalConfigFileName()
+	if !ok {
 		return OptionalPathForPath(nil)
 	}
-	return OptionalPathForPath(
-		pathForBuildToolDep(ctx, *c.productVariables.DexpreoptGlobalConfig))
+	return OptionalPathForPath(pathForBuildToolDep(ctx, name))
+}
+
+// DexpreoptGlobalConfigFileName returns the name of the dexpreopt.config file
+// that Kati writes during the product configuration phase, or false where the
+// product configuration names none.
+func (c *config) DexpreoptGlobalConfigFileName() (string, bool) {
+	if c.productVariables.DexpreoptGlobalConfig == nil {
+		return "", false
+	}
+	return *c.productVariables.DexpreoptGlobalConfig, true
 }
 
 // DexpreoptGlobalConfig returns the raw byte contents of the dexpreopt global

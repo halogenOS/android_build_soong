@@ -185,6 +185,12 @@ type makeVarsSingleton struct {
 	lateForTesting     []byte
 }
 
+func (s *makeVarsSingleton) IncrementalSupported() bool {
+	// The .mk files are written outside the Ninja file, so a restored
+	// singleton would leave them as they were.
+	return false
+}
+
 type makeVarsProvider struct {
 	pctx PackageContext
 	call MakeVarsProvider

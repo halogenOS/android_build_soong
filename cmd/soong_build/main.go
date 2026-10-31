@@ -53,9 +53,19 @@ var (
 const configCacheFile = "config.cache"
 
 type ConfigCache struct {
-	EnvDepsHash                  proptools.Hash
-	ProductVariableFileTimestamp int64
-	SoongBuildFileTimestamp      int64
+	EnvDepsHash proptools.Hash
+	// ProductVariablesHash and DexpreoptConfigHash are the hashes of the
+	// contents of the files that Kati writes for Soong during the product
+	// configuration. Kati replaces each file only when its contents change.
+	ProductVariablesHash    proptools.Hash
+	DexpreoptConfigHash     proptools.Hash
+	SoongBuildFileTimestamp int64
+	// KatiEnabled, KatiSuffix and SplitAllVariants are the build mode. An
+	// analysis for one mode leaves out what another mode needs, such as the
+	// Make data of modules and the variants that Make may depend on.
+	KatiEnabled      bool
+	KatiSuffix       string
+	SplitAllVariants bool
 }
 
 func init() {
@@ -190,8 +200,9 @@ func writeDepFile(outputFile string, eventHandler *metrics.EventHandler, ninjaDe
 	maybeQuit(err, "error writing depfile '%s'", depFile)
 }
 
-// Check if there are changes to the environment file, product variable file and
-// soong_build binary, in which case no incremental will be performed. For env
+// Check if there are changes to the environment file, the files written by Kati
+// for Soong, the build mode and the soong_build binary, in which case no
+// incremental will be performed. For env
 // variables we check the used env file, which will be removed in soong ui if
 // there is any changes to the env variables used last time, in which case the
 // check below will fail and a full build will be attempted. If any new env
@@ -199,7 +210,8 @@ func writeDepFile(outputFile string, eventHandler *metrics.EventHandler, ninjaDe
 // used env file check below will pass. But unless there is a soong build code
 // change, in which case the soong build binary check will fail, otherwise the
 // new env variables shouldn't have any affect.
-func incrementalValid(config android.Config, configCacheFile string) (*ConfigCache, bool) {
+func incrementalValid(ctx *android.Context, configCacheFile string) (*ConfigCache, bool) {
+	config := ctx.Config()
 	var newConfigCache ConfigCache
 	data, err := os.ReadFile(shared.JoinPath(topDir, usedEnvFile))
 	if err != nil {
@@ -212,9 +224,15 @@ func incrementalValid(config android.Config, configCacheFile string) (*ConfigCac
 	}
 
 	newConfigCache.EnvDepsHash, err = proptools.CalculateHashReflection(data)
-	newConfigCache.ProductVariableFileTimestamp = getFileTimestamp(filepath.Join(topDir, cmdlineArgs.SoongVariables))
+	maybeQuit(err, "")
+	newConfigCache.ProductVariablesHash = hashFileContents(cmdlineArgs.SoongVariables)
+	if dexpreoptConfig, ok := config.DexpreoptGlobalConfigFileName(); ok {
+		newConfigCache.DexpreoptConfigHash = hashFileContents(dexpreoptConfig)
+	}
 	newConfigCache.SoongBuildFileTimestamp = getFileTimestamp(filepath.Join(topDir, config.HostToolDir(), "soong_build"))
-	//TODO(b/344917959): out/soong/dexpreopt.config might need to be checked as well.
+	newConfigCache.KatiEnabled = cmdlineArgs.KatiEnabled
+	newConfigCache.KatiSuffix = cmdlineArgs.KatiSuffix
+	newConfigCache.SplitAllVariants = ctx.GetSplitAllVariants()
 
 	file, err := os.Open(configCacheFile)
 	if err != nil && os.IsNotExist(err) {
@@ -232,6 +250,20 @@ func incrementalValid(config android.Config, configCacheFile string) (*ConfigCac
 	}
 
 	return &newConfigCache, newConfigCache == configCache
+}
+
+// hashFileContents returns the hash of the contents of file, which is absolute
+// or relative to the top of the source tree, or proptools.ZeroHash where the
+// file does not exist.
+func hashFileContents(file string) proptools.Hash {
+	data, err := os.ReadFile(shared.JoinPath(topDir, file))
+	if os.IsNotExist(err) {
+		return proptools.ZeroHash
+	}
+	maybeQuit(err, "")
+	hash, err := proptools.CalculateHashReflection(data)
+	maybeQuit(err, "")
+	return hash
 }
 
 func getFileTimestamp(file string) int64 {
@@ -348,19 +380,6 @@ func main() {
 	ctx := newContext(configuration)
 	android.StartBackgroundMetrics(configuration)
 
-	var configCache *ConfigCache
-	configFile := filepath.Join(topDir, ctx.Config().OutDir(), configCacheFile)
-	incremental := false
-	// Tie incremental analysis to soong-only for now.
-	ctx.SetIncrementalEnabled(cmdlineArgs.IncrementalBuildActions && !cmdlineArgs.KatiEnabled)
-	if ctx.GetIncrementalEnabled() {
-		configCache, incremental = incrementalValid(ctx.Config(), configFile)
-		ctx.SetIncrementalProviderTest(incremental && cmdlineArgs.IncrementalProviderTest)
-	}
-	ctx.SetIncrementalAnalysis(incremental)
-	ctx.SetPartialAnalysisTargets(cmdlineArgs.PartialAnalysisTargets)
-	ctx.SetIncrementalDebugFile(cmdlineArgs.IncrementalDebugFile)
-
 	if configuration.Getenv("SOONG_SPLIT_ALL_VARIANTS") == "true" ||
 		configuration.Getenv("RUN_BUILD_TESTS") == "true" ||
 		// Soong does not have sufficient information to determine if an androidmk module
@@ -371,6 +390,18 @@ func main() {
 		configuration.AllowMissingDependencies() {
 		ctx.SetSplitAllVariants(true)
 	}
+
+	var configCache *ConfigCache
+	configFile := filepath.Join(topDir, ctx.Config().OutDir(), configCacheFile)
+	incremental := false
+	ctx.SetIncrementalEnabled(cmdlineArgs.IncrementalBuildActions)
+	if ctx.GetIncrementalEnabled() {
+		configCache, incremental = incrementalValid(ctx, configFile)
+		ctx.SetIncrementalProviderTest(incremental && cmdlineArgs.IncrementalProviderTest)
+	}
+	ctx.SetIncrementalAnalysis(incremental)
+	ctx.SetPartialAnalysisTargets(cmdlineArgs.PartialAnalysisTargets)
+	ctx.SetIncrementalDebugFile(cmdlineArgs.IncrementalDebugFile)
 
 	ctx.Register()
 	finalOutputFile, ninjaDeps := runSoongOnlyBuild(ctx)

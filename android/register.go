@@ -121,10 +121,11 @@ type SingletonFactory func() Singleton
 func SingletonFactoryAdaptor(ctx *Context, factory SingletonFactory) blueprint.SingletonFactory {
 	return func() blueprint.Singleton {
 		singleton := factory()
-		if makevars, ok := singleton.(SingletonMakeVarsProvider); ok {
+		makevars, readByMake := singleton.(SingletonMakeVarsProvider)
+		if readByMake {
 			ctx.registerSingletonMakeVarsProvider(makevars)
 		}
-		return &singletonAdaptor{Singleton: singleton}
+		return &singletonAdaptor{Singleton: singleton, readByMake: readByMake && ctx.config.KatiEnabled()}
 	}
 }
 
