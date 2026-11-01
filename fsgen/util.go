@@ -28,32 +28,9 @@ import (
 // Returns the appropriate dpi for recovery common resources selection. Replicates the logic in
 // https://cs.android.com/android/platform/superproject/main/+/main:build/make/core/Makefile;l=2536;drc=a6af369e71ded123734523ea640b97b70a557cb9
 func getDpi(ctx android.EarlyModuleContext) string {
-	recoveryDensity := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.TargetScreenDensity
-	if len(recoveryDensity) == 0 {
-		aaptPreferredConfig := ctx.Config().ProductAAPTPreferredConfig()
-		if len(aaptPreferredConfig) > 0 {
-			recoveryDensity = aaptPreferredConfig
-		} else {
-			recoveryDensity = "mdpi"
-		}
-	}
-	if !android.InList(recoveryDensity, []string{"xxxhdpi", "xxhdpi", "xhdpi", "hdpi", "mdpi"}) {
-		recoveryDensity = strings.TrimSuffix(recoveryDensity, "dpi")
-		dpiInt, err := strconv.ParseInt(recoveryDensity, 10, 64)
-		if err != nil {
-			panic(fmt.Sprintf("Error in parsing recoveryDensity: %s", err.Error()))
-		}
-		if dpiInt >= 560 {
-			recoveryDensity = "xxxhdpi"
-		} else if dpiInt >= 400 {
-			recoveryDensity = "xxhdpi"
-		} else if dpiInt >= 280 {
-			recoveryDensity = "xhdpi"
-		} else if dpiInt >= 200 {
-			recoveryDensity = "hdpi"
-		} else {
-			recoveryDensity = "mdpi"
-		}
+	recoveryDensity, err := android.ScreenDensityBucket(ctx.Config())
+	if err != nil {
+		panic(fmt.Sprintf("Error in parsing recoveryDensity: %s", err.Error()))
 	}
 
 	if p := android.ExistentPathForSource(ctx, fmt.Sprintf("bootable/recovery/res-%s", recoveryDensity)); !p.Valid() {

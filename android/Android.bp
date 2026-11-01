@@ -116,6 +116,7 @@ bootstrap_go_package {
         "sandbox.go",
         "sbom.go",
         "sdk.go",
+        "screen_density.go",
         "sdk_version.go",
         "shared_properties.go",
         "singleton.go",
