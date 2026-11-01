@@ -10,8 +10,8 @@ const SigningDatePlaceholder = "00000000-000000"
 
 // SigningDateLayout is the form of the date of the signing build, as a layout
 // of time.Format. In the signing run, siso sets build_date to the newest
-// modification time of the files read by the steps of the signing run, in this
-// layout.
+// modification time of the files read by the steps of the signing run, in UTC
+// and in this layout.
 const SigningDateLayout = "20060102-150405"
 
 // The Ninja variables that the signing run sets to other values than the

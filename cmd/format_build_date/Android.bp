@@ -1,0 +1,8 @@
+// SPDX-FileCopyrightText: The halogenOS Project
+// SPDX-License-Identifier: Apache-2.0
+
+blueprint_go_binary {
+    name: "format_build_date",
+    srcs: ["main.go"],
+    deps: ["soong-shared"],
+}
