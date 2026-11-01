@@ -20,7 +20,6 @@ import argparse
 import contextlib
 import json
 import os
-import subprocess
 import sys
 
 TEST_KEY_DIR = "build/make/target/product/security"
@@ -73,7 +72,8 @@ def parse_args():
   parser.add_argument("--build-system-fingerprint-file", required=True, type=argparse.FileType("r"))
   parser.add_argument("--build-thumbprint-file", type=argparse.FileType("r"))
   parser.add_argument("--build-username", required=True)
-  parser.add_argument("--date-file", required=True, type=argparse.FileType("r"))
+  parser.add_argument("--date-unix-time-file", required=True, type=argparse.FileType("r"))
+  parser.add_argument("--date-text-file", required=True, type=argparse.FileType("r"))
   parser.add_argument("--build-date", required=True)
   parser.add_argument("--build-date-placeholder", required=True)
   parser.add_argument("--platform-preview-sdk-fingerprint-file", required=True, type=argparse.FileType("r"))
@@ -115,9 +115,8 @@ def parse_args():
   build_version_tags = ",".join(sorted(set(build_version_tags_list)))
   config["BuildVersionTags"] = build_version_tags
 
-  raw_date = args.date_file.read().strip()
-  config["Date"] = subprocess.check_output(["date", "-d", f"@{raw_date}"], text=True).strip()
-  config["DateUtc"] = subprocess.check_output(["date", "-d", f"@{raw_date}", "+%s"], text=True).strip()
+  config["Date"] = args.date_text_file.read().strip()
+  config["DateUtc"] = str(int(args.date_unix_time_file.read()))
 
   # build_desc is human readable strings that describe this build. This has the same info as the
   # build fingerprint.
