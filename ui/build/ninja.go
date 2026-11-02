@@ -358,6 +358,10 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 			"SISO_PROJECT",
 			"SISO_CREDENTIAL_HELPER",
 			"SISO_LIMITS",
+			// Siso reaches the systemd manager of the session through these to run
+			// each local step in a cgroup of its own.
+			"DBUS_SESSION_BUS_ADDRESS",
+			"XDG_RUNTIME_DIR",
 		}, config.BuildBrokenNinjaUsesEnvVars()...)...)
 	}
 
