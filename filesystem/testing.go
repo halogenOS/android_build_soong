@@ -34,7 +34,6 @@ var PrepareForTestWithAndroidDeviceComponents = android.GroupFixturePreparers(
 	cc.PrepareForTestWithCcBuildComponents,
 	cc.PrepareForTestWithCcDefaultModules,
 	etc.PrepareForTestWithPrebuiltEtc,
-	android.SetBuildDateFileEnvVarForTests(),
 	android.FixtureMergeMockFs(android.MockFS{
 		"images/Android.bp": []byte(`
 			android_filesystem {

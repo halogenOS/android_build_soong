@@ -160,7 +160,7 @@ func (p *buildPropModule) GenerateAndroidBuildActions(ctx ModuleContext) {
 		cmd.FlagWithInput("--build-thumbprint-file=", config.BuildThumbprintFile(ctx))
 	}
 	cmd.FlagWithArg("--build-username=", config.Getenv("BUILD_USERNAME"))
-	cmd.FlagWithInput("--date-unix-time-file=", buildDateUnixTimePath(ctx))
+	cmd.FlagWithInput("--date-unix-time-file=", BuildDateUnixTimePath(ctx))
 	cmd.FlagWithInput("--date-text-file=", buildDateTextPath(ctx))
 	cmd.FlagWithExternalVariable("--build-date=", SigningDate, "")
 	cmd.FlagWithArg("--build-date-placeholder=", shared.SigningDatePlaceholder)

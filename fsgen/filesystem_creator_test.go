@@ -1334,7 +1334,6 @@ func TestBootImagesFromBoardKernelBuildModule(t *testing.T) {
 			java.PrepareForTestWithJavaBuildComponents,
 			prepareMockRamdiksNodeList,
 			filesystem.PrepareForTestWithFilesystemBuildComponents,
-			android.SetBuildDateFileEnvVarForTests(),
 			android.FixtureRegisterWithContext(func(ctx android.RegistrationContext) {
 				ctx.RegisterModuleType("test_kernel_build", testKernelBuildFactory)
 			}),

@@ -24,8 +24,8 @@ var formatBuildDate = pctx.AndroidStaticRule("formatBuildDate",
 		Description: "build date $out",
 	}, "textOut")
 
-// buildDateUnixTimePath returns the path of the file that contains the build date as Unix time.
-func buildDateUnixTimePath(ctx PathContext) OutputPath {
+// BuildDateUnixTimePath returns the path of the file that contains the build date as Unix time.
+func BuildDateUnixTimePath(ctx PathContext) OutputPath {
 	return PathForOutput(ctx, "build_date_unix_time.txt")
 }
 
@@ -45,7 +45,7 @@ func buildDateFilesSingletonFactory() Singleton {
 func (s *buildDateFilesSingleton) GenerateBuildActions(ctx SingletonContext) {
 	ctx.Build(pctx, BuildParams{
 		Rule:           formatBuildDate,
-		Output:         buildDateUnixTimePath(ctx),
+		Output:         BuildDateUnixTimePath(ctx),
 		ImplicitOutput: buildDateTextPath(ctx),
 		Args: map[string]string{
 			"textOut": buildDateTextPath(ctx).String(),
@@ -54,6 +54,6 @@ func (s *buildDateFilesSingleton) GenerateBuildActions(ctx SingletonContext) {
 }
 
 func (s *buildDateFilesSingleton) MakeVars(ctx MakeVarsContext) {
-	ctx.Strict("SOONG_BUILD_DATE_UNIX_TIME_FILE", buildDateUnixTimePath(ctx).String())
+	ctx.Strict("SOONG_BUILD_DATE_UNIX_TIME_FILE", BuildDateUnixTimePath(ctx).String())
 	ctx.Strict("SOONG_BUILD_DATE_TEXT_FILE", buildDateTextPath(ctx).String())
 }

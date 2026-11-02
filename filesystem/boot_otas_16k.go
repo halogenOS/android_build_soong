@@ -96,7 +96,8 @@ func (b *bootOtas16k) createOtaPackage(ctx android.ModuleContext, primaryBootIma
 		BuiltTool("ota_from_raw_img").
 		FlagWithArg("--package_key ", strings.TrimSuffix(key.String(), key.Ext())).
 		Implicit(key).
-		Textf("--max_timestamp $(cat %s)", ctx.Config().Getenv("BUILD_DATETIME_FILE"))
+		Textf("--max_timestamp $(cat %s)", android.BuildDateUnixTimePath(ctx)).
+		Implicit(android.BuildDateUnixTimePath(ctx))
 
 	if dtboImage.Valid() {
 		cmd.FlagWithArg("--partition_name ", "boot,dtbo")

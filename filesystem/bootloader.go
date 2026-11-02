@@ -128,9 +128,8 @@ func (p *prebuiltBootloader) avbAddHash(ctx android.ModuleContext, builder *andr
 		ImplicitTool(ctx.Config().HostToolPath(ctx, "avb_openssl")).
 		Text("add_hash_footer").
 		FlagWithOutput("--image ", output).
-		FlagWithArg("--partition_name ", partitionName).
-		Textf(`--salt $(sha256sum "%s" "%s" | cut -d " " -f 1 | tr -d '\n')`, cmd.PathForInput(ctx.Config().BuildNumberFile(ctx)), cmd.PathForInput(ctx.Config().BuildDateFile(ctx))).
-		OrderOnly(ctx.Config().BuildNumberFile(ctx)).OrderOnly(ctx.Config().BuildDateFile(ctx))
+		FlagWithArg("--partition_name ", partitionName)
+	addAvbSaltFromBuild(ctx, cmd)
 
 	vbmetaPaddingSize := 64*1024 + 4096
 	cmd.Textf("--partition_size $(( %d + (( $(stat -c %%s %s) - 1) / 4096 + 1) * 4096 ))", vbmetaPaddingSize, cmd.PathForOutput(unpackedPartition))

@@ -501,9 +501,7 @@ func (b *bootimg) addAvbFooter(ctx android.ModuleContext, unsignedImage android.
 		cmd.Textf(`--salt $(sha256sum "%s" | cut -d " " -f 1)`, kernel.String())
 		cmd.Implicit(kernel)
 	} else {
-		cmd.Textf(`--salt $(sha256sum "%s" "%s" | cut -d " " -f 1 | tr -d '\n')`, ctx.Config().BuildNumberFile(ctx), ctx.Config().BuildDateFile(ctx))
-		cmd.OrderOnly(ctx.Config().BuildNumberFile(ctx))
-		cmd.OrderOnly(ctx.Config().BuildDateFile(ctx))
+		addAvbSaltFromBuild(ctx, cmd)
 	}
 
 	cmd.FlagWithArg("--partition_name ", b.bootImageType.String())

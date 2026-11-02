@@ -63,9 +63,8 @@ func (p *prebuiltTzsw) avbAddHash(ctx android.ModuleContext, src android.Path) a
 	cmd.BuiltTool("avbtool").
 		Text("add_hash_footer").
 		FlagWithOutput("--image ", output).
-		FlagWithArg("--partition_name ", "tzsw").
-		Textf(`--salt $(sha256sum "%s" "%s" | cut -d " " -f 1 | tr -d '\n')`, cmd.PathForInput(ctx.Config().BuildNumberFile(ctx)), cmd.PathForInput(ctx.Config().BuildDateFile(ctx))).
-		OrderOnly(ctx.Config().BuildNumberFile(ctx)).OrderOnly(ctx.Config().BuildDateFile(ctx))
+		FlagWithArg("--partition_name ", "tzsw")
+	addAvbSaltFromBuild(ctx, cmd)
 
 	vbmetaPaddingSize := 64*1024 + 4096
 	cmd.Textf("--partition_size $(( %d + (( $(stat -c %%s %s) - 1) / 4096 + 1) * 4096 ))", vbmetaPaddingSize, cmd.PathForInput(src))

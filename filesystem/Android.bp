@@ -28,6 +28,7 @@ bootstrap_go_package {
         "android_device_product_out.go",
         "avb_add_hash_footer.go",
         "avb_gen_vbmeta_image.go",
+        "avb_salt.go",
         "bootimg.go",
         "bootconfig.go",
         "bootloader.go",

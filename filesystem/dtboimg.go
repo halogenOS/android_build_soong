@@ -85,8 +85,8 @@ func (p *prebuiltDtboImg) avbAddHash(ctx android.ModuleContext, input android.Pa
 		BuiltTool("avbtool").
 		Text("add_hash_footer").
 		FlagWithArg("--image ", output.String()).
-		Flag("--partition_name dtbo").
-		Textf(`--salt $(sha256sum "%s" "%s" | cut -d " " -f 1 | tr -d '\n')`, ctx.Config().BuildNumberFile(ctx), ctx.Config().Getenv("BUILD_DATETIME_FILE"))
+		Flag("--partition_name dtbo")
+	addAvbSaltFromBuild(ctx, cmd)
 
 	if p.properties.Partition_size == nil {
 		cmd.Flag("--dynamic_partition_size")
