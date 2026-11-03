@@ -20,12 +20,15 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"android/soong/finder"
 	"android/soong/finder/fs"
 	"android/soong/ui/logger"
 
 	"android/soong/ui/metrics"
+
+	"github.com/google/blueprint/pathtools"
 )
 
 // This file provides an interface to the Finder type for soong_ui. Finder is
@@ -99,12 +102,37 @@ func NewSourceFinder(ctx Context, config Config) (f *finder.Finder) {
 		},
 	}
 	dumpDir := config.FileListDir()
+	startedAt := time.Now()
 	f, err = finder.New(cacheParams, filesystem, logger.New(ioutil.Discard),
 		filepath.Join(dumpDir, "files.db"))
 	if err != nil {
 		ctx.Fatalf("Could not create module-finder: %v", err)
 	}
+	ctx.SourceFinderRun = &SourceFinderRun{finder: f, startedAt: startedAt}
 	return f
+}
+
+// A SourceFinderRun is a source finder together with a time taken before its
+// first stat.
+type SourceFinderRun struct {
+	finder    *finder.Finder
+	startedAt time.Time
+}
+
+// A globCheckSource is the file system through which the glob check stats
+// paths, and a time before every stat made through it.
+type globCheckSource struct {
+	fs        pathtools.FileSystem
+	validAsOf time.Time
+}
+
+// globCheckSource returns the stats of the finder over the OS file system.
+// Without a finder, it returns the OS file system and the time of the call.
+func (r *SourceFinderRun) globCheckSource() globCheckSource {
+	if r == nil {
+		return globCheckSource{fs: pathtools.OsFs, validAsOf: time.Now()}
+	}
+	return globCheckSource{fs: pathtools.WithKnownDirs(pathtools.OsFs, r.finder), validAsOf: r.startedAt}
 }
 
 func findProductAndBoardConfigFiles(entries finder.DirEntries) (dirNames []string, fileNames []string) {

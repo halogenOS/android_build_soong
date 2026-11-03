@@ -35,6 +35,7 @@ bootstrap_go_package {
         "finder_test.go",
     ],
     deps: [
+        "blueprint-pathtools",
         "soong-finder-fs",
     ],
 }

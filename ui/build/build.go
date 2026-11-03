@@ -416,8 +416,12 @@ func Build(ctx Context, config Config) {
 	// the packaging step. Also, the kati suffix is used for the combined ninja file.
 	genKatiSuffix(ctx, config)
 
+	// The glob check of runSoong is the only reader of the finder run, so the
+	// node tree of the finder is freed once that check is done.
+	finderRun := ctx.SourceFinderRun
+	ctx.SourceFinderRun = nil
 	if what&RunSoong != 0 {
-		runSoong(ctx, config, what&RunBuildTests != 0)
+		runSoong(ctx, config, finderRun, what&RunBuildTests != 0)
 	}
 
 	if what&RunKati != 0 {

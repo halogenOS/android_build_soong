@@ -590,7 +590,7 @@ func migrateOutputSymlinks(ctx Context, config Config) error {
 	return fixOutDirSymlinks(ctx, config, outDir)
 }
 
-func runSoong(ctx Context, config Config, enforceNoSoongOutput bool) {
+func runSoong(ctx Context, config Config, finderRun *SourceFinderRun, enforceNoSoongOutput bool) {
 	e := ctx.BeginTrace(metrics.RunSoong, "soong")
 	defer e.End()
 
@@ -784,7 +784,7 @@ func runSoong(ctx Context, config Config, enforceNoSoongOutput bool) {
 	}
 
 	for _, target := range targets {
-		if err := checkGlobs(ctx, config, target); err != nil {
+		if err := checkGlobs(ctx, config, target, finderRun.globCheckSource()); err != nil {
 			ctx.Fatalf("Error checking globs: %s", err.Error())
 		}
 	}
@@ -839,8 +839,11 @@ func runSoong(ctx Context, config Config, enforceNoSoongOutput bool) {
 // Both soong_build and soong_ui will also update a ".globs_time" file
 // with the time that they ran at every build. When soong_ui checks
 // globs, it only reruns globs whose dependencies are newer than the
-// time in the ".globs_time" file.
-func checkGlobs(ctx Context, config Config, finalOutFile string) error {
+// time in the ".globs_time" file. soong_ui uses the directory stats taken
+// by the source finder, and writes the time before the first of those
+// stats, so a directory changed after its stat is checked again in the
+// next build.
+func checkGlobs(ctx Context, config Config, finalOutFile string, source globCheckSource) error {
 	e := ctx.BeginTrace(metrics.RunSoong, "check_globs")
 	defer e.End()
 	st := ctx.Status.StartTool()
@@ -870,9 +873,7 @@ func checkGlobs(ctx Context, config Config, finalOutFile string) error {
 	if err != nil {
 		return err
 	}
-	globCheckStartTime := time.Now().UnixMicro()
-
-	hasChangedGlobs, err := pathtools.CheckForChangedGlobs(pathtools.OsFs, globsFile, globsTimeMicros)
+	hasChangedGlobs, err := pathtools.CheckForChangedGlobs(source.fs, globsFile, globsTimeMicros)
 	if err != nil {
 		if config.EnforceNoReanalysis() {
 			msg := fmt.Sprintf("Reanalysis will run due to glob error: %s", err.Error())
@@ -890,7 +891,7 @@ func checkGlobs(ctx Context, config Config, finalOutFile string) error {
 		// some unique value to trigger a rerun, it doesn't matter what it is.
 		err = os.WriteFile(
 			finalOutFile+".glob_results",
-			[]byte(fmt.Sprintf("%d\n", globCheckStartTime)),
+			[]byte(fmt.Sprintf("%d\n", time.Now().UnixMicro())),
 			0666,
 		)
 		if err != nil {
@@ -901,7 +902,7 @@ func checkGlobs(ctx Context, config Config, finalOutFile string) error {
 		// rerun globs in the future that we just saw didn't change.
 		err = os.WriteFile(
 			finalOutFile+".globs_time",
-			[]byte(fmt.Sprintf("%d\n", globCheckStartTime)),
+			[]byte(fmt.Sprintf("%d\n", source.validAsOf.UnixMicro())),
 			0666,
 		)
 		if err != nil {

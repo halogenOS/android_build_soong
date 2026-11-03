@@ -31,6 +31,8 @@ import (
 	"time"
 
 	"android/soong/finder/fs"
+
+	"github.com/google/blueprint/pathtools"
 )
 
 // This file provides a Finder struct that can quickly search for files satisfying
@@ -211,9 +213,7 @@ func newImpl(cacheParams CacheParams, filesystem fs.FileSystem,
 
 	// confirm that every path mentioned in the CacheConfig exists
 	for _, path := range cacheParams.RootDirs {
-		if !filepath.IsAbs(path) {
-			path = filepath.Join(f.cacheMetadata.Config.WorkingDirectory, path)
-		}
+		path = f.absolutePath(path)
 		node := f.nodes.GetNode(filepath.Clean(path), false)
 		if node == nil || node.ModTime == 0 {
 			return nil, fmt.Errorf("path %v was specified to be included in the cache but does not exist\n", path)
@@ -290,13 +290,9 @@ func (f *Finder) FindFirstNamedAt(rootPath string, fileName string) []string {
 func (f *Finder) FindMatching(rootPath string, filter WalkFunc) []string {
 	// set up some parameters
 	scanStart := time.Now()
-	var isRel bool
 	workingDir := f.cacheMetadata.Config.WorkingDirectory
-
-	isRel = !filepath.IsAbs(rootPath)
-	if isRel {
-		rootPath = filepath.Join(workingDir, rootPath)
-	}
+	isRel := !filepath.IsAbs(rootPath)
+	rootPath = f.absolutePath(rootPath)
 
 	rootPath = filepath.Clean(rootPath)
 
@@ -327,6 +323,38 @@ func (f *Finder) FindMatching(rootPath string, filter WalkFunc) []string {
 	f.verbosef("Found %v files under %v in %v using cache\n",
 		len(results), rootPath, time.Since(scanStart))
 	return results
+}
+
+var _ pathtools.KnownDirs = (*Finder)(nil)
+
+// DirStat returns the stat taken by the Finder for the directory at path when
+// the Finder read that directory. path is absolute or relative to the working
+// directory. The stat follows symbolic links: for a path that is a symbolic
+// link itself, DirStat returns false.
+//
+// The node tree does not change once New returns, so DirStat reads it without
+// waiting for other callers.
+func (f *Finder) DirStat(path string) (pathtools.DirStat, bool) {
+	// An empty path, or a path that leaves the working directory, is not a
+	// directory of the Finder. absolutePath would turn an empty path into the
+	// working directory.
+	if !filepath.IsAbs(path) && !filepath.IsLocal(path) {
+		return pathtools.DirStat{}, false
+	}
+	node := f.nodes.GetNode(f.absolutePath(path), false)
+	if node == nil || node.kind != dirKindDirectory {
+		return pathtools.DirStat{}, false
+	}
+	return pathtools.DirStat{ModTime: time.Unix(0, node.ModTime), Device: node.Device, Inode: node.Inode}, true
+}
+
+// absolutePath returns path, joined to the working directory when it is
+// relative.
+func (f *Finder) absolutePath(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	return filepath.Join(f.cacheMetadata.Config.WorkingDirectory, path)
 }
 
 // Shutdown declares that the finder is no longer needed and waits for its cleanup to complete
@@ -391,10 +419,7 @@ func (f *Finder) loadFromFilesystem() {
 }
 
 func (f *Finder) startFind(path string) {
-	if !filepath.IsAbs(path) {
-		path = filepath.Join(f.cacheMetadata.Config.WorkingDirectory, path)
-	}
-	node := f.nodes.GetNode(path, true)
+	node := f.nodes.GetNode(f.absolutePath(path), true)
 	f.statDirAsync(node)
 }
 
@@ -411,7 +436,19 @@ type statResponse struct {
 	ModTime int64
 	Inode   uint64
 	Device  uint64
+	// The database does not store kind, so a stat read from it has the zero
+	// dirKind, which is neither of the values below.
+	kind dirKind
 }
+
+// A dirKind is what the lstat of a path found there.
+type dirKind struct{ name string }
+
+var (
+	// dirKindDirectory is a directory, not a symbolic link to one.
+	dirKindDirectory = dirKind{"directory"}
+	dirKindOther     = dirKind{"other"}
+)
 
 // a pathAndStats stores a path and its stats
 type pathAndStats struct {
@@ -1312,6 +1349,11 @@ func (f *Finder) statDirSync(path string) statResponse {
 		modTime = permissionsChangeTime
 	}
 	stats.ModTime = modTime.UnixNano()
+	if fileInfo.IsDir() {
+		stats.kind = dirKindDirectory
+	} else {
+		stats.kind = dirKindOther
+	}
 
 	return stats
 }

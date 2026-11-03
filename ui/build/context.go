@@ -50,6 +50,10 @@ type ContextImpl struct {
 
 	RBEProxyCmd *Cmd
 
+	// SourceFinderRun is the source finder for the glob check, or nil when no
+	// finder ran. Build takes it off the context.
+	SourceFinderRun *SourceFinderRun
+
 	FinalStdout []string
 }
 
