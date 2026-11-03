@@ -55,7 +55,7 @@ func TestLibraryHeaders(t *testing.T) {
 			// better to test its output, but there are no test functions that capture that.
 			android.AssertBoolEquals(t, "AndroidMkEntries.OutputFile.Valid()", true, e.OutputFile.Valid())
 
-			android.AssertStringListContains(t, "LOCAL_EXPORT_CFLAGS for headers module", e.EntryMap["LOCAL_EXPORT_CFLAGS"], "-Imy_include")
+			android.AssertStringListContains(t, "LOCAL_EXPORT_CFLAGS for headers module", e.ExportListValues(ExportedCFlagsKind), "-Imy_include")
 		})
 	}
 }

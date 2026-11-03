@@ -22,6 +22,7 @@ declare -r out=${OUT_DIR:-out}
 : ${TARGET_PRODUCT:?not set, run lunch?}
 : ${TARGET_BUILD_VARIANT:?not set, run lunch?}
 declare -r androidmk=${out}/soong/Android-${TARGET_PRODUCT}.mk
+declare -r exportsmk=${out}/soong/exports-${TARGET_PRODUCT}.mk
 declare -r makevarsmk=${out}/soong/make_vars-${TARGET_PRODUCT}.mk
 declare -r target_device_dir=$(${out}/soong_ui --dumpvar-mode TARGET_DEVICE_DIR)
 : ${target_device_dir:?cannot find device directory for ${TARGET_PRODUCT}}
@@ -29,7 +30,7 @@ declare -r target_device=$(${out}/soong_ui --dumpvar-mode TARGET_DEVICE)
 : ${target_device:?cannot find target device for ${TARGET_PRODUCT}}
 declare -r timestamp_file=${out}/build_date.txt
 # Files should exist, so ls should succeed:
-ls -1d "$androidmk" "$makevarsmk" "$target_device_dir" "$timestamp_file" >/dev/null
+ls -1d "$androidmk" "$exportsmk" "$makevarsmk" "$target_device_dir" "$timestamp_file" >/dev/null
 
 outfile=${out}/ckati.trace
 while getopts "ho:" opt; do
@@ -84,6 +85,7 @@ prebuilts/build-tools/linux-x86/bin/ckati \
   PATH="$PWD/prebuilts/build-tools/path/linux-x86:$PWD/${out}/.path" \
   PYTHONDONTWRITEBYTECODE=1 \
   SOONG_ANDROID_MK="$androidmk" \
+  SOONG_EXPORTS_MK="$exportsmk" \
   SOONG_MAKEVARS_MK="$makevarsmk" \
   TARGET_BUILD_VARIANT="$TARGET_BUILD_VARIANT" \
   TARGET_DEVICE_DIR="$target_device_dir" \

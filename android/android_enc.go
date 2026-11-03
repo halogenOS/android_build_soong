@@ -1147,12 +1147,27 @@ func (r AndroidMkInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error 
 			}
 		}
 	}
+
+	if r.ExportLists == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r.ExportLists)); err != nil {
+			return err
+		}
+		for val10 := 0; val10 < len(r.ExportLists); val10++ {
+			if err = r.ExportLists[val10].Encode(ctx, buf); err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
 func (r AndroidMkInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":android.AndroidMkInfo")
-	hasher.WriteInt(12)
+	hasher.WriteInt(13)
 	hasher.WriteString(":.string")
 	hasher.WriteString(r.Class)
 	hasher.WriteString(":.string")
@@ -1216,6 +1231,13 @@ func (r AndroidMkInfo) CustomHash(hasher *proptools.Hasher) error {
 	for val10 := 0; val10 < len(r.EntryOrder); val10++ {
 		hasher.WriteString(":.string")
 		hasher.WriteString(r.EntryOrder[val10])
+	}
+	hasher.WriteString(":.[]ExportList")
+	hasher.WriteInt(len(r.ExportLists))
+	for val11 := 0; val11 < len(r.ExportLists); val11++ {
+		if err := r.ExportLists[val11].CustomHash(hasher); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -1369,6 +1391,20 @@ func (r *AndroidMkInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error
 		}
 	}
 
+	var val40 int
+	err = gobtools.DecodeInt(buf, &val40)
+	if err != nil {
+		return err
+	}
+	if val40 != -1 {
+		r.ExportLists = make([]ExportList, val40)
+		for val41 := 0; val41 < int(val40); val41++ {
+			if err = r.ExportLists[val41].Decode(ctx, buf); err != nil {
+				return err
+			}
+		}
+	}
+
 	return err
 }
 
@@ -1379,6 +1415,129 @@ func (r AndroidMkInfo) GetTypeId() int16 {
 }
 
 // end of androidmk.go
+
+// begin of androidmk_export_lists.go
+func init() {
+	ExportListKindGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ExportListKind) })
+	ExportListGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ExportList) })
+}
+
+func (r ExportListKind) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.numberVariable); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.definitionPrefix); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r ExportListKind) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ExportListKind")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.numberVariable)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.definitionPrefix)
+	return nil
+}
+
+func (r *ExportListKind) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.numberVariable)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.definitionPrefix)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var ExportListKindGobRegId int16
+
+func (r ExportListKind) GetTypeId() int16 {
+	return ExportListKindGobRegId
+}
+
+func (r ExportList) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = r.Kind.Encode(ctx, buf); err != nil {
+		return err
+	}
+
+	if r.Values == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r.Values)); err != nil {
+			return err
+		}
+		for val1 := 0; val1 < len(r.Values); val1++ {
+			if err = gobtools.EncodeString(buf, r.Values[val1]); err != nil {
+				return err
+			}
+		}
+	}
+	return err
+}
+
+func (r ExportList) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ExportList")
+	hasher.WriteInt(2)
+	if err := r.Kind.CustomHash(hasher); err != nil {
+		return err
+	}
+	hasher.WriteString(":.[]string")
+	hasher.WriteInt(len(r.Values))
+	for val1 := 0; val1 < len(r.Values); val1++ {
+		hasher.WriteString(":.string")
+		hasher.WriteString(r.Values[val1])
+	}
+	return nil
+}
+
+func (r *ExportList) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if err = r.Kind.Decode(ctx, buf); err != nil {
+		return err
+	}
+
+	var val3 int
+	err = gobtools.DecodeInt(buf, &val3)
+	if err != nil {
+		return err
+	}
+	if val3 != -1 {
+		r.Values = make([]string, val3)
+		for val4 := 0; val4 < int(val3); val4++ {
+			err = gobtools.DecodeString(buf, &r.Values[val4])
+			if err != nil {
+				return err
+			}
+		}
+	}
+
+	return err
+}
+
+var ExportListGobRegId int16
+
+func (r ExportList) GetTypeId() int16 {
+	return ExportListGobRegId
+}
+
+// end of androidmk_export_lists.go
 
 // begin of apex.go
 func init() {

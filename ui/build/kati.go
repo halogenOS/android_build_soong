@@ -279,6 +279,9 @@ func runKatiBuild(ctx Context, config Config) {
 		// file contains Soong modules represented as Kati modules,
 		// allowing Kati modules to depend on Soong modules.
 		"SOONG_ANDROID_MK="+config.SoongAndroidMk(),
+		// Location of the export lists named by number in the modules
+		// of SOONG_ANDROID_MK.
+		"SOONG_EXPORTS_MK="+config.SoongExportsMk(),
 		// Directory containing outputs for the target device.
 		"TARGET_DEVICE_DIR="+config.TargetDeviceDir(),
 		// Directory containing .mk files for packaging purposes, such as

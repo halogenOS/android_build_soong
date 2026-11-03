@@ -36,6 +36,8 @@ import (
 	"github.com/google/blueprint/parallel"
 	"github.com/google/blueprint/pathtools"
 	"github.com/google/blueprint/proptools"
+
+	"android/soong/shared"
 )
 
 //go:generate go run ../../blueprint/gobtools/codegen
@@ -587,25 +589,31 @@ func (c *androidMkSingleton) GenerateBuildActions(ctx SingletonContext) {
 	}
 
 	transMk := PathForOutput(ctx, "Android"+String(ctx.Config().productVariables.Make_suffix)+".mk")
+	exportsMk := PathForOutput(ctx, shared.SoongExportsMkName(String(ctx.Config().productVariables.Make_suffix)))
 	if ctx.Failed() {
 		return
 	}
 
 	moduleInfoJSON := PathForOutput(ctx, "module-info"+String(ctx.Config().productVariables.Make_suffix)+".json")
 
-	err := translateAndroidMk(ctx, absolutePath(transMk.String()), moduleInfoJSON, allModulesSorted(ctx))
+	err := translateAndroidMk(ctx, absolutePath(transMk.String()), absolutePath(exportsMk.String()), moduleInfoJSON,
+		allModulesSorted(ctx))
 	if err != nil {
 		ctx.Errorf(err.Error())
 	}
 
 	ctx.Build(pctx, BuildParams{
-		Rule:   blueprint.Phony,
-		Output: transMk,
+		Rule:    blueprint.Phony,
+		Outputs: WritablePaths{transMk, exportsMk},
 	})
 }
 
-func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPath WritablePath, mods []ModuleOrProxy) error {
+// translateAndroidMk writes the Make text of mods into absMkFile, and the export lists named by
+// number in the text into absExportsMkFile.
+func translateAndroidMk(ctx SingletonContext, absMkFile, absExportsMkFile string, moduleInfoJSONPath WritablePath,
+	mods []ModuleOrProxy) error {
 	buf := &bytes.Buffer{}
+	exportLists := newExportListTable()
 
 	var moduleInfoJSONs []*ModuleInfoJSON
 
@@ -614,11 +622,12 @@ func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPa
 	renderings, err := renderAndroidMkModules(ctx, mods)
 	if err != nil {
 		os.Remove(absMkFile)
+		os.Remove(absExportsMkFile)
 		return err
 	}
 	typeStats := make(map[string]int)
 	for i, mod := range mods {
-		renderings[i].appendTo(buf, &moduleInfoJSONs)
+		renderings[i].appendTo(buf, exportLists, &moduleInfoJSONs)
 		// buf now contains the text, so the rendering is freed.
 		renderings[i] = androidMkRendering{}
 
@@ -641,7 +650,11 @@ func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPa
 
 	err = pathtools.WriteFileIfChanged(absMkFile, buf.Bytes(), 0666)
 	if err != nil {
-		return err
+		return fmt.Errorf("could not write the Soong Make file %s: %w", absMkFile, err)
+	}
+	err = pathtools.WriteFileIfChanged(absExportsMkFile, exportLists.exportsMk(), 0666)
+	if err != nil {
+		return fmt.Errorf("could not write the export lists file %s: %w", absExportsMkFile, err)
 	}
 
 	return writeModuleInfoJSON(ctx, moduleInfoJSONs, moduleInfoJSONPath)
@@ -650,7 +663,7 @@ func translateAndroidMk(ctx SingletonContext, absMkFile string, moduleInfoJSONPa
 // androidMkRendering is what translateAndroidMkModule rendered for one module: its Make text and
 // its module-info.json entries.
 type androidMkRendering struct {
-	mk              bytes.Buffer
+	mk              androidMkText
 	moduleInfoJSONs []*ModuleInfoJSON
 }
 
@@ -664,9 +677,11 @@ func renderAndroidMkModules(ctx SingletonContext, mods []ModuleOrProxy) ([]andro
 	return renderings, err
 }
 
-// appendTo appends the Make text to buf and the module-info.json entries to moduleInfoJSONs.
-func (r *androidMkRendering) appendTo(buf *bytes.Buffer, moduleInfoJSONs *[]*ModuleInfoJSON) {
-	buf.Write(r.mk.Bytes())
+// appendTo appends the Make text to buf, with its export lists numbered in exportLists, and the
+// module-info.json entries to moduleInfoJSONs.
+func (r *androidMkRendering) appendTo(buf *bytes.Buffer, exportLists *exportListTable,
+	moduleInfoJSONs *[]*ModuleInfoJSON) {
+	r.mk.appendTo(buf, exportLists)
 	*moduleInfoJSONs = append(*moduleInfoJSONs, r.moduleInfoJSONs...)
 }
 
@@ -699,7 +714,7 @@ func WritePhonyPackage(w io.Writer, comment, dir, name string, required []string
 	fmt.Fprintln(w, "include $(BUILD_PHONY_PACKAGE)")
 }
 
-func translateAndroidMkModule(ctx SingletonContext, w io.Writer, moduleInfoJSONs *[]*ModuleInfoJSON, mod ModuleOrProxy) error {
+func translateAndroidMkModule(ctx SingletonContext, w *androidMkText, moduleInfoJSONs *[]*ModuleInfoJSON, mod ModuleOrProxy) error {
 	defer func() {
 		if r := recover(); r != nil {
 			panic(fmt.Errorf("%s in translateAndroidMkModule for module %s variant %s",
@@ -1019,6 +1034,9 @@ type AndroidMkInfo struct {
 	// without worrying about the variables being mixed up in the actual mk file.
 	// 3. Makes troubleshooting and spotting errors easier.
 	EntryOrder []string
+	// The export lists of the module, in insertion order. The Soong Make file sets their
+	// numbers after the entries of EntryMap.
+	ExportLists []ExportList
 }
 
 type AndroidMkProviderInfoProducer interface {
@@ -1030,7 +1048,7 @@ var AndroidMkInfoProvider = blueprint.NewProvider[*AndroidMkProviderInfo]()
 
 // TODO(b/397766191): Change the signature to take ModuleProxy
 // Please only access the module's internal data through providers.
-func translateAndroidMkEntriesInfoModule(ctx SingletonContext, w io.Writer, moduleInfoJSONs *[]*ModuleInfoJSON,
+func translateAndroidMkEntriesInfoModule(ctx SingletonContext, w *androidMkText, moduleInfoJSONs *[]*ModuleInfoJSON,
 	mod ModuleOrProxy, providerInfo *AndroidMkProviderInfo) error {
 	commonInfo := OtherModulePointerProviderOrDefault(ctx, mod, CommonModuleInfoProvider)
 	if commonInfo.SkipAndroidMkProcessing {
@@ -1358,8 +1376,8 @@ func (a *AndroidMkInfo) disabled() bool {
 }
 
 // write  flushes the AndroidMkEntries's in-struct data populated by AndroidMkEntries into the
-// given Writer object.
-func (a *AndroidMkInfo) write(w io.Writer) {
+// given Make text.
+func (a *AndroidMkInfo) write(w *androidMkText) {
 	if a.disabled() {
 		return
 	}
@@ -1369,6 +1387,9 @@ func (a *AndroidMkInfo) write(w io.Writer) {
 	w.Write([]byte(combinedHeaderString))
 	for _, name := range a.EntryOrder {
 		AndroidMkEmitAssignList(w, name, a.EntryMap[name])
+	}
+	for _, list := range a.ExportLists {
+		w.deferNumberedLine(list)
 	}
 	w.Write([]byte(combinedFooterString))
 }
@@ -1417,6 +1438,9 @@ func deepCopyAndroidMkInfo(mkinfo *AndroidMkInfo) AndroidMkInfo {
 	info.EntryMap = make(map[string][]string)
 	for k, v := range mkinfo.EntryMap {
 		info.EntryMap[k] = deepCopyStringSlice(v)
+	}
+	for _, list := range mkinfo.ExportLists {
+		info.ExportLists = append(info.ExportLists, ExportList{Kind: list.Kind, Values: deepCopyStringSlice(list.Values)})
 	}
 
 	return info

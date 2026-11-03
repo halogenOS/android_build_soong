@@ -40,6 +40,7 @@ bootstrap_go_package {
         "android_enc.go",
         "android_info.go",
         "androidmk.go",
+        "androidmk_export_lists.go",
         "apex.go",
         "apex_contributions.go",
         "api_levels.go",

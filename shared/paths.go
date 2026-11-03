@@ -44,3 +44,10 @@ func TempDirForOutDir(outDir string) (tempPath string) {
 // test keys under the file names of a release key directory. It is the value
 // of keys_dir in a build without signing keys.
 const TestKeysDir = "test-keys"
+
+// SoongExportsMkName returns the name of the file in the Soong output directory
+// that defines the export lists named by number in the Soong Make file of the
+// product. makeSuffix is the Make_suffix of that product.
+func SoongExportsMkName(makeSuffix string) string {
+	return "exports" + makeSuffix + ".mk"
+}

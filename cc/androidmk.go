@@ -32,6 +32,15 @@ var (
 	sdkSuffix           = ".sdk"
 )
 
+var (
+	// ExportedCFlagsKind is the kind of the flags exported by a library, include directories
+	// among them.
+	ExportedCFlagsKind = android.NewExportListKind("LOCAL_EXPORT_CFLAGS")
+	// ExportedIncludeDepsKind is the kind of the files exported by a library and needed by the
+	// modules using it before they compile, generated headers among them.
+	ExportedIncludeDepsKind = android.NewExportListKind("LOCAL_EXPORT_C_INCLUDE_DEPS")
+)
+
 type AndroidMkContext interface {
 	BaseModuleName() string
 	Target() android.Target
@@ -194,12 +203,8 @@ func (library *libraryDecorator) androidMkWriteExportedFlags(entries *android.An
 	for _, dir := range systemIncludeDirs {
 		exportedFlags = append(exportedFlags, "-isystem "+dir.String())
 	}
-	if len(exportedFlags) > 0 {
-		entries.AddStrings("LOCAL_EXPORT_CFLAGS", exportedFlags...)
-	}
-	if len(exportedDeps) > 0 {
-		entries.AddStrings("LOCAL_EXPORT_C_INCLUDE_DEPS", exportedDeps.Strings()...)
-	}
+	entries.AddExportList(ExportedCFlagsKind, exportedFlags...)
+	entries.AddExportList(ExportedIncludeDepsKind, exportedDeps.Strings()...)
 }
 
 func (library *libraryDecorator) prepareAndroidMKProviderInfo(config android.Config, ctx AndroidMkContext, entries *android.AndroidMkInfo) {

@@ -807,6 +807,7 @@ func runSoong(ctx Context, config Config, finderRun *SourceFinderRun, enforceNoS
 
 	if !config.SkipKati() {
 		distGzipFile(ctx, config, config.SoongAndroidMk(), "soong_ui/soong")
+		distGzipFile(ctx, config, config.SoongExportsMk(), "soong_ui/soong")
 		distGzipFile(ctx, config, config.SoongMakeVarsMk(), "soong_ui/soong")
 	} else {
 		distGzipFile(ctx, config, config.SoongPhonyNinjaFile(), "soong_ui/soong")

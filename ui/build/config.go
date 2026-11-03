@@ -2078,6 +2078,12 @@ func (c *configImpl) SoongAndroidMk() string {
 	return filepath.Join(c.SoongOutDir(), "Android-"+c.TargetProduct()+c.CoverageSuffix()+".mk")
 }
 
+// SoongExportsMk returns the file in which soong_build defines the export lists
+// named by number in the modules of SoongAndroidMk.
+func (c *configImpl) SoongExportsMk() string {
+	return filepath.Join(c.SoongOutDir(), shared.SoongExportsMkName("-"+c.TargetProduct()+c.CoverageSuffix()))
+}
+
 func (c *configImpl) SoongMakeVarsMk() string {
 	return filepath.Join(c.SoongOutDir(), "make_vars-"+c.TargetProduct()+c.CoverageSuffix()+".mk")
 }
