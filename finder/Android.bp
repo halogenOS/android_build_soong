@@ -28,6 +28,7 @@ bootstrap_go_package {
     name: "soong-finder",
     pkgPath: "android/soong/finder",
     srcs: [
+        "dir_check.go",
         "finder.go",
     ],
     testSrcs: [

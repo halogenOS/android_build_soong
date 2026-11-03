@@ -793,7 +793,7 @@ func (f *Finder) validateCacheHeader(cacheReader *bufio.Reader) bool {
 
 // loadBytes compares the cache info in <data> to the state of the filesystem
 // loadBytes returns a map representing <data> and also a slice of dirs that need to be re-walked
-func (f *Finder) loadBytes(id int, data []byte) (m *pathMap, dirsToWalk []string, err error) {
+func (f *Finder) loadBytes(id int, data []byte, check *dirCheck) (m *pathMap, dirsToWalk []string, err error) {
 
 	helperStartTime := time.Now()
 
@@ -807,12 +807,8 @@ func (f *Finder) loadBytes(id int, data []byte) (m *pathMap, dirsToWalk []string
 		len(cachedNodes), id, unmarshalDate.Sub(helperStartTime))
 
 	tempMap := newPathMap("/")
-	stats := make([]statResponse, len(cachedNodes))
-
-	for i, node := range cachedNodes {
-		// check the file system for an updated timestamp
-		stats[i] = f.statDirSync(node.Path)
-	}
+	// check the file system for an updated timestamp
+	stats := check.statAll(cachedNodes)
 
 	dirsToWalk = []string{}
 	for i, cachedNode := range cachedNodes {
@@ -910,6 +906,7 @@ func (f *Finder) startFromExternalCache() (err error) {
 	processBlocks := func() {
 		numProcessed := 0
 		threadPool := newThreadPool(f.numDbLoadingThreads)
+		check := newDirCheck(f.statDirSync, f.numDbLoadingThreads)
 		for {
 			// get a block to process
 			block, received := <-blockChannel
@@ -928,7 +925,7 @@ func (f *Finder) startFromExternalCache() (err error) {
 					processStartTime := time.Now()
 					f.verbosef("Starting to process block %v after %v\n",
 						block.id, processStartTime.Sub(startTime))
-					tempMap, updatedDirs, err := f.loadBytes(block.id, block.data)
+					tempMap, updatedDirs, err := f.loadBytes(block.id, block.data, check)
 					var response workResponse
 					if err != nil {
 						f.verbosef(
@@ -951,8 +948,9 @@ func (f *Finder) startFromExternalCache() (err error) {
 			)
 		}
 		threadPool.Wait()
-		f.verbosef("Finished processing %v blocks in %v\n",
-			numProcessed, time.Since(startTime))
+		check.wait()
+		f.verbosef("Finished processing %v blocks in %v, %v ranges at once\n",
+			numProcessed, time.Since(startTime), check.rangesAtOnce())
 		close(resultChannel)
 	}
 	go processBlocks()
