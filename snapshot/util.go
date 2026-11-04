@@ -27,7 +27,7 @@ type buildContext interface {
 
 func CopyFileToOutputPathRule(pctx android.PackageContext, ctx buildContext, path android.Path, outPath android.OutputPath) {
 	ctx.Build(pctx, android.BuildParams{
-		Rule:        android.CpRule,
+		Rule:        android.CpNoPreserveSymlink,
 		Input:       path,
 		Output:      outPath,
 		Description: "copy " + path.String() + " -> " + outPath.String(),

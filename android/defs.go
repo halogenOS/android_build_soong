@@ -52,14 +52,15 @@ var (
 			SandboxDisabled: true,
 		})
 
-	// A copy rule.
+	// A copy of one file to one output. The command is only this copy, so a build tool may
+	// perform the copy itself without running the command. siso_config/copy.star matches the
+	// rule by its name. Copies that need cp flags or extra commands use the Cp rules below.
 	CpRule = pctx.AndroidStaticRule("CpRule",
 		blueprint.RuleParams{
 			Command2: blueprint.NewCommand(
-				Rm, " -f $out && ", Cp, " $cpPreserveSymlinks $cpFlags $in $out$extraCmds"),
+				Rm, " -f $out && ", Cp, " $cpPreserveSymlinks $in $out"),
 			Description: "cp $out",
-		},
-		"cpFlags", "extraCmds")
+		})
 
 	// A copy rule wrapped with bash.
 	CpWithBash = pctx.AndroidStaticRule("CpWithBash",

@@ -2,10 +2,11 @@ load("@builtin//encoding.star", "json")
 load("@builtin//path.star", "path")
 load("@builtin//struct.star", "module")
 load("./clang.star", "clang")
+load("./copy.star", "copy")
 load("./java.star", "java")
 load("./rust.star", "rust")
 
-__my_imports = [clang, java, rust]
+__my_imports = [clang, copy, java, rust]
 
 def __filegroups(ctx, vars, filegroups):
     # We only need to resolve expensive filegroup globs if we are running in a
