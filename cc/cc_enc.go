@@ -6171,37 +6171,151 @@ func (r nativeBridgeSdkTraitStruct) GetTypeId() int16 {
 
 // begin of ndk_headers.go
 func init() {
+	NdkHeaderFileGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(NdkHeaderFile) })
 	NdkHeaderInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(NdkHeaderInfo) })
+}
+
+func (r NdkHeaderFile) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Src); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Install); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Content); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r NdkHeaderFile) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":cc.NdkHeaderFile")
+	hasher.WriteInt(3)
+	hasher.WriteString(":cc.android.Path")
+	val1 := r.Src == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Src); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.Src == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.Src.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Src.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":cc.android.Path")
+	val4 := r.Install == nil
+	if val4 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Install); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val5 := r.Install == nil
+				if val5 {
+					hasher.WriteByte(0)
+				} else {
+					val6 := func(hasher *proptools.Hasher) error { return r.Install.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val6); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Install.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":cc.android.Path")
+	val7 := r.Content == nil
+	if val7 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Content); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val8 := r.Content == nil
+				if val8 {
+					hasher.WriteByte(0)
+				} else {
+					val9 := func(hasher *proptools.Hasher) error { return r.Content.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val9); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Content.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	return nil
+}
+
+func (r *NdkHeaderFile) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if val2, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val2 == nil {
+		r.Src = nil
+	} else {
+		r.Src = val2.(android.Path)
+	}
+
+	if val4, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val4 == nil {
+		r.Install = nil
+	} else {
+		r.Install = val4.(android.Path)
+	}
+
+	if val6, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val6 == nil {
+		r.Content = nil
+	} else {
+		r.Content = val6.(android.Path)
+	}
+
+	return err
+}
+
+var NdkHeaderFileGobRegId int16
+
+func (r NdkHeaderFile) GetTypeId() int16 {
+	return NdkHeaderFileGobRegId
 }
 
 func (r NdkHeaderInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 	var err error
 
-	if r.SrcPaths == nil {
+	if r.Headers == nil {
 		if err = gobtools.EncodeInt(buf, -1); err != nil {
 			return err
 		}
 	} else {
-		if err = gobtools.EncodeInt(buf, len(r.SrcPaths)); err != nil {
+		if err = gobtools.EncodeInt(buf, len(r.Headers)); err != nil {
 			return err
 		}
-		for val1 := 0; val1 < len(r.SrcPaths); val1++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.SrcPaths[val1]); err != nil {
-				return err
-			}
-		}
-	}
-
-	if r.InstallPaths == nil {
-		if err = gobtools.EncodeInt(buf, -1); err != nil {
-			return err
-		}
-	} else {
-		if err = gobtools.EncodeInt(buf, len(r.InstallPaths)); err != nil {
-			return err
-		}
-		for val2 := 0; val2 < len(r.InstallPaths); val2++ {
-			if err = gobtools.EncodeInterface(ctx, buf, r.InstallPaths[val2]); err != nil {
+		for val1 := 0; val1 < len(r.Headers); val1++ {
+			if err = r.Headers[val1].Encode(ctx, buf); err != nil {
 				return err
 			}
 		}
@@ -6219,82 +6333,29 @@ func (r NdkHeaderInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error 
 
 func (r NdkHeaderInfo) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":cc.NdkHeaderInfo")
-	hasher.WriteInt(4)
-	hasher.WriteString(":cc.android.Paths")
-	hasher.WriteString(":.[]Path")
-	hasher.WriteInt(len(r.SrcPaths))
-	for val1 := 0; val1 < len(r.SrcPaths); val1++ {
-		hasher.WriteString("android/soong/android:android.Path")
-		val2 := r.SrcPaths[val1] == nil
-		if val2 {
-			hasher.WriteByte(0)
-		} else {
-			if v := reflect.ValueOf(r.SrcPaths[val1]); v.Kind() == reflect.Ptr {
-				if v.IsNil() {
-					panic(fmt.Errorf("nil pointer is not supported in interface"))
-				} else {
-					val3 := r.SrcPaths[val1] == nil
-					if val3 {
-						hasher.WriteByte(0)
-					} else {
-						val4 := func(hasher *proptools.Hasher) error {
-							return r.SrcPaths[val1].(proptools.CustomHash).CustomHash(hasher)
-						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val4); err != nil {
-							return err
-						}
-					}
-				}
-			} else {
-				r.SrcPaths[val1].(proptools.CustomHash).CustomHash(hasher)
-			}
-		}
-	}
-	hasher.WriteString(":cc.android.Paths")
-	hasher.WriteString(":.[]Path")
-	hasher.WriteInt(len(r.InstallPaths))
-	for val5 := 0; val5 < len(r.InstallPaths); val5++ {
-		hasher.WriteString("android/soong/android:android.Path")
-		val6 := r.InstallPaths[val5] == nil
-		if val6 {
-			hasher.WriteByte(0)
-		} else {
-			if v := reflect.ValueOf(r.InstallPaths[val5]); v.Kind() == reflect.Ptr {
-				if v.IsNil() {
-					panic(fmt.Errorf("nil pointer is not supported in interface"))
-				} else {
-					val7 := r.InstallPaths[val5] == nil
-					if val7 {
-						hasher.WriteByte(0)
-					} else {
-						val8 := func(hasher *proptools.Hasher) error {
-							return r.InstallPaths[val5].(proptools.CustomHash).CustomHash(hasher)
-						}
-						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val8); err != nil {
-							return err
-						}
-					}
-				}
-			} else {
-				r.InstallPaths[val5].(proptools.CustomHash).CustomHash(hasher)
-			}
+	hasher.WriteInt(3)
+	hasher.WriteString(":.[]NdkHeaderFile")
+	hasher.WriteInt(len(r.Headers))
+	for val1 := 0; val1 < len(r.Headers); val1++ {
+		if err := r.Headers[val1].CustomHash(hasher); err != nil {
+			return err
 		}
 	}
 	hasher.WriteString(":cc.android.Path")
-	val9 := r.LicensePath == nil
-	if val9 {
+	val2 := r.LicensePath == nil
+	if val2 {
 		hasher.WriteByte(0)
 	} else {
 		if v := reflect.ValueOf(r.LicensePath); v.Kind() == reflect.Ptr {
 			if v.IsNil() {
 				panic(fmt.Errorf("nil pointer is not supported in interface"))
 			} else {
-				val10 := r.LicensePath == nil
-				if val10 {
+				val3 := r.LicensePath == nil
+				if val3 {
 					hasher.WriteByte(0)
 				} else {
-					val11 := func(hasher *proptools.Hasher) error { return r.LicensePath.(proptools.CustomHash).CustomHash(hasher) }
-					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val11); err != nil {
+					val4 := func(hasher *proptools.Hasher) error { return r.LicensePath.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val4); err != nil {
 						return err
 					}
 				}
@@ -6315,48 +6376,26 @@ func (r NdkHeaderInfo) CustomHash(hasher *proptools.Hasher) error {
 func (r *NdkHeaderInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
 	var err error
 
-	var val3 int
-	err = gobtools.DecodeInt(buf, &val3)
+	var val2 int
+	err = gobtools.DecodeInt(buf, &val2)
 	if err != nil {
 		return err
 	}
-	if val3 != -1 {
-		r.SrcPaths = make([]android.Path, val3)
-		for val4 := 0; val4 < int(val3); val4++ {
-			if val6, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+	if val2 != -1 {
+		r.Headers = make([]NdkHeaderFile, val2)
+		for val3 := 0; val3 < int(val2); val3++ {
+			if err = r.Headers[val3].Decode(ctx, buf); err != nil {
 				return err
-			} else if val6 == nil {
-				r.SrcPaths[val4] = nil
-			} else {
-				r.SrcPaths[val4] = val6.(android.Path)
 			}
 		}
 	}
 
-	var val9 int
-	err = gobtools.DecodeInt(buf, &val9)
-	if err != nil {
+	if val6, err := gobtools.DecodeInterface(ctx, buf); err != nil {
 		return err
-	}
-	if val9 != -1 {
-		r.InstallPaths = make([]android.Path, val9)
-		for val10 := 0; val10 < int(val9); val10++ {
-			if val12, err := gobtools.DecodeInterface(ctx, buf); err != nil {
-				return err
-			} else if val12 == nil {
-				r.InstallPaths[val10] = nil
-			} else {
-				r.InstallPaths[val10] = val12.(android.Path)
-			}
-		}
-	}
-
-	if val14, err := gobtools.DecodeInterface(ctx, buf); err != nil {
-		return err
-	} else if val14 == nil {
+	} else if val6 == nil {
 		r.LicensePath = nil
 	} else {
-		r.LicensePath = val14.(android.Path)
+		r.LicensePath = val6.(android.Path)
 	}
 
 	err = gobtools.DecodeBool(buf, &r.SkipVerification)

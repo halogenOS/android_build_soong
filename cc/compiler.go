@@ -479,8 +479,7 @@ func (compiler *baseCompiler) compilerFlags(ctx ModuleContext, flags Flags, deps
 		// typical Soong approach would be to only make the headers for the
 		// library you're using available, we're trying to emulate the NDK
 		// behavior here, and the NDK always has all the NDK headers available.
-		flags.SystemIncludeFlags = append(flags.SystemIncludeFlags,
-			"--sysroot "+getNdkSysrootBase(ctx).String())
+		flags = addNdkSysrootFlags(ctx, flags)
 	} else if ctx.Device() {
 		flags.Global.CommonFlags = append(flags.Global.CFlags, "-nostdlibinc")
 	}
@@ -812,22 +811,13 @@ func makeDefineString(name string) string {
 
 var gnuToCReplacer = strings.NewReplacer("gnu", "c")
 
-func ndkPathDeps(ctx ModuleContext) android.Paths {
-	if ctx.Module().(*Module).IsSdkVariant() {
-		// The NDK sysroot timestamp file depends on all the NDK sysroot header files
-		// for compiling src to obj files.
-		return android.Paths{getNdkHeadersTimestampFile(ctx)}
-	}
-	return nil
-}
-
 func (compiler *baseCompiler) hasAidl(ctx BaseModuleContext, deps PathDeps) bool {
 	return len(deps.AidlLibraryInfos) > 0 || compiler.hasSrcExt(ctx, ".aidl")
 }
 
 func (compiler *baseCompiler) compile(ctx ModuleContext, flags Flags, deps PathDeps) Objects {
 	pathDeps := deps.GeneratedDeps
-	pathDeps = append(pathDeps, ndkPathDeps(ctx)...)
+	pathDeps = append(pathDeps, flags.orderOnlyDeps...)
 
 	buildFlags := flagsToBuilderFlags(flags)
 

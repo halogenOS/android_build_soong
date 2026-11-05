@@ -2743,6 +2743,17 @@ func TestIncludeDirectoryOrdering(t *testing.T) {
 	lastNDKFlags := []string{
 		"--sysroot",
 		"out/soong/ndk/sysroot",
+		"-nostdlibinc",
+		"-ivfsoverlay",
+		"out/soong/ndk_sysroot.vfs.yaml",
+		"-Xclang",
+		"-internal-externc-isystem",
+		"-Xclang",
+		"out/soong/ndk/sysroot/usr/include/arm-linux-androideabi",
+		"-Xclang",
+		"-internal-externc-isystem",
+		"-Xclang",
+		"out/soong/ndk/sysroot/usr/include",
 	}
 
 	lastPlatformIncludes := []string{

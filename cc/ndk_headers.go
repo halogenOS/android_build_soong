@@ -78,16 +78,28 @@ type headerModule struct {
 
 	properties headerProperties
 
-	srcPaths     android.Paths
-	installPaths android.Paths
-	licensePath  android.Path
+	srcPaths    android.Paths
+	headers     []NdkHeaderFile
+	licensePath android.Path
+}
+
+// NdkHeaderFile is one header of the NDK sysroot.
+// @auto-generate: gob
+type NdkHeaderFile struct {
+	// Src is the file in the source tree that the header is made from.
+	Src android.Path
+	// Install is the path of the header in the sysroot.
+	Install android.Path
+	// Content is the file that compiles read for the header through the header
+	// map of getNdkSysrootOverlay: Src for ndk_headers, Install for
+	// preprocessed_ndk_headers, which writes its output there.
+	Content android.Path
 }
 
 // @auto-generate: gob
 type NdkHeaderInfo struct {
-	SrcPaths     android.Paths
-	InstallPaths android.Paths
-	LicensePath  android.Path
+	Headers     []NdkHeaderFile
+	LicensePath android.Path
 	// Set to true if the headers installed by this module should skip
 	// verification. This step ensures that each header is self-contained (can
 	// be #included alone) and is valid C. This should not be disabled except in
@@ -147,16 +159,15 @@ func (m *headerModule) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 			Input:  header,
 			Output: installPath,
 		})
-		m.installPaths = append(m.installPaths, installPath)
+		m.headers = append(m.headers, NdkHeaderFile{Src: header, Install: installPath, Content: header})
 	}
 
-	if len(m.installPaths) == 0 {
+	if len(m.headers) == 0 {
 		ctx.ModuleErrorf("srcs %q matched zero files", m.properties.Srcs)
 	}
 
 	android.SetProvider(ctx, NdkHeaderInfoProvider, NdkHeaderInfo{
-		SrcPaths:         m.srcPaths,
-		InstallPaths:     m.installPaths,
+		Headers:          m.headers,
 		LicensePath:      m.licensePath,
 		SkipVerification: Bool(m.properties.Skip_verification),
 	})
@@ -223,9 +234,9 @@ type preprocessedHeadersModule struct {
 
 	properties preprocessedHeadersProperties
 
-	srcPaths     android.Paths
-	installPaths android.Paths
-	licensePath  android.Path
+	srcPaths    android.Paths
+	headers     []NdkHeaderFile
+	licensePath android.Path
 }
 
 var NdkPreprocessedHeaderInfoProvider = blueprint.NewProvider[NdkHeaderInfo]()
@@ -242,7 +253,7 @@ func (m *preprocessedHeadersModule) GenerateAndroidBuildActions(ctx android.Modu
 	installDir := getCurrentIncludePath(ctx).Join(ctx, String(m.properties.To))
 	for _, src := range m.srcPaths {
 		installPath := installDir.Join(ctx, src.Base())
-		m.installPaths = append(m.installPaths, installPath)
+		m.headers = append(m.headers, NdkHeaderFile{Src: src, Install: installPath, Content: installPath})
 
 		ctx.Build(pctx, android.BuildParams{
 			Rule:        preprocessNdkHeader,
@@ -255,13 +266,12 @@ func (m *preprocessedHeadersModule) GenerateAndroidBuildActions(ctx android.Modu
 		})
 	}
 
-	if len(m.installPaths) == 0 {
+	if len(m.headers) == 0 {
 		ctx.ModuleErrorf("srcs %q matched zero files", m.properties.Srcs)
 	}
 
 	android.SetProvider(ctx, NdkPreprocessedHeaderInfoProvider, NdkHeaderInfo{
-		SrcPaths:         m.srcPaths,
-		InstallPaths:     m.installPaths,
+		Headers:          m.headers,
 		LicensePath:      m.licensePath,
 		SkipVerification: Bool(m.properties.Skip_verification),
 	})

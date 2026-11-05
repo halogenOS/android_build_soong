@@ -1169,21 +1169,11 @@ func (library *libraryDecorator) linkStatic(ctx ModuleContext,
 	return outputFile
 }
 
-func ndkSharedLibDeps(ctx ModuleContext) android.Paths {
-	if ctx.Module().(*Module).IsSdkVariant() {
-		// The NDK sysroot timestamp file depends on all the NDK
-		// sysroot header and shared library files.
-		return android.Paths{getNdkBaseTimestampFile(ctx)}
-	}
-	return nil
-}
-
 func (library *libraryDecorator) linkShared(ctx ModuleContext,
 	flags Flags, deps PathDeps, objs Objects) android.Path {
 
 	var linkerDeps android.Paths
 	linkerDeps = append(linkerDeps, flags.LdFlagsDeps...)
-	linkerDeps = append(linkerDeps, ndkSharedLibDeps(ctx)...)
 
 	exportedSymbols := ctx.ExpandOptionalSource(library.Properties.Exported_symbols_list, "exported_symbols_list")
 	unexportedSymbols := ctx.ExpandOptionalSource(library.Properties.Unexported_symbols_list, "unexported_symbols_list")

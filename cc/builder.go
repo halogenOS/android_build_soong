@@ -461,6 +461,7 @@ type builderFlags struct {
 	sAbiFlags       string        // Flags that apply to header-abi-dumps
 	aidlFlags       string        // Flags that apply to aidl source files
 	aidlFlagsDeps   android.Paths // Implicit deps of the flags in aidlFlags
+	headerCopies    android.Paths // Order-only deps of the Kythe and header-abi-dumper steps besides pathDeps
 	rsFlags         string        // Flags that apply to renderscript source files
 	toolchain       config.Toolchain
 
@@ -691,6 +692,11 @@ func transformSourceToObj(ctx android.ModuleContext, subdir string, srcFiles, no
 		return "$" + kind + n
 	}
 
+	// The Kythe extractor and header-abi-dumper cannot read a clang file map,
+	// neither through -ivfsoverlay nor through an option of their own. They
+	// read the copies of the headers read by the compile through the map.
+	headerCopyPathDeps := append(slices.Clone(pathDeps), flags.headerCopies...)
+
 	for i, srcFile := range srcObjFiles {
 		objFile := android.ObjPathWithExt(ctx, subdir, srcFile, "o")
 
@@ -800,7 +806,7 @@ func transformSourceToObj(ctx android.ModuleContext, subdir string, srcFiles, no
 				Output:      kytheFile,
 				Input:       srcFile,
 				Implicits:   cFlagsDeps,
-				OrderOnly:   pathDeps,
+				OrderOnly:   headerCopyPathDeps,
 				Args: map[string]string{
 					"cFlags": shareFlags("cFlags", moduleFlags),
 				},
@@ -856,7 +862,7 @@ func transformSourceToObj(ctx android.ModuleContext, subdir string, srcFiles, no
 				Input:       srcFile,
 				Implicit:    objFile,
 				Implicits:   cFlagsDeps,
-				OrderOnly:   pathDeps,
+				OrderOnly:   headerCopyPathDeps,
 				Args: map[string]string{
 					"cFlags":     shareFlags("cFlags", moduleToolingFlags),
 					"exportDirs": shareFlags("exportDirs", flags.sAbiFlags),

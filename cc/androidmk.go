@@ -144,10 +144,10 @@ func (c *Module) PrepareAndroidMKProviderInfo(config android.Config) *android.An
 		// Using the SDK variant as a JNI library needs a copy of the .so that
 		// is not named .sdk.so so that it can be packaged into the APK with
 		// the right name.
-		entries.FooterStrings = []string{
+		entries.FooterStrings = append(entries.FooterStrings,
 			fmt.Sprintf("%s %s %s", "$(eval $(call copy-one-file,",
 				"$(LOCAL_BUILT_MODULE),",
-				"$(patsubst %.sdk.so,%.so,$(LOCAL_BUILT_MODULE))))")}
+				"$(patsubst %.sdk.so,%.so,$(LOCAL_BUILT_MODULE))))"))
 	}
 
 	for _, obj := range []interface{}{c.compiler, c.linker, c.sanitize, c.installer} {
@@ -282,29 +282,14 @@ func (object *objectLinker) prepareAndroidMKFooterInfo(config android.Config, ct
 		name = entries.OverrideName
 	}
 
-	prefix := ""
-	if ctx.ArchSpecific() {
-		switch ctx.Os().Class {
-		case android.Host:
-			if ctx.Target().HostCross {
-				prefix = "HOST_CROSS_"
-			} else {
-				prefix = "HOST_"
-			}
-		case android.Device:
-			prefix = "TARGET_"
+	varname := fmt.Sprintf("SOONG_%sOBJECT_%s%s", android.MakeVariablePrefix(config, ctx), name, entries.SubName)
+	entries.FooterStrings = append(entries.FooterStrings, readOnlyMakeAssignment(varname, out.String()))
+}
 
-		}
-
-		if ctx.Arch().ArchType != config.Targets[ctx.Os()][0].Arch.ArchType {
-			prefix = "2ND_" + prefix
-		}
-	}
-
-	varname := fmt.Sprintf("SOONG_%sOBJECT_%s%s", prefix, name, entries.SubName)
-
-	entries.FooterStrings = append(entries.FooterStrings,
-		fmt.Sprintf("\n%s := %s\n.KATI_READONLY: %s", varname, out.String(), varname))
+// readOnlyMakeAssignment returns the Make text that sets the variable name to
+// value and makes it read-only.
+func readOnlyMakeAssignment(name, value string) string {
+	return fmt.Sprintf("\n%s := %s\n.KATI_READONLY: %s", name, value, name)
 }
 
 func (test *testDecorator) prepareAndroidMKProviderInfo(config android.Config, ctx AndroidMkContext, entries *android.AndroidMkInfo) {
@@ -406,6 +391,15 @@ func (c *stubDecorator) prepareAndroidMKProviderInfo(config android.Config, ctx 
 	entries.SetString("LOCAL_MODULE_STEM", stem)
 	entries.SetBool("LOCAL_NO_NOTICE_FILE", true)
 	entries.SetBool("LOCAL_UNINSTALLABLE_MODULE", true) // Stubs should not be installed
+
+	// Make modules built against the NDK link the stub where Soong built it,
+	// from the variable SOONG_<prefix>NDK_STUB_<library>.<API level>.
+	if entries.OutputFile.Valid() {
+		varname := fmt.Sprintf("SOONG_%sNDK_STUB_%s.%s", android.MakeVariablePrefix(config, ctx),
+			ctx.BaseModuleName(), c.apiLevel.String())
+		entries.FooterStrings = append(entries.FooterStrings,
+			readOnlyMakeAssignment(varname, entries.OutputFile.String()))
+	}
 }
 
 func (c *vndkPrebuiltLibraryDecorator) prepareAndroidMKProviderInfo(config android.Config, ctx AndroidMkContext, entries *android.AndroidMkInfo) {

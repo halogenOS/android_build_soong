@@ -347,6 +347,40 @@ func GetModuleInfoJSONInfo(ctx OtherModuleProviderContext, module ModuleOrProxy)
 	return nil
 }
 
+// MakeVariablePrefixTarget is what MakeVariablePrefix reads of a module.
+type MakeVariablePrefixTarget interface {
+	ArchSpecific() bool
+	Os() OsType
+	Target() Target
+	Arch() Arch
+}
+
+// MakeVariablePrefix returns the prefix of the Make variables of the target of
+// module, such as TARGET_ or 2ND_HOST_, or nothing when module is not arch
+// specific.
+func MakeVariablePrefix(config Config, module MakeVariablePrefixTarget) string {
+	if !module.ArchSpecific() {
+		return ""
+	}
+
+	prefix := ""
+	switch module.Os().Class {
+	case Host:
+		if module.Target().HostCross {
+			prefix = "HOST_CROSS_"
+		} else {
+			prefix = "HOST_"
+		}
+	case Device:
+		prefix = "TARGET_"
+	}
+
+	if module.Arch().ArchType != config.Targets[module.Os()][0].Arch.ArchType {
+		prefix = "2ND_" + prefix
+	}
+	return prefix
+}
+
 func (a *AndroidMkEntries) fillInEntries(ctx fillInEntriesContext, mod Module) {
 	a.entryContext = ctx
 	a.EntryMap = make(map[string][]string)
@@ -485,24 +519,7 @@ func (a *AndroidMkEntries) fillInEntries(ctx fillInEntriesContext, mod Module) {
 		a.SetString("LOCAL_IS_HOST_MODULE", "true")
 	}
 
-	prefix := ""
-	if base.ArchSpecific() {
-		switch base.Os().Class {
-		case Host:
-			if base.Target().HostCross {
-				prefix = "HOST_CROSS_"
-			} else {
-				prefix = "HOST_"
-			}
-		case Device:
-			prefix = "TARGET_"
-
-		}
-
-		if base.Arch().ArchType != ctx.Config().Targets[base.Os()][0].Arch.ArchType {
-			prefix = "2ND_" + prefix
-		}
-	}
+	prefix := MakeVariablePrefix(ctx.Config(), base)
 
 	if licenseMetadata := commInfo.LicenseMetadata; licenseMetadata != nil {
 		a.SetPath("LOCAL_SOONG_LICENSE_METADATA", licenseMetadata.LicenseMetadataPath)
@@ -798,24 +815,7 @@ func translateAndroidModule(ctx SingletonContext, w io.Writer, moduleInfoJSONs *
 	data.fillInData(ctx, mod)
 	aconfigUpdateAndroidMkData(ctx, mod, &data)
 
-	prefix := ""
-	if amod.ArchSpecific() {
-		switch amod.Os().Class {
-		case Host:
-			if amod.Target().HostCross {
-				prefix = "HOST_CROSS_"
-			} else {
-				prefix = "HOST_"
-			}
-		case Device:
-			prefix = "TARGET_"
-
-		}
-
-		if amod.Arch().ArchType != ctx.Config().Targets[amod.Os()][0].Arch.ArchType {
-			prefix = "2ND_" + prefix
-		}
-	}
+	prefix := MakeVariablePrefix(ctx.Config(), amod)
 
 	name := provider.BaseModuleName()
 	blueprintDir := filepath.Dir(ctx.BlueprintFile(mod))

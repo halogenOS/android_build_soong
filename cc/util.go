@@ -58,6 +58,7 @@ func flagsToBuilderFlags(in Flags) builderFlags {
 		noOverrideFlags: strings.Join(in.NoOverrideFlags, " "),
 		aidlFlags:       strings.Join(in.aidlFlags, " "),
 		aidlFlagsDeps:   in.aidlFlagsDeps,
+		headerCopies:    in.headerCopies,
 		rsFlags:         strings.Join(in.rsFlags, " "),
 		libFlags:        strings.Join(in.libFlags, " "),
 		extraLibFlags:   strings.Join(in.extraLibFlags, " "),

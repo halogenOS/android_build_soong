@@ -571,6 +571,10 @@ func (stub *stubDecorator) link(ctx ModuleContext, flags Flags, deps PathDeps,
 	}
 
 	stub.libraryDecorator.skipAPIDefine = true
+	// The ABI diffs of the stub run as validations of its output, like the
+	// source ABI diffs of a library, so every build that links the stub checks
+	// its ABI.
+	stub.libraryDecorator.sAbiDiff = append(stub.libraryDecorator.sAbiDiff, stub.abiDiffPaths...)
 	return stub.libraryDecorator.link(ctx, flags, deps, objs)
 }
 

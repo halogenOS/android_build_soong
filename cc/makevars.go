@@ -138,6 +138,12 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 	ctx.Strict("DEFAULT_TIDY_HEADER_DIRS", "${config.TidyDefaultHeaderDirs}")
 	ctx.Strict("WITH_TIDY_FLAGS", "${config.TidyWithTidyFlags}")
 
+	// Make modules built against the NDK depend on all of these files as normal
+	// prerequisites.
+	ndkCompileImplicits, ndkCompileOrderOnly := ndkSysrootCompileDeps(ctx)
+	ctx.Strict("NDK_SYSROOT_COMPILE_DEPS", strings.Join(append(ndkCompileImplicits, ndkCompileOrderOnly...).Strings(), " "))
+	ctx.Strict("NDK_SYSROOT_TIDY_FLAGS", strings.Join(ndkSysrootTidyFlags(ctx), " "))
+
 	ctx.Strict("AIDL_CPP", "${aidlCmd}")
 	ctx.Strict("ALLOWED_MANUAL_INTERFACE_PATHS", strings.Join(allowedManualInterfacePaths, " "))
 
@@ -280,6 +286,7 @@ func makeVarsToolchain(ctx android.MakeVarsContext, secondPrefix string,
 		ctx.Strict(makePrefix+"OBJCOPY", "${config.ClangBin}/llvm-objcopy")
 		ctx.Strict(makePrefix+"LD", "${config.ClangBin}/lld")
 		ctx.Strict(makePrefix+"NDK_TRIPLE", config.NDKTriple(toolchain))
+		ctx.Strict(makePrefix+"NDK_SYSROOT_CFLAGS", strings.Join(ndkSysrootCflags(ctx, toolchain), " "))
 		ctx.Strict(makePrefix+"TOOLS_PREFIX", "${config.ClangBin}/llvm-")
 	}
 

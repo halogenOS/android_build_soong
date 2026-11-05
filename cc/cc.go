@@ -514,6 +514,8 @@ type Flags struct {
 
 	aidlFlags     []string      // Flags that apply to aidl source files
 	aidlFlagsDeps android.Paths // Implicit deps of the flags in aidlFlags
+	orderOnlyDeps android.Paths // Order-only deps of every step that compiles a source
+	headerCopies  android.Paths // Order-only deps of the Kythe and header-abi-dumper steps besides those of the compile
 	rsFlags       []string      // Flags that apply to renderscript source files
 	libFlags      []string      // Flags to add libraries early to the link order
 	extraLibFlags []string      // Flags to add libraries late in the link order after LdFlags
