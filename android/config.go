@@ -2365,6 +2365,12 @@ func (c *config) ProductHiddenAPIStubsTest() []string {
 	return c.productVariables.ProductHiddenAPIStubsTest
 }
 
+// ProductRemovedPackages returns the modules that the product keeps off the device, even where
+// another module requires them.
+func (c *config) ProductRemovedPackages() []string {
+	return c.productVariables.ProductRemovedPackages
+}
+
 func (c *deviceConfig) TargetFSConfigGen() []string {
 	return c.config.productVariables.TargetFSConfigGen
 }

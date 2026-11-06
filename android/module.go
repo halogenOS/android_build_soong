@@ -1140,6 +1140,9 @@ func addRequiredDeps(ctx BottomUpMutatorContext) {
 
 	if ctx.Device() {
 		for _, depName := range append(ctx.Module().RequiredModuleNames(ctx), ctx.Module().VintfFragmentModuleNames(ctx)...) {
+			if InList(depName, ctx.Config().ProductRemovedPackages()) {
+				continue
+			}
 			for _, target := range deviceTargets {
 				addDep(target, depName)
 			}

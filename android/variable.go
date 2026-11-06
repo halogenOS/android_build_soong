@@ -433,6 +433,8 @@ type ProductVariables struct {
 	ProductHiddenAPIStubsSystem []string `json:",omitempty"`
 	ProductHiddenAPIStubsTest   []string `json:",omitempty"`
 
+	ProductRemovedPackages []string `json:",omitempty"`
+
 	ProductPublicSepolicyDirs  []string `json:",omitempty"`
 	ProductPrivateSepolicyDirs []string `json:",omitempty"`
 
