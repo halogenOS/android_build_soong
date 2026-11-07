@@ -176,6 +176,16 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 			makeVarsToolchain(ctx, "2ND_", deviceTargets[1])
 		}
 	}
+
+	// Android.mk modules of the vendor-side images compile with these flags, for the CPU of the
+	// vendor variants of Soong modules.
+	vendorTargets := ctx.Config().TargetsForImage(android.Android, android.VendorVariation)
+	if len(vendorTargets) > 0 {
+		makeVarsGlobalFlags(ctx, "VENDOR_CLANG_TARGET_", vendorTargets[0])
+		if len(vendorTargets) > 1 {
+			makeVarsGlobalFlags(ctx, "2ND_VENDOR_CLANG_TARGET_", vendorTargets[1])
+		}
+	}
 }
 
 type FakeToolchainFlagsContext struct {
@@ -202,18 +212,6 @@ func makeVarsToolchain(ctx android.MakeVarsContext, secondPrefix string,
 
 	toolchain := config.FindToolchain(target.Os, target.Arch, false)
 
-	var productExtraCflags string
-	var productExtraLdflags string
-
-	hod := "Host"
-	if target.Os.Class == android.Device {
-		hod = "Device"
-	}
-
-	if target.Os.Class == android.Host && ctx.Config().HostStaticBinaries() {
-		productExtraLdflags += "-static"
-	}
-
 	includeFlags, err := ctx.Eval(toolchain.IncludeFlags())
 	if err != nil {
 		panic(err)
@@ -239,26 +237,7 @@ func makeVarsToolchain(ctx android.MakeVarsContext, secondPrefix string,
 	clangPrefix := secondPrefix + "CLANG_" + typePrefix
 
 	ctx.Strict(clangPrefix+"TRIPLE", toolchain.ClangTriple())
-	ctx.Strict(clangPrefix+"GLOBAL_CFLAGS", strings.Join([]string{
-		toolchain.Cflags(),
-		"${config.CommonGlobalCflags}",
-		fmt.Sprintf("${config.%sGlobalCflags}", hod),
-		toolchain.ToolchainCflags(),
-		productExtraCflags,
-	}, " "))
-	ctx.Strict(clangPrefix+"GLOBAL_CPPFLAGS", strings.Join([]string{
-		"${config.CommonGlobalCppflags}",
-		fmt.Sprintf("${config.%sGlobalCppflags}", hod),
-		toolchain.Cppflags(),
-	}, " "))
-	ldFlags := toolchain.Ldflags(&FakeToolchainFlagsContext{ctx})
-	toolchainLdFlags := toolchain.ToolchainLdflags()
-	ctx.Strict(clangPrefix+"GLOBAL_LDFLAGS", strings.Join([]string{
-		fmt.Sprintf("${config.%sGlobalLdflags}", hod),
-		ldFlags.Flags,
-		toolchainLdFlags.Flags,
-		productExtraLdflags,
-	}, " "))
+	makeVarsGlobalFlags(ctx, clangPrefix, target)
 
 	if target.Os.Class == android.Device {
 		for variable, value := range sanitizerVariables {
@@ -296,6 +275,45 @@ func makeVarsToolchain(ctx android.MakeVarsContext, secondPrefix string,
 
 	ctx.Strict(makePrefix+"SHLIB_SUFFIX", toolchain.ShlibSuffix())
 	ctx.Strict(makePrefix+"EXECUTABLE_SUFFIX", toolchain.ExecutableSuffix())
+}
+
+// makeVarsGlobalFlags exports the global compile and link flags of the target's toolchain as the
+// Make variables GLOBAL_CFLAGS, GLOBAL_CPPFLAGS and GLOBAL_LDFLAGS behind clangPrefix.
+func makeVarsGlobalFlags(ctx android.MakeVarsContext, clangPrefix string, target android.Target) {
+	toolchain := config.FindToolchain(target.Os, target.Arch, false)
+
+	var productExtraCflags string
+	var productExtraLdflags string
+
+	hod := "Host"
+	if target.Os.Class == android.Device {
+		hod = "Device"
+	}
+
+	if target.Os.Class == android.Host && ctx.Config().HostStaticBinaries() {
+		productExtraLdflags += "-static"
+	}
+
+	ctx.Strict(clangPrefix+"GLOBAL_CFLAGS", strings.Join([]string{
+		toolchain.Cflags(),
+		"${config.CommonGlobalCflags}",
+		fmt.Sprintf("${config.%sGlobalCflags}", hod),
+		toolchain.ToolchainCflags(),
+		productExtraCflags,
+	}, " "))
+	ctx.Strict(clangPrefix+"GLOBAL_CPPFLAGS", strings.Join([]string{
+		"${config.CommonGlobalCppflags}",
+		fmt.Sprintf("${config.%sGlobalCppflags}", hod),
+		toolchain.Cppflags(),
+	}, " "))
+	ldFlags := toolchain.Ldflags(&FakeToolchainFlagsContext{ctx})
+	toolchainLdFlags := toolchain.ToolchainLdflags()
+	ctx.Strict(clangPrefix+"GLOBAL_LDFLAGS", strings.Join([]string{
+		fmt.Sprintf("${config.%sGlobalLdflags}", hod),
+		ldFlags.Flags,
+		toolchainLdFlags.Flags,
+		productExtraLdflags,
+	}, " "))
 }
 
 func splitSystemIncludes(ctx android.MakeVarsContext, val string) (includes, systemIncludes []string) {

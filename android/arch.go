@@ -744,7 +744,7 @@ func (a *archTransitionMutator) split(ctx BaseModuleContext) ([]string, *allArch
 	}
 
 	image := base.commonProperties.ImageVariation
-	osTargets := ctx.Config().targetsForImage(os, image)
+	osTargets := ctx.Config().TargetsForImage(os, image)
 
 	// Filter NativeBridge targets unless they are explicitly supported.
 	// Skip creating native bridge variants for non-core modules.

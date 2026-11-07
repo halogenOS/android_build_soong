@@ -43,10 +43,10 @@ func decodeVendorTargets(variables ProductVariables) ([]Target, error) {
 	return targets, nil
 }
 
-// targetsForImage returns the targets that variants of the image variation compile for on the OS:
+// TargetsForImage returns the targets that variants of the image variation compile for on the OS:
 // the vendor targets for a vendor-side image of a product that names them, the targets of the OS
 // otherwise.
-func (c *config) targetsForImage(os OsType, image string) []Target {
+func (c *config) TargetsForImage(os OsType, image string) []Target {
 	if c.vendorTargets != nil && slices.Contains(vendorSideImageVariations, image) {
 		return c.vendorTargets
 	}
@@ -59,7 +59,7 @@ func (c *config) targetsForImage(os OsType, image string) []Target {
 // set of this image takes its place. Any other variation stays as it is.
 func (c *config) archVariationForImage(image, variation string) string {
 	androidTargets := slices.Concat(c.Targets[Android], c.vendorTargets)
-	for _, own := range c.targetsForImage(Android, image) {
+	for _, own := range c.TargetsForImage(Android, image) {
 		if slices.ContainsFunc(androidTargets, func(t Target) bool {
 			return t.ArchVariation() == variation && t.Arch.ArchType == own.Arch.ArchType &&
 				t.NativeBridge == own.NativeBridge
