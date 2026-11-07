@@ -743,9 +743,9 @@ func (a *archTransitionMutator) split(ctx BaseModuleContext) ([]string, *allArch
 		return []string{""}, nil
 	}
 
-	osTargets := ctx.Config().Targets[os]
-
 	image := base.commonProperties.ImageVariation
+	osTargets := ctx.Config().targetsForImage(os, image)
+
 	// Filter NativeBridge targets unless they are explicitly supported.
 	// Skip creating native bridge variants for non-core modules.
 	if os == Android && !(base.IsNativeBridgeSupported() && image == CoreVariation) {
@@ -892,6 +892,13 @@ func (a *archTransitionMutator) IncomingTransition(ctx IncomingTransitionContext
 		if allArchInfo, ok := ModuleProvider(ctx, allArchProvider); ok {
 			return allArchInfo.Primary
 		}
+	}
+
+	// A dependency from an image that compiles for the other target set asks for its own target.
+	// The module's own targets are not known yet while the variations propagate, so the mapping
+	// reads only the target sets of the config.
+	if os == Android {
+		return ctx.Config().archVariationForImage(base.commonProperties.ImageVariation, incomingVariation)
 	}
 
 	return incomingVariation

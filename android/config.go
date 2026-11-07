@@ -402,6 +402,11 @@ type config struct {
 	AndroidFirstDeviceTarget Target // the first Target for modules for the Android device
 	AndroidLFITarget         Target
 
+	// vendorTargets are the Android targets of the vendor-side images, or nil where these compile
+	// for Targets[Android] as well. A dependency asking for a variation of the other set gets the
+	// target of the same arch, see archVariationForImage.
+	vendorTargets []Target
+
 	// Flags for Partial Compile, derived from SOONG_PARTIAL_COMPILE.
 	partialCompileFlags partialCompileFlags
 
@@ -882,6 +887,13 @@ func initConfig(cmdArgs CmdArgs, availableEnv map[string]string) (*config, error
 			return &config{}, err
 		}
 		targets[Android] = androidTargets
+	} else {
+		// Only the product's own targets have a vendor CPU. Builds for the fixed ABI lists above
+		// compile every image for those.
+		newConfig.vendorTargets, err = decodeVendorTargets(newConfig.productVariables)
+		if err != nil {
+			return &config{}, err
+		}
 	}
 
 	multilib := make(map[string]bool)

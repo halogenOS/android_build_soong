@@ -244,6 +244,12 @@ type ProductVariables struct {
 	DeviceSecondaryCpuVariant  *string  `json:",omitempty"`
 	DeviceSecondaryAbi         []string `json:",omitempty"`
 
+	// The arch and CPU variants that the vendor-side images compile for, see decodeVendorTargets.
+	VendorArchVariant          *string `json:",omitempty"`
+	VendorCpuVariant           *string `json:",omitempty"`
+	VendorSecondaryArchVariant *string `json:",omitempty"`
+	VendorSecondaryCpuVariant  *string `json:",omitempty"`
+
 	NativeBridgeArch         *string  `json:",omitempty"`
 	NativeBridgeArchVariant  *string  `json:",omitempty"`
 	NativeBridgeCpuVariant   *string  `json:",omitempty"`
