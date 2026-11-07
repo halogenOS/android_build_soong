@@ -2023,13 +2023,8 @@ func decodeArch(os OsType, arch string, archVariant, cpuVariant *string, abi []s
 		}
 	}
 
-	// Filter empty ABIs out of the list.
-	for i := 0; i < len(a.Abi); i++ {
-		if a.Abi[i] == "" {
-			a.Abi = append(a.Abi[:i], a.Abi[i+1:]...)
-			i--
-		}
-	}
+	// Filter empty ABIs out of a copy of the list. The list in the product variables is unchanged.
+	a.Abi = slices.DeleteFunc(slices.Clone(a.Abi), func(abi string) bool { return abi == "" })
 
 	// Set ArchFeatures from the arch type. for Android OS, other os-es do not specify features
 	if os == Android {
