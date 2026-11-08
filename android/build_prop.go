@@ -74,7 +74,25 @@ func (p *buildPropModule) stem() string {
 	return proptools.StringDefault(p.properties.Stem, "build.prop")
 }
 
+// partitionPropFiles are the property files added by plugins, by partition.
+var partitionPropFiles = map[string][]func(PathContext) Path{}
+
+// RegisterPartitionPropFile adds the property file returned by propFile to the build.prop of
+// partition. Plugins call it from init.
+func RegisterPartitionPropFile(partition string, propFile func(PathContext) Path) {
+	partitionPropFiles[partition] = append(partitionPropFiles[partition], propFile)
+}
+
 func (p *buildPropModule) propFiles(ctx ModuleContext) Paths {
+	files := p.configPropFiles(ctx)
+	for _, propFile := range partitionPropFiles[p.partition(ctx.DeviceConfig())] {
+		files = append(files, propFile(ctx))
+	}
+	return files
+}
+
+// configPropFiles are the property files of the partition given by the product configuration.
+func (p *buildPropModule) configPropFiles(ctx ModuleContext) Paths {
 	partition := p.partition(ctx.DeviceConfig())
 	if partition == "system" {
 		return ctx.Config().SystemPropFiles(ctx)
@@ -175,12 +193,6 @@ func (p *buildPropModule) GenerateAndroidBuildActions(ctx ModuleContext) {
 		postProcessCmd.Flag("--allow-dup")
 	}
 	postProcessCmd.FlagWithArg("--sdk-version ", config.PlatformSdkVersion().String())
-	if ctx.Config().EnableUffdGc() == "default" {
-		postProcessCmd.FlagWithInput("--kernel-version-file-for-uffd-gc ", PathForOutput(ctx, "dexpreopt/kernel_version_for_uffd_gc.txt"))
-	} else {
-		// still need to pass an empty string to kernel-version-file-for-uffd-gc
-		postProcessCmd.FlagWithArg("--kernel-version-file-for-uffd-gc ", `""`)
-	}
 	postProcessCmd.Text(outputFilePath.String())
 	postProcessCmd.Flags(p.properties.Block_list)
 

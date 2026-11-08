@@ -530,7 +530,6 @@ type ProductVariables struct {
 	OdmPropFiles       []string `json:",omitempty"`
 	VendorPropFiles    []string `json:",omitempty"`
 
-	EnableUffdGc           *string `json:",omitempty"`
 	BoardKernelVersion     *string `json:",omitempty"`
 	BoardKernelBuildModule *string `json:",omitempty"`
 

@@ -25,4 +25,8 @@ bootstrap_go_package {
         "blueprint-proptools",
         "soong-android",
     ],
+    visibility: [
+        "//build/soong:__subpackages__",
+        "//build/custom/art",
+    ],
 }

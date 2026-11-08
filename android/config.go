@@ -2764,10 +2764,6 @@ func (c *config) VendorPropFiles(ctx PathContext) Paths {
 	return PathsForSource(ctx, c.productVariables.VendorPropFiles)
 }
 
-func (c *config) EnableUffdGc() string {
-	return String(c.productVariables.EnableUffdGc)
-}
-
 // BoardKernelBuildModule returns the module reference that BOARD_KERNEL_BUILD_MODULE gives, the
 // qualified name of the module that builds the device's kernel, or an empty string.
 func (c *config) BoardKernelBuildModule() string {

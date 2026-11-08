@@ -410,7 +410,6 @@ func TestAssumeValueFlags(t *testing.T) {
 			preparers := android.GroupFixturePreparers(
 				PrepareForTestWithDexpreopt,
 				dexpreopt.PrepareForTestWithDexpreoptConfig,
-				dexpreopt.FixtureSetEnableUffdGc("false"),
 				dexpreopt.FixtureSetPlatformSdkVersion(platformSdkVersion),
 			)
 

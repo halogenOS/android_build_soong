@@ -205,13 +205,6 @@ func FixtureDisableDexpreopt(disable bool) android.FixturePreparer {
 	})
 }
 
-// FixtureSetEnableUffdGc sets the EnableUffdGc property in the global config.
-func FixtureSetEnableUffdGc(value string) android.FixturePreparer {
-	return FixtureModifyGlobalConfig(func(_ android.PathContext, dexpreoptConfig *GlobalConfig) {
-		dexpreoptConfig.EnableUffdGc = value
-	})
-}
-
 // FixtureSetPlatformSdkVersion sets the PlatformSdkVersion property in the global config.
 func FixtureSetPlatformSdkVersion(value string) android.FixturePreparer {
 	return FixtureModifyGlobalConfig(func(_ android.PathContext, dexpreoptConfig *GlobalConfig) {

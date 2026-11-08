@@ -41,6 +41,7 @@ bootstrap_go_package {
         "//build/soong:__subpackages__",
         "//prebuilts/clang/host/linux-x86/soong",
         "//art/build",
+        "//build/custom/art",
         "//build/custom/kernel:__subpackages__",
     ],
 }

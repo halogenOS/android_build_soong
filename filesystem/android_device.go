@@ -115,9 +115,8 @@ type DeviceProperties struct {
 
 	// The kernel version in the build. Will be verified against the actual kernel.
 	// If not provided, will attempt to extract it from the loose kernel or the kernel inside
-	// the boot image. The version is later used to decide whether or not to enable uffd_gc
-	// when dexpreopting apps. So setting this doesn't really do anything except enforce that the
-	// actual kernel version is as specified here.
+	// the boot image. So setting this only checks that the actual kernel version is as
+	// specified here.
 	Kernel_version *string
 
 	// Precompiled sepolicy only with system + system_ext + product. Used for SELinux tests.
@@ -1909,11 +1908,6 @@ func (a *androidDevice) getKernel(ctx android.ModuleContext) android.Path {
 //     in the BootimgInfo. We don't currently support prebuilt boot images, but even if we add that
 //     in the future, it can be done in a prebuilt_bootimage module type that still exports the same
 //     BootimgInfo.
-//   - We don't print a warning and output '<unknown-kernel>' to kernel_version_for_uffd_gc.txt
-//     because we expect the kernel to always be present. If it's not, we will get an error that
-//     kernel_version_for_uffd_gc.txt doesn't exist. This may require later tweaking to the
-//     dexpreopt rules so that they don't attempt to access that file in builds that don't have
-//     a kernel.
 func (a *androidDevice) extractKernelVersionAndConfigs(ctx android.ModuleContext) (android.Path, android.Path) {
 	kernel := a.getKernel(ctx)
 	// If there's no kernel, don't create kernel version / kernel config files. Reverse dependencies
@@ -1946,15 +1940,6 @@ func (a *androidDevice) extractKernelVersionAndConfigs(ctx android.ModuleContext
 	builder.Build("extract_kernel_info", "Extract kernel version and configs")
 
 	if proptools.Bool(a.deviceProps.Main_device) && !ctx.Config().KatiEnabled() {
-		if ctx.Config().EnableUffdGc() == "default" {
-			kernelVersionFile := android.PathForOutput(ctx, "dexpreopt/kernel_version_for_uffd_gc.txt")
-			ctx.Build(pctx, android.BuildParams{
-				Rule:   android.CpIfChangedRule,
-				Input:  extractedVersionFile,
-				Output: kernelVersionFile,
-			})
-		}
-
 		ctx.DistForGoal("droid_targets", extractedVersionFile)
 	}
 

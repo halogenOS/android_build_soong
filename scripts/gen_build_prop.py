@@ -530,12 +530,6 @@ def append_additional_product_props(args):
   if config["NoBionicPageSizeMacro"]:
     props.append(f"ro.product.build.no_bionic_page_size_macro=true")
 
-  # This is a temporary system property that controls the ART module. The plan is
-  # to remove it by Aug 2025, at which time Mainline updates of the ART module
-  # will ignore it as well.
-  # If the value is "default", it will be mangled by post_process_props.py.
-  props.append(f"ro.dalvik.vm.enable_uffd_gc={config['EnableUffdGc']}")
-
   config["ADDITIONAL_PRODUCT_PROPERTIES"] = props
 
 def build_system_prop(args):
