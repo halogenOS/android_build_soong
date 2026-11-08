@@ -14,6 +14,8 @@
 
 package android
 
+import "slices"
+
 type ImageInterfaceContext interface {
 	ArchModuleContext
 
@@ -100,6 +102,30 @@ const (
 	// DebugRamdiskVariation means a module to be installed to debug ramdisk image.
 	DebugRamdiskVariation string = "debug_ramdisk"
 )
+
+// ImageSide is the side of the images that an image variation belongs to. System-side images
+// compile for the system targets, which run on every CPU of the device's arch. Device-side images
+// compile for the device targets, which use the CPU of the device.
+type ImageSide struct{ name string }
+
+var (
+	ImageSideSystem = ImageSide{"system"}
+	ImageSideDevice = ImageSide{"device"}
+)
+
+// deviceSideImageVariations are the image variations on the device side: the vendor image, which
+// contains the odm modules as well, the vendor ramdisk and the recovery.
+var deviceSideImageVariations = []string{VendorVariation, VendorRamdiskVariation, RecoveryVariation}
+
+// FindImageSide returns the side that the image variation belongs to. The versioned vendor
+// snapshot variations (vendor.<version>) contain prebuilts, which only the arch type selects, and
+// are on the system side like every image variation not in deviceSideImageVariations.
+func FindImageSide(image string) ImageSide {
+	if slices.Contains(deviceSideImageVariations, image) {
+		return ImageSideDevice
+	}
+	return ImageSideSystem
+}
 
 type imageInterfaceContextAdapter struct {
 	IncomingTransitionContext

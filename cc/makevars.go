@@ -177,13 +177,15 @@ func makeVarsProvider(ctx android.MakeVarsContext) {
 		}
 	}
 
-	// Android.mk modules of the vendor-side images compile with these flags, for the CPU of the
-	// vendor variants of Soong modules.
-	vendorTargets := ctx.Config().TargetsForImage(android.Android, android.VendorVariation)
-	if len(vendorTargets) > 0 {
-		makeVarsGlobalFlags(ctx, "VENDOR_CLANG_TARGET_", vendorTargets[0])
-		if len(vendorTargets) > 1 {
-			makeVarsGlobalFlags(ctx, "2ND_VENDOR_CLANG_TARGET_", vendorTargets[1])
+	// Android.mk modules of the device-side images compile with these flags, for the CPU of the
+	// device-side variants of Soong modules. The primary and the secondary target come before the
+	// native bridge ones.
+	deviceSideTargets := ctx.Config().FindTargetsForSide(android.Android, android.ImageSideDevice)
+	for i, secondPrefix := range []string{"", "2ND_"} {
+		if i < len(deviceSideTargets) && !deviceSideTargets[i].NativeBridge {
+			target := deviceSideTargets[i]
+			makeVarsGlobalFlags(ctx, secondPrefix+"DEVICE_SIDE_CLANG_TARGET_", target.Os.Class,
+				config.FindToolchain(target.Os, target.Arch, false))
 		}
 	}
 }
@@ -237,7 +239,7 @@ func makeVarsToolchain(ctx android.MakeVarsContext, secondPrefix string,
 	clangPrefix := secondPrefix + "CLANG_" + typePrefix
 
 	ctx.Strict(clangPrefix+"TRIPLE", toolchain.ClangTriple())
-	makeVarsGlobalFlags(ctx, clangPrefix, target)
+	makeVarsGlobalFlags(ctx, clangPrefix, target.Os.Class, toolchain)
 
 	if target.Os.Class == android.Device {
 		for variable, value := range sanitizerVariables {
@@ -277,20 +279,20 @@ func makeVarsToolchain(ctx android.MakeVarsContext, secondPrefix string,
 	ctx.Strict(makePrefix+"EXECUTABLE_SUFFIX", toolchain.ExecutableSuffix())
 }
 
-// makeVarsGlobalFlags exports the global compile and link flags of the target's toolchain as the
-// Make variables GLOBAL_CFLAGS, GLOBAL_CPPFLAGS and GLOBAL_LDFLAGS behind clangPrefix.
-func makeVarsGlobalFlags(ctx android.MakeVarsContext, clangPrefix string, target android.Target) {
-	toolchain := config.FindToolchain(target.Os, target.Arch, false)
+// makeVarsGlobalFlags exports the global compile and link flags of the toolchain as the Make
+// variables GLOBAL_CFLAGS, GLOBAL_CPPFLAGS and GLOBAL_LDFLAGS behind clangPrefix.
+func makeVarsGlobalFlags(ctx android.MakeVarsContext, clangPrefix string, osClass android.OsClass,
+	toolchain config.Toolchain) {
 
 	var productExtraCflags string
 	var productExtraLdflags string
 
 	hod := "Host"
-	if target.Os.Class == android.Device {
+	if osClass == android.Device {
 		hod = "Device"
 	}
 
-	if target.Os.Class == android.Host && ctx.Config().HostStaticBinaries() {
+	if osClass == android.Host && ctx.Config().HostStaticBinaries() {
 		productExtraLdflags += "-static"
 	}
 

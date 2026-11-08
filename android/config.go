@@ -402,10 +402,12 @@ type config struct {
 	AndroidFirstDeviceTarget Target // the first Target for modules for the Android device
 	AndroidLFITarget         Target
 
-	// vendorTargets are the Android targets of the vendor-side images, or nil where these compile
-	// for Targets[Android] as well. A dependency asking for a variation of the other set gets the
-	// target of the same arch, see archVariationForImage.
-	vendorTargets []Target
+	// deviceSideTargets are the Android targets of the device-side images, for the device's CPU, or
+	// nil where these are the same as Targets[Android], the targets of the system-side images.
+	deviceSideTargets []Target
+	// archVariationsBySide maps each image side and requested arch variation to the variation used
+	// on that side, see translateArchVariationToSide. It is nil with nil deviceSideTargets.
+	archVariationsBySide map[ImageSide]map[string]string
 
 	// Flags for Partial Compile, derived from SOONG_PARTIAL_COMPILE.
 	partialCompileFlags partialCompileFlags
@@ -861,7 +863,7 @@ func initConfig(cmdArgs CmdArgs, availableEnv map[string]string) (*config, error
 
 	// Sets up the map of target OSes to the finer grained compilation targets
 	// that are configured from the product variables.
-	targets, err := decodeTargetProductVariables(newConfig)
+	targets, deviceSideTargets, err := decodeTargetProductVariables(newConfig)
 	if err != nil {
 		return &config{}, err
 	}
@@ -888,12 +890,9 @@ func initConfig(cmdArgs CmdArgs, availableEnv map[string]string) (*config, error
 		}
 		targets[Android] = androidTargets
 	} else {
-		// Only the product's own targets have a vendor CPU. Builds for the fixed ABI lists above
+		// Only the product's own targets have a device side. Builds for the fixed ABI lists above
 		// compile every image for those.
-		newConfig.vendorTargets, err = decodeVendorTargets(newConfig.productVariables)
-		if err != nil {
-			return &config{}, err
-		}
+		newConfig.deviceSideTargets = deviceSideTargets
 	}
 
 	multilib := make(map[string]bool)
@@ -915,8 +914,13 @@ func initConfig(cmdArgs CmdArgs, availableEnv map[string]string) (*config, error
 	if len(newConfig.Targets[Android]) > 0 {
 		newConfig.AndroidCommonTarget = getCommonTargets(newConfig.Targets[Android])[0]
 		newConfig.AndroidFirstDeviceTarget = FirstTarget(newConfig.Targets[Android], "lib64", "lib32")[0]
-		newConfig.AndroidLFITarget = newConfig.AndroidFirstDeviceTarget
-		newConfig.AndroidLFITarget.LFI = true
+		newConfig.AndroidLFITarget = findLFITarget(newConfig.Targets[Android])
+	}
+
+	newConfig.archVariationsBySide, err = mapArchVariationsToSides(newConfig.Targets[Android],
+		newConfig.deviceSideTargets)
+	if err != nil {
+		return &config{}, err
 	}
 
 	setBuildMode := func(arg string, mode SoongBuildMode) {

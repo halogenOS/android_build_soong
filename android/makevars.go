@@ -38,6 +38,8 @@ func init() {
 func androidMakeVarsProvider(ctx MakeVarsContext) {
 	ctx.Strict("MIN_SUPPORTED_SDK_VERSION", ctx.Config().MinSupportedSdkVersion().String())
 	ctx.Strict("BUILD_UUID_FILE", ctx.Config().BuildUUIDFile(ctx).String())
+	// Android.mk modules of these images compile with the DEVICE_SIDE_ flags of cc.
+	ctx.Strict("SOONG_DEVICE_SIDE_IMAGE_VARIATIONS", strings.Join(deviceSideImageVariations, " "))
 }
 
 // /////////////////////////////////////////////////////////////////////////////

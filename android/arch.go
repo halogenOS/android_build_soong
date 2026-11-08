@@ -744,7 +744,7 @@ func (a *archTransitionMutator) split(ctx BaseModuleContext) ([]string, *allArch
 	}
 
 	image := base.commonProperties.ImageVariation
-	osTargets := ctx.Config().TargetsForImage(os, image)
+	osTargets := ctx.Config().FindTargetsForSide(os, FindImageSide(image))
 
 	// Filter NativeBridge targets unless they are explicitly supported.
 	// Skip creating native bridge variants for non-core modules.
@@ -785,7 +785,7 @@ func (a *archTransitionMutator) split(ctx BaseModuleContext) ([]string, *allArch
 	}
 
 	if os == Android && base.IsLFISupported() {
-		targets = append([]Target{ctx.Config().AndroidLFITarget}, targets...)
+		targets = append([]Target{findLFITarget(osTargets)}, targets...)
 	}
 
 	// If the module is using extraMultilib, decode the extraMultilib selection into
@@ -894,11 +894,12 @@ func (a *archTransitionMutator) IncomingTransition(ctx IncomingTransitionContext
 		}
 	}
 
-	// A dependency from an image that compiles for the other target set asks for its own target.
-	// The module's own targets are not known yet while the variations propagate, so the mapping
-	// reads only the target sets of the config.
+	// A dependency from the other image side requests a target of that side. The module's own
+	// targets are not known yet while the variations propagate, so the translation reads only the
+	// target sets of the config.
 	if os == Android {
-		return ctx.Config().archVariationForImage(base.commonProperties.ImageVariation, incomingVariation)
+		side := FindImageSide(base.commonProperties.ImageVariation)
+		return ctx.Config().translateArchVariationToSide(side, incomingVariation)
 	}
 
 	return incomingVariation
@@ -1756,8 +1757,9 @@ func determineBuildOS(config *config) {
 
 }
 
-// Convert the arch product variables into a list of targets for each OsType.
-func decodeTargetProductVariables(config *config) (map[OsType][]Target, error) {
+// Convert the arch product variables into a list of targets for each OsType, and into the targets
+// of the device-side images, or nil where these equal the Android targets.
+func decodeTargetProductVariables(config *config) (map[OsType][]Target, []Target, error) {
 	variables := config.productVariables
 
 	targets := make(map[OsType][]Target)
@@ -1774,15 +1776,10 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, error) {
 		nativeBridgeRelativePath *string
 	}
 
-	addTarget := func(target targetConfig) {
-		if targetErr != nil {
-			return
-		}
-
+	decodeTarget := func(target targetConfig) (Target, error) {
 		arch, err := decodeArch(target.os, target.archName, target.archVariant, target.cpuVariant, target.abi)
 		if err != nil {
-			targetErr = err
-			return
+			return Target{}, err
 		}
 		nativeBridgeRelativePathStr := String(target.nativeBridgeRelativePath)
 		nativeBridgeHostArchNameStr := String(target.nativeBridgeHostArchName)
@@ -1822,19 +1819,55 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, error) {
 			}
 		}
 
-		targets[target.os] = append(targets[target.os],
-			Target{
-				Os:                       target.os,
-				Arch:                     arch,
-				NativeBridge:             target.nativeBridgeEnabled,
-				NativeBridgeHostArchName: nativeBridgeHostArchNameStr,
-				NativeBridgeRelativePath: nativeBridgeRelativePathStr,
-				HostCross:                hostCross,
-			})
+		return Target{
+			Os:                       target.os,
+			Arch:                     arch,
+			NativeBridge:             target.nativeBridgeEnabled,
+			NativeBridgeHostArchName: nativeBridgeHostArchNameStr,
+			NativeBridgeRelativePath: nativeBridgeRelativePathStr,
+			HostCross:                hostCross,
+		}, nil
 	}
 
+	addTarget := func(target targetConfig) {
+		if targetErr != nil {
+			return
+		}
+		decoded, err := decodeTarget(target)
+		if err != nil {
+			targetErr = err
+			return
+		}
+		targets[target.os] = append(targets[target.os], decoded)
+	}
+
+	// deviceTargetConfigs lists the primary and the optional secondary device target for the CPU.
+	deviceTargetConfigs := func(cpu archAndCpuVariants) []targetConfig {
+		configs := []targetConfig{{
+			os:                  Android,
+			archName:            *variables.DeviceArch,
+			archVariant:         cpu.archVariant,
+			cpuVariant:          cpu.cpuVariant,
+			abi:                 variables.DeviceAbi,
+			nativeBridgeEnabled: NativeBridgeDisabled,
+		}}
+		if variables.DeviceSecondaryArch != nil && *variables.DeviceSecondaryArch != "" {
+			configs = append(configs, targetConfig{
+				os:                  Android,
+				archName:            *variables.DeviceSecondaryArch,
+				archVariant:         cpu.secondaryArchVariant,
+				cpuVariant:          cpu.secondaryCpuVariant,
+				abi:                 variables.DeviceSecondaryAbi,
+				nativeBridgeEnabled: NativeBridgeDisabled,
+			})
+		}
+		return configs
+	}
+
+	var deviceSideTargets []Target
+
 	if variables.HostArch == nil {
-		return nil, fmt.Errorf("No host primary architecture set")
+		return nil, nil, fmt.Errorf("No host primary architecture set")
 	}
 
 	// The primary host target, which must always exist.
@@ -1849,11 +1882,11 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, error) {
 	if String(variables.CrossHost) != "" {
 		crossHostOs := osByName(*variables.CrossHost)
 		if crossHostOs == NoOsType {
-			return nil, fmt.Errorf("Unknown cross host OS %q", *variables.CrossHost)
+			return nil, nil, fmt.Errorf("Unknown cross host OS %q", *variables.CrossHost)
 		}
 
 		if String(variables.CrossHostArch) == "" {
-			return nil, fmt.Errorf("No cross-host primary architecture set")
+			return nil, nil, fmt.Errorf("No cross-host primary architecture set")
 		}
 
 		// The primary cross-compiled host target.
@@ -1867,26 +1900,22 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, error) {
 
 	// Optional device targets
 	if variables.DeviceArch != nil && *variables.DeviceArch != "" {
-		// The primary device target.
-		addTarget(targetConfig{
-			os:                  Android,
-			archName:            *variables.DeviceArch,
-			archVariant:         variables.DeviceArchVariant,
-			cpuVariant:          variables.DeviceCpuVariant,
-			abi:                 variables.DeviceAbi,
-			nativeBridgeEnabled: NativeBridgeDisabled,
-		})
+		// The primary and the optional secondary device target of the system side.
+		for _, target := range deviceTargetConfigs(systemCpuVariants(variables)) {
+			addTarget(target)
+		}
 
-		// An optional secondary device target.
-		if variables.DeviceSecondaryArch != nil && *variables.DeviceSecondaryArch != "" {
-			addTarget(targetConfig{
-				os:                  Android,
-				archName:            *variables.DeviceSecondaryArch,
-				archVariant:         variables.DeviceSecondaryArchVariant,
-				cpuVariant:          variables.DeviceSecondaryCpuVariant,
-				abi:                 variables.DeviceSecondaryAbi,
-				nativeBridgeEnabled: NativeBridgeDisabled,
-			})
+		// The same targets for the device's CPU, which the device-side images compile for.
+		for _, target := range deviceTargetConfigs(deviceCpuVariants(variables)) {
+			decoded, err := decodeTarget(target)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not decode the device-side target of %s: %w",
+					target.archName, err)
+			}
+			deviceSideTargets = append(deviceSideTargets, decoded)
+		}
+		if slices.EqualFunc(deviceSideTargets, targets[Android], hasSameArchVariation) {
+			deviceSideTargets = nil
 		}
 
 		// An optional NativeBridge device target.
@@ -1920,10 +1949,10 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, error) {
 	}
 
 	if targetErr != nil {
-		return nil, targetErr
+		return nil, nil, targetErr
 	}
 
-	return targets, nil
+	return targets, deviceSideTargets, nil
 }
 
 // hasArmAbi returns true if arch has at least one arm ABI
