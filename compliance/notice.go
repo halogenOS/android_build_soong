@@ -45,8 +45,7 @@ var (
 
 	// Command to generate NOTICE.xml.gz for a partition
 	genNoticeXmlRule = pctx.AndroidStaticRule("genNoticeXmlRule", blueprint.RuleParams{
-		Command: "rm -rf $out && " +
-			"${genNoticeXml} --output_file ${out} --metadata ${in} --partition ${partition} --product_out ${productOut} --soong_out ${soongOut}",
+		Command:         "${genNoticeXml} --output_file ${out} --metadata ${in} --partition ${partition} --product_out ${productOut} --soong_out ${soongOut}",
 		CommandDeps:     []string{"${genNoticeXml}"},
 		SandboxDisabled: true,
 	}, "partition", "productOut", "soongOut")
