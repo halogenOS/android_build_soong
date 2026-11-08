@@ -658,7 +658,7 @@ func (o *osTransitionMutator) Mutate(ctx BottomUpMutatorContext, variation strin
 		// the list) to the OS type specific variants.
 		osList := allOsInfo.Variations[:len(allOsInfo.Variations)-1]
 		for _, os := range osList {
-			variation := []blueprint.Variation{{"os", os}}
+			variation := []blueprint.Variation{{Mutator: "os", Variation: os}}
 			ctx.AddVariationDependencies(variation, commonOsToOsSpecificVariantTag, ctx.ModuleName())
 		}
 	}
@@ -956,7 +956,7 @@ func (a *archTransitionMutator) Mutate(ctx BottomUpMutatorContext, variation str
 		hasSecondaryConfigured := len(ctx.Config().Targets[Darwin]) > 1
 		if isUniversalBinary && isPrimary && hasSecondaryConfigured {
 			secondaryArch := ctx.Config().Targets[Darwin][1].Arch.String()
-			variation := []blueprint.Variation{{"arch", secondaryArch}}
+			variation := []blueprint.Variation{{Mutator: "arch", Variation: secondaryArch}}
 			ctx.AddVariationDependencies(variation, DarwinUniversalVariantTag, ctx.ModuleName())
 		}
 	}
