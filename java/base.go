@@ -1408,7 +1408,7 @@ func (j *Module) compile(ctx android.ModuleContext) *JavaInfo {
 		localHeaderJars, _, preJarjarHeaderJarFile := j.compileJavaHeader(ctx, uniqueJavaFiles, srcJars, deps, flags, jarName,
 			j.extraCombinedJars, manifest)
 
-		combinedHeaderJarFile, jarjared := j.jarjarIfNecessary(ctx, preJarjarHeaderJarFile, jarName, "turbine", false)
+		combinedHeaderJarFile, jarjared := j.jarjarHeaderIfNecessary(ctx, preJarjarHeaderJarFile, jarName, deps)
 		combinedHeaderJarFile, _ = j.repackageFlagsIfNecessary(ctx, combinedHeaderJarFile, jarName, "repackage-turbine")
 		if jarjared {
 			localHeaderJars = android.Paths{combinedHeaderJarFile}
@@ -1451,6 +1451,7 @@ func (j *Module) compile(ctx android.ModuleContext) *JavaInfo {
 		return &JavaInfo{
 			HeaderJars:                          android.PathsIfNonNil(j.headerJarFile),
 			LocalHeaderJarsPreJarjar:            android.PathsIfNonNil(preJarjarHeaderJarFile),
+			HeaderJarsJarjarRules:               j.headerJarsJarjarRules(deps),
 			LocalHeaderJars:                     localHeaderJars,
 			TransitiveStaticLibsHeaderJars:      depset.New(depset.PREORDER, localHeaderJars, transitiveStaticLibsHeaderJars),
 			TransitiveLibsHeaderJarsForR8:       j.transitiveLibsHeaderJarsForR8,
@@ -1706,7 +1707,7 @@ func (j *Module) compile(ctx android.ModuleContext) *JavaInfo {
 		localHeaderJars, shardingHeaderJars, combinedHeaderJarFile = j.compileJavaHeader(ctx, uniqueJavaFiles, srcJarsForTurbine, deps, flags, jarName, extraJars, manifest)
 
 		var jarjared bool
-		j.headerJarFile, jarjared = j.jarjarIfNecessary(ctx, combinedHeaderJarFile, jarName, "turbine", false)
+		j.headerJarFile, jarjared = j.jarjarHeaderIfNecessary(ctx, combinedHeaderJarFile, jarName, deps)
 		if jarjared {
 			// jarjar modifies transitive static dependencies, use the combined header jar and drop the transitive
 			// static libs header jars.
@@ -2271,6 +2272,7 @@ func (j *Module) compile(ctx android.ModuleContext) *JavaInfo {
 		HeaderJars:               android.PathsIfNonNil(j.headerJarFile),
 		LocalHeaderJarsPreJarjar: android.PathsIfNonNil(combinedHeaderJarFile),
 		RepackagedHeaderJars:     android.PathsIfNonNil(repackagedHeaderJarFile),
+		HeaderJarsJarjarRules:    j.headerJarsJarjarRules(deps),
 
 		LocalHeaderJars:                        localHeaderJars,
 		KotlinHeaderJars:                       kotlinHeaderJars,
@@ -2944,6 +2946,7 @@ func (j *Module) collectDeps(ctx android.ModuleContext) deps {
 				} else {
 					deps.headerJarOverride = android.OptionalPathForPath(dep.HeaderJars[0])
 					deps.headerJarOverridePreJarjar = android.OptionalPathForPath(dep.LocalHeaderJarsPreJarjar[0])
+					deps.headerJarOverrideJarjarRules = dep.HeaderJarsJarjarRules
 					if enableStrictDeps {
 						deps.directClasspath = append(deps.directClasspath, dep.LocalHeaderJars...)
 					}
@@ -3438,6 +3441,24 @@ func (j *Module) repackageFlagsIfNecessary(ctx android.ModuleContext, infile and
 	repackagedJarjarFile := android.PathForModuleOut(ctx, "repackaged-jarjar", info, jarName)
 	TransformJarJar(ctx, repackagedJarjarFile, infile, j.repackageJarjarRules)
 	return repackagedJarjarFile, true
+}
+
+// Apply the jarjar rules of this module to its combined header jar. A header jar override that
+// went through the same jarjar rules file already contains the renames.
+func (j *Module) jarjarHeaderIfNecessary(ctx android.ModuleContext, combinedHeaderJar android.Path, jarName string, deps deps) (android.Path, bool) {
+	if j.expandJarjarRules != nil && deps.headerJarOverrideJarjarRules.String() == j.expandJarjarRules.String() {
+		return combinedHeaderJar, true
+	}
+	return j.jarjarIfNecessary(ctx, combinedHeaderJar, jarName, "turbine", false)
+}
+
+// The jarjar rules file whose renames the exported header jars contain. With a header jar
+// override, they are the header jars of the override module.
+func (j *Module) headerJarsJarjarRules(deps deps) android.OptionalPath {
+	if deps.headerJarOverride.Valid() {
+		return deps.headerJarOverrideJarjarRules
+	}
+	return android.OptionalPathForPath(j.expandJarjarRules)
 }
 
 func (j *Module) jarjarIfNecessary(ctx android.ModuleContext, infile android.Path, jarName, info string, useShards bool) (android.Path, bool) {

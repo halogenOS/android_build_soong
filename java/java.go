@@ -310,6 +310,10 @@ type JavaInfo struct {
 	// The only place this is needed is when `header_jar_override` on another module references this module.
 	LocalHeaderJarsPreJarjar android.Paths
 
+	// The jarjar rules file whose renames the classes of HeaderJars contain. It is not valid when
+	// they went through no jarjar rules.
+	HeaderJarsJarjarRules android.OptionalPath
+
 	// set of header jars for all transitive libs deps
 	TransitiveLibsHeaderJarsForR8 depset.DepSet[android.Path]
 
@@ -826,8 +830,9 @@ type deps struct {
 	kotlinPlugins           android.Paths
 	aconfigCacheFiles       aconfigCacheFileSets
 
-	headerJarOverride          android.OptionalPath
-	headerJarOverridePreJarjar android.OptionalPath
+	headerJarOverride            android.OptionalPath
+	headerJarOverridePreJarjar   android.OptionalPath
+	headerJarOverrideJarjarRules android.OptionalPath
 
 	javaStrictDepsPluginJars   android.Paths
 	kotlinStrictDepsPluginJars android.Paths
