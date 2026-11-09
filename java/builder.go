@@ -34,14 +34,15 @@ import (
 var (
 	pctx = android.NewPackageContext("android/soong/java")
 
-	mergeZips       = android.MergeZips
-	zipSync         = android.ZipSync
-	rm              = android.Rm
-	mkdir           = android.Mkdir
-	touch           = android.Touch
-	splitZips       = pctx.HostTool("split_zips")
-	extractApks     = pctx.HostTool("extract_apks")
-	packageCheckCmd = pctx.HostTool("package_check")
+	mergeZips        = android.MergeZips
+	zipSync          = android.ZipSync
+	rm               = android.Rm
+	mkdir            = android.Mkdir
+	touch            = android.Touch
+	splitZips        = pctx.HostTool("split_zips")
+	extractApks      = pctx.HostTool("extract_apks")
+	packageCheckCmd  = pctx.HostTool("package_check")
+	renameClassesCmd = pctx.HostTool("rename_classes")
 
 	// Splits jars into a number of jars, with equal files in each output jar.
 	splitSrcJars = pctx.AndroidStaticRule("javac-split-srcJars",
@@ -360,14 +361,24 @@ var (
 				// leading to stale or missing files later in the build.  Remove the output file
 				// before running jarjar.
 				"rm -f ${out} && " +
-				"${config.JavaCmd} ${config.JavaVmFlags}" +
-				// b/146418363 Enable Android specific jarjar transformer to drop compat annotations
-				// for newly repackaged classes. Dropping @UnsupportedAppUsage on repackaged classes
-				// avoids adding new hiddenapis after jarjar'ing.
-				" -DremoveAndroidCompatAnnotations=true" +
-				" -jar ${config.JarjarCmd} process $rulesFile $in $out $total_shards $shard_index && " +
-				// Turn a missing output file into a ninja error
-				`[ -e ${out} ] || (echo "Missing output file"; exit 1)`,
+				jarjarCommand + " && " +
+				jarjarOutputCheck,
+			CommandDeps:     []string{"${config.JavaCmd}", "${config.JarjarCmd}", "$rulesFile"},
+			SandboxDisabled: true,
+		},
+		"rulesFile", "total_shards", "shard_index")
+
+	// Applies a rules file with rename_classes, and with jarjar when rename_classes exits with
+	// status 3 for a rule of the file that is not an exact class rename. Status 3 is
+	// Status::NeedsJarjar in rename_classes/main.rs.
+	renameClassesOrJarjar = pctx.AndroidStaticRule("renameClassesOrJarjar",
+		blueprint.RuleParams{
+			Command2: blueprint.NewCommand(
+				rm, " -f ${out} && { ",
+				renameClassesCmd, " ", renameClassesRemoveCompatAnnotations, " $in $out $rulesFile",
+				" || { [ $$? -eq 3 ] && ", jarjarCommand, "; }; } && ",
+				jarjarOutputCheck,
+			),
 			CommandDeps:     []string{"${config.JavaCmd}", "${config.JarjarCmd}", "$rulesFile"},
 			SandboxDisabled: true,
 		},
@@ -1153,6 +1164,20 @@ func convertImplementationJarToHeaderJar(ctx android.ModuleContext, implementati
 	})
 }
 
+const (
+	// b/146418363 Enable Android specific jarjar transformer to drop compat annotations
+	// for newly repackaged classes. Dropping @UnsupportedAppUsage on repackaged classes
+	// avoids adding new hiddenapis after jarjar'ing. rename_classes drops them by its own flag.
+	jarjarRemoveCompatAnnotations        = "-DremoveAndroidCompatAnnotations=true"
+	renameClassesRemoveCompatAnnotations = "--remove-android-compat-annotations"
+
+	jarjarCommand = "${config.JavaCmd} ${config.JavaVmFlags} " + jarjarRemoveCompatAnnotations +
+		" -jar ${config.JarjarCmd} process $rulesFile $in $out $total_shards $shard_index"
+
+	// Turn a missing output file into a ninja error
+	jarjarOutputCheck = `[ -e ${out} ] || (echo "Missing output file"; exit 1)`
+)
+
 func TransformJarJar(ctx android.ModuleContext, outputFile android.WritablePath,
 	classesJar android.Path, rulesFile android.Path) {
 	TransformJarJarWithShards(ctx, outputFile, classesJar, rulesFile, 1)
@@ -1161,11 +1186,11 @@ func TransformJarJar(ctx android.ModuleContext, outputFile android.WritablePath,
 func TransformJarJarWithShards(ctx android.ModuleContext, outputFile android.WritablePath,
 	classesJar android.Path, rulesFile android.Path, totalShards int) {
 
-	// If the total number of shards is 1, just run jarjar as-is, with `total_shards` = 1
-	// and `shard_index` == 0, which effectively disables sharding
+	// If the total number of shards is 1, rename with rename_classes, or with jarjar as-is, with
+	// `total_shards` = 1 and `shard_index` == 0, which effectively disables sharding
 	if totalShards == 1 {
 		ctx.Build(pctx, android.BuildParams{
-			Rule:        jarjar,
+			Rule:        renameClassesOrJarjar,
 			Description: "jarjar",
 			Output:      outputFile,
 			Input:       classesJar,
