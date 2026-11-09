@@ -1,0 +1,19 @@
+// SPDX-FileCopyrightText: The halogenOS Project
+// SPDX-License-Identifier: Apache-2.0
+
+package {
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+rust_binary_host {
+    name: "rename_classes",
+    crate_name: "rename_classes",
+    srcs: ["main.rs"],
+    edition: "2021",
+    rustlibs: [
+        "libcesu8",
+        "libclap",
+        "libtempfile",
+        "libzip",
+    ],
+}
