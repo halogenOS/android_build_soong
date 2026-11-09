@@ -17,25 +17,42 @@ def __copy_file(ctx, cmd):
     ctx.actions.copy(src = cmd.inputs[0], dst = cmd.outputs[0])
     ctx.actions.exit(exit_status = 0)
 
-# The metadata key of the install commands, set by the step config and read by the handler.
-__INSTALL_COMMANDS = "install_commands"
+# The metadata key of the install scripts, set by the step config and read by the handler.
+__INSTALL_SCRIPTS = "install_scripts"
 
-# Returns the scripts that the Kati install steps run with `bash -c`, built from
-# install_commands, the commands of the install rules that Soong writes to
-# install_commands.json (installCommands in android/makevars.go). {out} stands for the
-# installed file and {src} for the file it is copied from, or the target of the symlink.
-# Kati joins the commands of a rule with " && " and wraps each in "(" and " )" when there
-# are several.
-def __install_scripts(install_commands):
-    commands = json.decode(install_commands)
-    return struct(
-        copy = struct(script = commands["copy"], is_executable = False),
-        copy_executable = struct(
-            script = "(%s ) && (%s )" % (commands["copy"], commands["make_executable"]),
-            is_executable = True,
-        ),
-        symlink = commands["symlink"],
-    )
+# Returns the script that Kati writes for a rule with commands: it joins the commands with
+# " && " and wraps each in "(" and " )" when there are several.
+def __kati_script(commands):
+    if len(commands) == 1:
+        return commands[0]
+    return " && ".join(["(%s )" % command for command in commands])
+
+# Returns the install scripts of text, the contents of install_commands.json, which contains
+# the commands of the install rules written by Soong (installCommands in android/makevars.go).
+def __soong_install_scripts(text):
+    commands = json.decode(text)
+    return [
+        struct(script = commands["copy"], action = "copy"),
+        struct(script = __kati_script([commands["copy"], commands["make_executable"]]), action = "copy_executable"),
+        struct(script = commands["symlink"], action = "symlink"),
+    ]
+
+# Returns the install scripts of text, the contents of make_install_commands.txt, which
+# contains the recipe lines of copy-file-or-link-to-new-target in build/make, one per line.
+# A file cut short by an interrupted write of Kati lacks a placeholder and gives no script.
+def __make_install_scripts(text):
+    script = __kati_script(text.splitlines())
+    if "{out}" not in script or "{src}" not in script:
+        return []
+    return [struct(script = script, action = "copy_regular_file")]
+
+# The files with the commands of the install steps, below the out directory, and the readers
+# of their contents. Soong and Kati write them, so they do not exist yet while siso builds
+# Soong.
+__INSTALL_COMMAND_FILES = [
+    (path.join("soong", "install_commands.json"), __soong_install_scripts),
+    ("make_install_commands.txt", __make_install_scripts),
+]
 
 # The characters that bash passes on unchanged in a word without quotes.
 __LITERAL_PATH_CHARS = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789/._+-,=@%:"
@@ -47,47 +64,65 @@ def __is_literal_path(word):
 
 # Returns the {src} of script when the step runs `bash -c` with exactly script, filled in
 # for its only output, and bash passes both paths on unchanged. Returns None otherwise.
+# {out} stands for the installed file and {src} for the file it is copied from, or the
+# target of the symlink. Either may stand in several places of script.
 def __install_source(cmd, script):
     if len(cmd.outputs) != 1 or len(cmd.args) != 3 or cmd.args[1] != "-c":
         return None
     out = cmd.outputs[0]
     if not __is_literal_path(out):
         return None
-    head, tail = script.replace("{out}", out).split("{src}")
+    parts = script.replace("{out}", out).split("{src}")
     command = cmd.args[2]
-    src = command.removeprefix(head).removesuffix(tail)
-    if command != head + src + tail or not __is_literal_path(src):
+    if not command.startswith(parts[0]):
+        return None
+    rest = command[len(parts[0]):]
+    src = rest[:len(rest) - len(rest.lstrip(__LITERAL_PATH_CHARS))]
+    if command != src.join(parts) or not __is_literal_path(src):
         return None
     return src
 
-# Copies the file of an install step that runs the script of install, and returns whether
-# it did. The source must be an input of the step, so that siso has it ready. An executable
-# copy of a symlink runs its command, as chmod +x changes the target of the copied symlink.
-def __copy_installed_file(ctx, cmd, install):
-    src = __install_source(cmd, install.script)
-    if src == None or src not in cmd.inputs:
+# Each install action does what the script of a step does with src, and returns whether it
+# did. A copied source must be an input of the step, so that siso has it ready.
+def __copy(ctx, cmd, src):
+    if src not in cmd.inputs:
         return False
-    if install.is_executable and ctx.fs.is_symlink(src):
-        return False
-    ctx.actions.copy(src = src, dst = cmd.outputs[0], is_executable = install.is_executable)
+    ctx.actions.copy(src = src, dst = cmd.outputs[0])
     return True
 
-# Makes the symlink of an install step that runs script, and returns whether it did.
-def __link_installed_symlink(ctx, cmd, script):
-    target = __install_source(cmd, script)
-    if target == None:
+# chmod +x on a copied symlink changes its target, so a symlink source runs the command.
+def __copy_executable(ctx, cmd, src):
+    if src not in cmd.inputs or ctx.fs.is_symlink(src):
         return False
+    ctx.actions.copy(src = src, dst = cmd.outputs[0], is_executable = True)
+    return True
+
+# Make links the installed file to the absolute path of a symlink target, so a symlink source
+# runs the command.
+def __copy_regular_file(ctx, cmd, src):
+    if ctx.fs.is_symlink(src):
+        return False
+    return __copy(ctx, cmd, src)
+
+def __link(ctx, cmd, target):
     ctx.actions.symlink(target = target, linkpath = cmd.outputs[0])
     return True
 
-# Copies the file, or makes the symlink, of an install step whose command runs one of the
+__INSTALL_ACTIONS = {
+    "copy": __copy,
+    "copy_executable": __copy_executable,
+    "copy_regular_file": __copy_regular_file,
+    "symlink": __link,
+}
+
+# Does what the script of an install step does when the command of the step runs one of the
 # install scripts. A step whose command runs none of them runs its command.
 def __install(ctx, cmd):
-    scripts = __install_scripts(ctx.metadata[__INSTALL_COMMANDS])
-    if (__copy_installed_file(ctx, cmd, scripts.copy) or
-        __copy_installed_file(ctx, cmd, scripts.copy_executable) or
-        __link_installed_symlink(ctx, cmd, scripts.symlink)):
-        ctx.actions.exit(exit_status = 0)
+    for install in [struct(**entry) for entry in json.decode(ctx.metadata[__INSTALL_SCRIPTS])]:
+        src = __install_source(cmd, install.script)
+        if src != None and __INSTALL_ACTIONS[install.action](ctx, cmd, src):
+            ctx.actions.exit(exit_status = 0)
+            return
 
 __handlers = {
     "copy_file": __copy_file,
@@ -99,8 +134,8 @@ __handlers = {
 # with argv[0] shortened to its base name, `bash` for the `/bin/bash` that Kati runs.
 def __install_rules(scripts):
     prefixes = {}
-    for script in [scripts.copy.script, scripts.copy_executable.script, scripts.symlink]:
-        prefixes["bash -c \"" + script[:script.index("{")]] = None
+    for install in scripts:
+        prefixes["bash -c \"" + install.script[:install.script.index("{")]] = None
     return [
         {
             "name": "kati.install.%d" % i,
@@ -117,12 +152,13 @@ def __step_config(ctx, vars, step_config):
         "handler": "copy_file",
     })
 
-    # Soong writes the file, so it does not exist yet while siso builds Soong.
-    install_commands_file = path.join(vars.OUT_DIR, "soong", "install_commands.json")
-    if ctx.fs.exists(install_commands_file):
-        install_commands = str(ctx.fs.read(install_commands_file))
-        ctx.actions.metadata(__INSTALL_COMMANDS, install_commands)
-        step_config["rules"].extend(__install_rules(__install_scripts(install_commands)))
+    scripts = []
+    for name, read_install_scripts in __INSTALL_COMMAND_FILES:
+        file = path.join(vars.OUT_DIR, name)
+        if ctx.fs.exists(file):
+            scripts.extend(read_install_scripts(str(ctx.fs.read(file))))
+    ctx.actions.metadata(__INSTALL_SCRIPTS, json.encode(scripts))
+    step_config["rules"].extend(__install_rules(scripts))
     return step_config
 
 copy = module(
