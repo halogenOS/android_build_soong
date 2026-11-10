@@ -713,6 +713,11 @@ func runSoong(ctx Context, config Config, finderRun *SourceFinderRun, enforceNoS
 					sisoExperiments = append(sisoExperiments, exps)
 				}
 				ninjaEnv.Set("SISO_EXPERIMENTS", strings.Join(sisoExperiments, ","))
+				for _, name := range sisoSessionBusVariables {
+					if value, ok := config.Environment().Get(name); ok {
+						ninjaEnv.Set(name, value)
+					}
+				}
 
 				if config.IsVerbose() {
 					// Output `siso version`.

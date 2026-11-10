@@ -18,6 +18,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -358,11 +359,7 @@ func runNinja(ctx Context, config Config, ninjaArgs []string) {
 			"SISO_PROJECT",
 			"SISO_CREDENTIAL_HELPER",
 			"SISO_LIMITS",
-			// Siso reaches the systemd manager of the session through these to run
-			// each local step in a cgroup of its own.
-			"DBUS_SESSION_BUS_ADDRESS",
-			"XDG_RUNTIME_DIR",
-		}, config.BuildBrokenNinjaUsesEnvVars()...)...)
+		}, slices.Concat(sisoSessionBusVariables, config.BuildBrokenNinjaUsesEnvVars())...)...)
 	}
 
 	cmd.Environment.Set("DIST_DIR", config.DistDir())
@@ -471,6 +468,10 @@ func (c *ninjaStucknessChecker) check(ctx Context, config Config) {
 	}
 	c.prevModTime = newModTime
 }
+
+// sisoSessionBusVariables contains the variables that siso uses to ask the
+// systemd user manager for a cgroup of its own for each local step.
+var sisoSessionBusVariables = []string{"DBUS_SESSION_BUS_ADDRESS", "XDG_RUNTIME_DIR"}
 
 // sisoLocalJobsArgs returns the siso arguments for the number of local jobs.
 // Only a number given with -j is passed. Without one, siso sizes its local
