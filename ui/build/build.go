@@ -22,6 +22,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sync"
 	"text/template"
 
@@ -548,6 +549,10 @@ func evaluateWhatToRun(config Config, verboseln func(v ...interface{})) int {
 
 var distWaitGroup sync.WaitGroup
 
+// distGzipSlots bounds the compressed dist copies that run at once to the CPUs that compress them,
+// as each copy has two files open and a compressor in memory.
+var distGzipSlots = make(chan struct{}, runtime.NumCPU())
+
 // waitForDist waits for all backgrounded distGzipFile and distFile writes to finish
 func waitForDist(ctx Context) {
 	e := ctx.BeginTrace("soong_ui", "dist")
@@ -573,6 +578,8 @@ func distGzipFile(ctx Context, config Config, src string, subDirs ...string) {
 	distWaitGroup.Add(1)
 	go func() {
 		defer distWaitGroup.Done()
+		distGzipSlots <- struct{}{}
+		defer func() { <-distGzipSlots }()
 		if err := gzipFileToDir(src, destDir); err != nil {
 			ctx.Printf("failed to dist %s: %s", filepath.Base(src), err.Error())
 		}

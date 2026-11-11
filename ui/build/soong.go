@@ -54,7 +54,7 @@ const (
 	// version of bootstrap and needs cleaning before continuing the build.  Increment this for
 	// incompatible changes, for example when moving the location of a microfactory binary that is
 	// executed during bootstrap before the primary builder has had a chance to update the path.
-	bootstrapEpoch = 1
+	bootstrapEpoch = 2
 )
 
 var (
@@ -258,6 +258,24 @@ func (pb PrimaryBuilderFactory) primaryBuilderInvocation(config Config) bootstra
 	}
 }
 
+// distModuleNinjaFiles copies the module ninja files next to soongNinjaFile into the dist directory.
+// Every module ninja file has the same name, so each copy has its path relative to the soong
+// output directory.
+func distModuleNinjaFiles(ctx Context, config Config, soongNinjaFile string) {
+	files, err := blueprint.ListModuleNinjaFiles(soongNinjaFile)
+	if err != nil {
+		ctx.Printf("failed to list the module ninja files to dist: %s", err)
+	}
+	for _, file := range files {
+		rel, err := filepath.Rel(config.SoongOutDir(), file)
+		if err != nil {
+			ctx.Printf("failed to dist %s: %s", file, err)
+			continue
+		}
+		distGzipFile(ctx, config, file, "soong_ui/soong", filepath.Dir(rel))
+	}
+}
+
 // bootstrapEpochCleanup deletes files used by bootstrap during incremental builds across
 // incompatible changes.  Incompatible changes are marked by incrementing the bootstrapEpoch
 // constant.  A tree is considered out of date for the current epoch of the
@@ -271,15 +289,13 @@ func bootstrapEpochCleanup(ctx Context, config Config) {
 		// The tree is out of date for the current epoch, delete files used by bootstrap
 		// and force the primary builder to rerun.
 		soongNinjaFile := config.SoongNinjaFile()
-		os.Remove(soongNinjaFile)
-		for _, file := range blueprint.GetNinjaShardFiles(soongNinjaFile) {
-			if ok, _ := fileExists(file); ok {
-				os.Remove(file)
-			}
-		}
-		os.Remove(soongNinjaFile + ".globs")
-		os.Remove(soongNinjaFile + ".globs_time")
-		os.Remove(soongNinjaFile + ".glob_results")
+		removeGlobs(ctx,
+			soongNinjaFile,
+			blueprint.ModuleNinjaDir(soongNinjaFile),
+			filepath.Join(config.SoongOutDir(), "build.*.[0-9].ninja"),
+			soongNinjaFile+".globs",
+			soongNinjaFile+".globs_time",
+			soongNinjaFile+".glob_results")
 
 		// Mark the tree as up to date with the current epoch by writing the epoch marker file.
 		writeEmptyFile(ctx, epochPath)
@@ -802,10 +818,8 @@ func runSoong(ctx Context, config Config, finderRun *SourceFinderRun, enforceNoS
 
 	soongNinjaFile := config.SoongNinjaFile()
 	distGzipFile(ctx, config, soongNinjaFile, "soong_ui/soong")
-	for _, file := range blueprint.GetNinjaShardFiles(soongNinjaFile) {
-		if ok, _ := fileExists(file); ok {
-			distGzipFile(ctx, config, file, "soong_ui/soong")
-		}
+	if config.Dist() {
+		distModuleNinjaFiles(ctx, config, soongNinjaFile)
 	}
 	distFile(ctx, config, config.SoongVarsFile(), "soong_ui/soong")
 	distFile(ctx, config, config.SoongExtraVarsFile(), "soong_ui/soong")

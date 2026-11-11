@@ -257,12 +257,14 @@ func main() {
 
 	c.run(buildCtx, config, args)
 
-	writeBuildDiskUsageMetrics(met, config)
+	if err := writeBuildDiskUsageMetrics(met, config); err != nil {
+		log.Printf("could not measure the disk usage of the ninja files: %s", err)
+	}
 }
 
 // Writes disk usage of Build analysis (e.g. ninja files or incremental analysis cache DB)
 // TODO (b/454665418): Add incremental analysis cache *.db file size
-func writeBuildDiskUsageMetrics(m *metrics.Metrics, config build.Config) {
+func writeBuildDiskUsageMetrics(m *metrics.Metrics, config build.Config) error {
 	// Sum of all ninja files.
 	var ninjaFileSize int64 = 0
 	var ninjaFiles []string
@@ -270,10 +272,14 @@ func writeBuildDiskUsageMetrics(m *metrics.Metrics, config build.Config) {
 	if _, err := os.Stat(soongNinjaFile); err != nil {
 		// Skip if the soong ninja file does not exist.
 		// This would be true in dump var mode.
-		return
+		return nil
 	}
 	ninjaFiles = append(ninjaFiles, soongNinjaFile)
-	ninjaFiles = append(ninjaFiles, blueprint.GetNinjaShardFiles(soongNinjaFile)...)
+	moduleNinjaFiles, err := blueprint.ListModuleNinjaFiles(soongNinjaFile)
+	if err != nil {
+		return fmt.Errorf("could not list the module ninja files: %w", err)
+	}
+	ninjaFiles = append(ninjaFiles, moduleNinjaFiles...)
 	if !config.SkipKatiNinja() && config.HasKatiSuffix() {
 		ninjaFiles = append(ninjaFiles, config.KatiBuildNinjaFile())
 	}
@@ -286,6 +292,7 @@ func writeBuildDiskUsageMetrics(m *metrics.Metrics, config build.Config) {
 		}
 	}
 	m.SetNinjaFileSize(&ninjaFileSize)
+	return nil
 }
 
 // This function must not modify config, since product config may cause us to recreate the config,

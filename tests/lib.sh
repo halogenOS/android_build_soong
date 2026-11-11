@@ -211,9 +211,8 @@ function assert_files_equal {
     exit 1
   fi
 
-  if ! cmp -s "$1" "$2"; then
+  if ! diff -ru "$1" "$2"; then
     echo "Files are different: $1 $2"
-    diff -u "$1" "$2"
     exit 1
   fi
 }
