@@ -643,7 +643,7 @@ func (a *apexBundle) installApexSystemServerFiles(ctx android.ModuleContext) {
 	performInstalls := a.GetOverriddenBy() == "" && !a.testApex && a.installable()
 	// TODO(b/234351700): Remove once ART does not have separated debug APEX, or make the selection
 	// explicit in the ART Android.bp files.
-	if ctx.Config().UseDebugArt() {
+	if ctx.Config().UseDebugArtFor(ctx.Module()) {
 		if ctx.ModuleName() == "com.android.art" {
 			performInstalls = false
 		}

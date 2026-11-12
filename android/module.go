@@ -3177,6 +3177,16 @@ func (e configurationEvalutor) PropertyErrorf(property string, fmt string, args 
 	e.ctx.OtherModulePropertyErrorf(e.m, property, fmt, args...)
 }
 
+// evaluateModuleVariantBool evaluates a product variable whose value depends on the module variant.
+// Whether an arch-specific module variant is a host variant is known only after the arch mutator ran.
+func (e configurationEvalutor) evaluateModuleVariantBool(property, variable string, valueFor func(Module) bool) proptools.ConfigurableValue {
+	if e.m.base().ArchSpecific() && !e.m.base().ArchReady() {
+		e.ctx.OtherModulePropertyErrorf(e.m, property, "A select on product_variable(%q) was attempted before the arch mutator ran", variable)
+		return proptools.ConfigurableValueUndefined()
+	}
+	return proptools.ConfigurableValueBool(valueFor(e.m))
+}
+
 func (e configurationEvalutor) EvaluateConfiguration(condition proptools.ConfigurableCondition, property string) proptools.ConfigurableValue {
 	ctx := e.ctx
 	m := e.m
@@ -3216,12 +3226,12 @@ func (e configurationEvalutor) EvaluateConfiguration(condition proptools.Configu
 		case "build_from_text_stub":
 			return proptools.ConfigurableValueBool(ctx.Config().BuildFromTextStub())
 		case "debuggable":
-			return proptools.ConfigurableValueBool(ctx.Config().Debuggable())
+			return e.evaluateModuleVariantBool(property, variable, ctx.Config().DebuggableFor)
 		case "eng":
-			return proptools.ConfigurableValueBool(ctx.Config().Eng())
+			return e.evaluateModuleVariantBool(property, variable, ctx.Config().EngFor)
 		case "use_debug_art":
 			// TODO(b/234351700): Remove once ART does not have separated debug APEX
-			return proptools.ConfigurableValueBool(ctx.Config().UseDebugArt())
+			return e.evaluateModuleVariantBool(property, variable, ctx.Config().UseDebugArtFor)
 		case "selinux_ignore_neverallows":
 			return proptools.ConfigurableValueBool(ctx.Config().SelinuxIgnoreNeverallows())
 		case "unbundled_build":

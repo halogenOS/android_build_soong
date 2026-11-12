@@ -1671,6 +1671,18 @@ func (c *config) Eng() bool {
 	return Bool(c.productVariables.Eng)
 }
 
+// DebuggableFor returns Debuggable as the module variant sees it: false where the build variant
+// does not apply to the module variant.
+func (c *config) DebuggableFor(module Module) bool {
+	return c.Debuggable() && TargetBuildVariantAppliesTo(module)
+}
+
+// EngFor returns Eng as the module variant sees it: false where the build variant does not apply
+// to the module variant.
+func (c *config) EngFor(module Module) bool {
+	return c.Eng() && TargetBuildVariantAppliesTo(module)
+}
+
 func (c *config) BuildType() string {
 	return String(c.productVariables.BuildType)
 }
@@ -2742,7 +2754,7 @@ func (c *config) OemProperties() []string {
 	return c.productVariables.OemProperties
 }
 
-func (c *config) UseDebugArt() bool {
+func (c *config) UseDebugArtFor(module Module) bool {
 	// If the RELEASE_APEX_CONTRIBUTIONS_ART build flag is set to use a prebuilt ART apex
 	// then don't use the debug apex.
 	if val, ok := c.GetBuildFlag("RELEASE_APEX_CONTRIBUTIONS_ART"); ok && val != "" {
@@ -2757,7 +2769,7 @@ func (c *config) UseDebugArt() bool {
 	}
 
 	// Default to the debug apex for eng builds.
-	return Bool(c.productVariables.Eng)
+	return c.EngFor(module)
 }
 
 func (c *config) SystemPropFiles(ctx PathContext) Paths {

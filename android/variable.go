@@ -107,7 +107,8 @@ type variableProperties struct {
 		// debuggable is true for eng and userdebug builds, and can be used to turn on additional
 		// debugging features that don't significantly impact runtime behavior.  userdebug builds
 		// are used for dogfooding and performance testing, and should be as similar to user builds
-		// as possible.
+		// as possible. Host variants are built the same in every build variant and never see this
+		// block.
 		Debuggable struct {
 			Apk             *string
 			Cflags          []string
@@ -137,7 +138,8 @@ type variableProperties struct {
 		}
 
 		// eng is true for -eng builds, and can be used to turn on additional heavyweight debugging
-		// features.
+		// features. Host variants are built the same in every build variant and never see this
+		// block.
 		Eng struct {
 			Cflags   []string
 			Cppflags []string
@@ -907,6 +909,14 @@ func (this *ProductVariables) GetBuildFlagBool(flag string) bool {
 	return val == "true"
 }
 
+// TargetBuildVariantAppliesTo reports whether the target build variant (user, userdebug or eng)
+// may change how the module variant is built. Host variants are built the same in every build
+// variant, so that switching the build variant does not rebuild the tools that run on the build
+// machine.
+func TargetBuildVariantAppliesTo(module Module) bool {
+	return !module.base().Host()
+}
+
 func VariableMutator(mctx BottomUpMutatorContext) {
 	var module Module
 	var ok bool
@@ -924,11 +934,16 @@ func VariableMutator(mctx BottomUpMutatorContext) {
 	variableValues := reflect.ValueOf(a.variableProperties).Elem().FieldByName("Product_variables")
 
 	productVariables := reflect.ValueOf(&mctx.Config().productVariables).Elem()
+	targetBuildVariantApplies := TargetBuildVariantAppliesTo(module)
 
 	for i := 0; i < variableValues.NumField(); i++ {
 		variableValue := variableValues.Field(i)
 		name := variableValues.Type().Field(i).Name
 		property := "product_variables." + proptools.PropertyNameForField(name)
+
+		if !targetBuildVariantApplies && (name == "Debuggable" || name == "Eng") {
+			continue
+		}
 
 		// Check that the variable was set for the product
 		val := productVariables.FieldByName(name)
