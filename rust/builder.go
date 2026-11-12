@@ -62,10 +62,10 @@ var (
 				"${RustcWrapper}",
 				"${SoongEnvCmd}",
 			},
-			Platform: map[string]string{remoteexec.PoolKey: "${config.RERustPool}"},
+			Platform: map[string]string{remoteexec.PoolKey: "${rePool}"},
 		},
 		[]string{"rustcFlags", "linkerScriptFlags", "earlyLinkFlags", "linkFlags", "libFlags", "crtBegin", "crtEnd", "emitType", "envVars", "soongSrcsFile"},
-		[]string{"rbeRspFile"})
+		[]string{"rbeRspFile", "rePool"})
 
 	_       = pctx.SourcePathVariable("rustdocCmd", "${config.RustBin}/rustdoc")
 	rustdoc = pctx.AndroidStaticRule("rustdoc",
@@ -371,17 +371,29 @@ func rustEnvVars(ctx android.ModuleContext, deps PathDeps, crateName string, car
 	}
 
 	// TODO: Remove, there are existing users.
-	envVars["TARGET_BUILD_VARIANT"] = func() string {
-		if ctx.Config().Eng() {
-			return "eng"
-		} else if ctx.Config().Debuggable() {
-			return "userdebug"
-		} else {
-			return "user"
-		}
-	}()
+	if android.TargetBuildVariantAppliesTo(ctx.Module()) {
+		envVars["TARGET_BUILD_VARIANT"] = targetBuildVariantName(ctx.Config())
+	}
 
 	return envVars
+}
+
+func targetBuildVariantName(config android.Config) string {
+	if config.Eng() {
+		return "eng"
+	} else if config.Debuggable() {
+		return "userdebug"
+	}
+	return "user"
+}
+
+// rustcRemotePool returns the remote execution pool for a rustc command. Eng builds use
+// codegen-units=16, which can take advantage of the larger java16 machines.
+func rustcRemotePool(config android.Config, eng bool) string {
+	if eng {
+		return config.GetenvWithDefault("RBE_RUST_ENG_POOL", "java16")
+	}
+	return config.GetenvWithDefault("RBE_RUST_POOL", "default")
 }
 
 func transformSrctoCrate(ctx android.ModuleContext, main android.Path, deps PathDeps, flags Flags,
@@ -419,12 +431,14 @@ func transformSrctoCrate(ctx android.ModuleContext, main android.Path, deps Path
 	// Suppress an implicit sysroot
 	rustcFlags = append(rustcFlags, "--sysroot=/dev/null")
 
+	eng := ctx.Config().EngFor(ctx.Module())
+
 	// Enable incremental compilation if requested by user
 	if ctx.Config().IsEnvTrue("SOONG_RUSTC_INCREMENTAL") {
 		incrementalPath := android.PathForOutput(ctx, "rustc").String()
 
 		rustcFlags = append(rustcFlags, "-C incremental="+incrementalPath)
-	} else if ctx.Config().Eng() {
+	} else if eng {
 		rustcFlags = append(rustcFlags, "-C codegen-units=16")
 	} else {
 		rustcFlags = append(rustcFlags, "-C codegen-units=1")
@@ -606,6 +620,7 @@ func transformSrctoCrate(ctx android.ModuleContext, main android.Path, deps Path
 		implicits = append(implicits, rbeRustRspFile)
 
 		args["rbeRspFile"] = rbeRustRspFile.String()
+		args["rePool"] = rustcRemotePool(ctx.Config(), eng)
 	}
 
 	ctx.Build(pctx, android.BuildParams{

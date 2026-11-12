@@ -210,19 +210,13 @@ func (singleton *projectGeneratorSingleton) addCrate(ctx android.SingletonContex
 	}
 	singleton.knownCrates[module.Name()] = crateInfo{Idx: idx, Deps: deps, Device: commonInfo.Target.Os.Class == android.Device}
 	if rustInfo.CompilerInfo.BuildTarget != nil {
-		buildVariant := "user"
-		if ctx.Config().Eng() {
-			buildVariant = "eng"
-		} else if ctx.Config().Debuggable() {
-			buildVariant = "userdebug"
-		}
 		mapping := rustTargetMappingJson{
 			Name:               module.Name(),
 			BuildTarget:        rustInfo.CompilerInfo.BuildTarget.String(),
 			CheckTarget:        rustInfo.CompilerInfo.CheckTarget.String(),
 			SourceDir:          ctx.ModuleDir(module),
 			TargetProduct:      ctx.Config().DeviceProduct(),
-			TargetBuildVariant: buildVariant,
+			TargetBuildVariant: targetBuildVariantName(ctx.Config()),
 		}
 		singleton.targetMappings = append(singleton.targetMappings, mapping)
 	}
