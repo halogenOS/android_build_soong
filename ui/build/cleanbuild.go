@@ -19,6 +19,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"io/fs"
 	"io/ioutil"
 	"os"
@@ -168,16 +169,20 @@ func installClean(ctx Context, config Config) {
 		productOut("install"))
 }
 
-// Since products and build variants (unfortunately) shared the same
-// PRODUCT_OUT staging directory, things can get out of sync if different
-// build configurations are built in the same tree. This function will
-// notice when the configuration has changed and call installClean to
-// remove the files necessary to keep things consistent.
+// Since products of one device share the same PRODUCT_OUT staging directory,
+// things can get out of sync if different products are built in the same
+// tree. This function will notice when the product has changed and call
+// installClean to remove the files necessary to keep things consistent. A
+// change of build variant does not call installClean: cleanOldInstalledFiles
+// removes each installed file and symlink contained in the lists of installed
+// files written by the previous build and missing from the lists written by
+// the current build.
 func installCleanIfNecessary(ctx Context, config Config) {
 	configFile := config.DevicePreviousProductConfig()
 	prefix := "PREVIOUS_BUILD_CONFIG := "
 	suffix := "\n"
-	currentConfig := prefix + config.TargetProduct() + "-" + config.TargetBuildVariant() + suffix
+	currentProduct := config.TargetProduct()
+	currentConfig := prefix + currentProduct + suffix
 
 	ensureDirectoriesExist(ctx, filepath.Dir(configFile))
 
@@ -213,10 +218,8 @@ func installCleanIfNecessary(ctx Context, config Config) {
 	e := ctx.BeginTrace(metrics.PrimaryNinja, "installclean")
 	defer e.End()
 
-	previousProductAndVariant := strings.TrimPrefix(strings.TrimSuffix(previousConfig, suffix), prefix)
-	currentProductAndVariant := strings.TrimPrefix(strings.TrimSuffix(currentConfig, suffix), prefix)
-
-	ctx.Printf("Build configuration changed: %q -> %q, forcing installclean\n", previousProductAndVariant, currentProductAndVariant)
+	previousProduct := strings.TrimPrefix(strings.TrimSuffix(previousConfig, suffix), prefix)
+	ctx.Printf("Product changed: %q -> %q, forcing installclean\n", previousProduct, currentProduct)
 
 	installClean(ctx, config)
 
@@ -337,7 +340,8 @@ func cleanOldFiles(ctx Context, basePath, newFile string) {
 		oldPath := filepath.Join(basePath, oldPaths[0])
 		oldPaths = oldPaths[1:]
 
-		if oldFile, err := os.Stat(oldPath); err == nil {
+		// Lstat, so a symlink is removed itself even when its target is missing.
+		if oldFile, err := os.Lstat(oldPath); err == nil {
 			if oldFile.IsDir() {
 				if err := os.Remove(oldPath); err == nil {
 					ctx.Println("Removed directory that is no longer installed: ", oldPath)
@@ -442,13 +446,12 @@ func cleanReplacedInstallDirs(ctx Context, basePath, listFile, copyFile, replace
 // cleanEmptyDirs will delete a directory if it contains no files.
 // If a deletion occurs, then it also recurses upwards to try and delete empty parent directories.
 func cleanEmptyDirs(ctx Context, dir string) {
-	files, err := ioutil.ReadDir(dir)
+	empty, err := isDirEmpty(dir)
 	if err != nil {
 		ctx.Println("Could not read directory while trying to clean empty dirs: ", dir)
 		return
 	}
-	if len(files) > 0 {
-		// Directory is not empty.
+	if !empty {
 		return
 	}
 
@@ -460,4 +463,19 @@ func cleanEmptyDirs(ctx Context, dir string) {
 
 	// Try and delete empty parent directories too.
 	cleanEmptyDirs(ctx, filepath.Dir(dir))
+}
+
+// isDirEmpty reads at most one name from dir, so a large directory is not listed in full.
+func isDirEmpty(dir string) (bool, error) {
+	f, err := os.Open(dir)
+	if err != nil {
+		return false, fmt.Errorf("could not open directory: %w", err)
+	}
+	defer f.Close()
+	if _, err := f.Readdirnames(1); err == io.EOF {
+		return true, nil
+	} else if err != nil {
+		return false, fmt.Errorf("could not read directory: %w", err)
+	}
+	return false, nil
 }
