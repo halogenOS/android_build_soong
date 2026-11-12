@@ -109,8 +109,9 @@ func (lto *lto) flags(ctx ModuleContext, flags Flags) Flags {
 		ltoCFlags := []string{"-flto=thin", "-fsplit-lto-unit"}
 		var ltoLdFlags []string
 
-		// Do not perform costly LTO optimizations for Eng builds.
-		if Bool(lto.Properties.Lto_O0) || ctx.Config().Eng() {
+		// Do not perform costly LTO optimizations for Eng builds of modules the build variant
+		// applies to.
+		if Bool(lto.Properties.Lto_O0) || ctx.Config().EngFor(ctx.Module()) {
 			ltoLdFlags = append(ltoLdFlags, "-Wl,--lto-O0")
 		}
 

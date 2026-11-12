@@ -73,7 +73,7 @@ func (stripper *Stripper) strip(actx android.ModuleContext, in android.Path, out
 		} else if !Bool(stripper.StripProperties.Strip.All) {
 			flags.StripKeepMiniDebugInfo = true
 		}
-		if actx.Config().Debuggable() && !flags.StripKeepMiniDebugInfo && !isStaticLib {
+		if actx.Config().DebuggableFor(actx.Module()) && !flags.StripKeepMiniDebugInfo && !isStaticLib {
 			flags.StripAddGnuDebuglink = true
 		}
 		transformStrip(actx, in, out, flags)
