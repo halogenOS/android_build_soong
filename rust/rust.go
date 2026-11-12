@@ -1543,6 +1543,9 @@ func (mod *Module) begin(ctx BaseModuleContext) {
 	}
 	if mod.compiler != nil {
 		mod.compiler.begin(ctx)
+		// rustEnvVars puts both into the rustc, rustdoc and clippy commands.
+		android.RecordBuildTypeRead(ctx, android.BuildTypeDebuggable)
+		android.RecordBuildTypeRead(ctx, android.BuildTypeEng)
 	}
 
 	if mod.UseSdk() && mod.IsSdkVariant() {

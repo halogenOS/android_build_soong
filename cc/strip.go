@@ -64,19 +64,33 @@ func (stripper *Stripper) strip(actx android.ModuleContext, in android.Path, out
 	if actx.Darwin() {
 		transformDarwinStrip(actx, in, out)
 	} else {
-		if Bool(stripper.StripProperties.Strip.Keep_symbols) {
-			flags.StripKeepSymbols = true
-		} else if Bool(stripper.StripProperties.Strip.Keep_symbols_and_debug_frame) {
-			flags.StripKeepSymbolsAndDebugFrame = true
-		} else if len(stripper.StripProperties.Strip.Keep_symbols_list) > 0 {
-			flags.StripKeepSymbolsList = strings.Join(stripper.StripProperties.Strip.Keep_symbols_list, ",")
-		} else if !Bool(stripper.StripProperties.Strip.All) {
-			flags.StripKeepMiniDebugInfo = true
-		}
-		if actx.Config().DebuggableFor(actx.Module()) && !flags.StripKeepMiniDebugInfo && !isStaticLib {
-			flags.StripAddGnuDebuglink = true
+		flags = stripper.withPropertyFlags(flags)
+		if !flags.StripKeepMiniDebugInfo {
+			// Debuggable builds replace the mini debug info by a debug link.
+			flags.StripAddGnuDebuglink = actx.Config().DebuggableFor(actx.Module()) && !isStaticLib
 		}
 		transformStrip(actx, in, out, flags)
+	}
+}
+
+// withPropertyFlags returns flags with the strip mode chosen by the strip properties.
+func (stripper *Stripper) withPropertyFlags(flags StripFlags) StripFlags {
+	if Bool(stripper.StripProperties.Strip.Keep_symbols) {
+		flags.StripKeepSymbols = true
+	} else if Bool(stripper.StripProperties.Strip.Keep_symbols_and_debug_frame) {
+		flags.StripKeepSymbolsAndDebugFrame = true
+	} else if len(stripper.StripProperties.Strip.Keep_symbols_list) > 0 {
+		flags.StripKeepSymbolsList = strings.Join(stripper.StripProperties.Strip.Keep_symbols_list, ",")
+	} else if !Bool(stripper.StripProperties.Strip.All) {
+		flags.StripKeepMiniDebugInfo = true
+	}
+	return flags
+}
+
+// RecordBuildTypeReads records, in a mutator, the build type values read by strip.
+func (stripper *Stripper) RecordBuildTypeReads(ctx android.BaseModuleContext) {
+	if !stripper.withPropertyFlags(StripFlags{}).StripKeepMiniDebugInfo {
+		android.RecordBuildTypeRead(ctx, android.BuildTypeDebuggable)
 	}
 }
 

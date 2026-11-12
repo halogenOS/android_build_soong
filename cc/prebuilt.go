@@ -89,7 +89,9 @@ type prebuiltLibraryLinker struct {
 var _ prebuiltLinkerInterface = (*prebuiltLibraryLinker)(nil)
 var _ prebuiltLibraryInterface = (*prebuiltLibraryLinker)(nil)
 
-func (p *prebuiltLibraryLinker) linkerInit(ctx BaseModuleContext) {}
+func (p *prebuiltLibraryLinker) linkerInit(ctx BaseModuleContext) {
+	p.stripper.RecordBuildTypeReads(ctx)
+}
 
 func (p *prebuiltLibraryLinker) linkerDeps(ctx DepsContext, deps Deps) Deps {
 	return p.libraryDecorator.linkerDeps(ctx, deps)

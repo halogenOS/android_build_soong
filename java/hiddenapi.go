@@ -86,6 +86,11 @@ type hiddenAPIIntf interface {
 
 var _ hiddenAPIIntf = (*hiddenAPI)(nil)
 
+// recordBuildTypeReads records, in a mutator, the build type values read by initHiddenAPI.
+func (h *hiddenAPI) recordBuildTypeReads(ctx android.BottomUpMutatorContext) {
+	android.RecordBuildTypeRead(ctx, android.BuildTypeEng)
+}
+
 // Initialize the hiddenapi structure
 //
 // uncompressedDexState should be nil when the module is a prebuilt and so does not require hidden
@@ -109,7 +114,7 @@ func (h *hiddenAPI) initHiddenAPI(ctx android.ModuleContext, dexJar OptionalDexJ
 	h.uncompressDexState = uncompressedDexState
 
 	// If hiddenapi processing is disabled treat this as inactive.
-	if ctx.Config().DisableHiddenApiChecks() {
+	if ctx.Config().DisableHiddenApiChecksFor(ctx.Module()) {
 		return
 	}
 

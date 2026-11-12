@@ -177,7 +177,15 @@ type chainedPartitionDep struct {
 var vbmetaPartitionDep = vbmetaDep{}
 var vbmetaChainedPartitionDep = chainedPartitionDep{}
 
+// disablesHashtree reports whether the image disables hashtree verification, which the top-level
+// vbmeta does in eng builds.
+func (v *vbmeta) disablesHashtree(ctx android.BaseModuleContext) bool {
+	return v.partitionName() == "vbmeta" && ctx.Config().EngFor(ctx.Module())
+}
+
 func (v *vbmeta) DepsMutator(ctx android.BottomUpMutatorContext) {
+	// Reading the value before the output folder is named puts Eng in the folder name.
+	_ = v.disablesHashtree(ctx)
 	ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), vbmetaPartitionDep, v.properties.Partitions.GetOrDefault(ctx, nil)...)
 	ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), vbmetaChainedPartitionDep, v.properties.Chained_partitions...)
 }
@@ -236,7 +244,7 @@ func (v *vbmeta) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 		return
 	}
 
-	if v.partitionName() == "vbmeta" && ctx.Config().Eng() {
+	if v.disablesHashtree(ctx) {
 		// https://source.corp.google.com/h/googleplex-android/platform/build/+/0cf7c289634e9aad9720cb45bb42ad0d338f7802:core/Makefile;l=5057-5060;drc=0e426f646784e2d233098f6aa0f7444070b1049f;bpv=1;bpt=0
 		cmd.Flag("--set_hashtree_disabled_flag")
 	}
@@ -480,7 +488,7 @@ func (v *vbmeta) buildPropFileForMiscInfo(ctx android.ModuleContext) android.Pat
 
 	// We only need the flag in top-level vbmeta.img.
 	// https://cs.android.com/android/platform/superproject/main/+/main:build/make/core/Makefile;l=4917;drc=a951ebf0198006f7fd38073a05c442d0eb92f97b
-	if ctx.Config().Eng() && v.partitionName() == "vbmeta" {
+	if v.disablesHashtree(ctx) {
 		args = append(args, "--set_hashtree_disabled_flag")
 	}
 

@@ -52,6 +52,9 @@ type LTOProperties struct {
 	LtoEnabled bool `blueprint:"mutated"`
 	LtoDefault bool `blueprint:"mutated"`
 
+	// LinkWithLtoO0 is set where the link skips the costly LTO optimizations.
+	LinkWithLtoO0 bool `blueprint:"mutated"`
+
 	// Use -fwhole-program-vtables cflag.
 	Whole_program_vtables *bool
 
@@ -97,6 +100,18 @@ func (lto *lto) begin(ctx BaseModuleContext) {
 
 	lto.Properties.LtoDefault = ltoDefault
 	lto.Properties.LtoEnabled = ltoEnabled
+	lto.setLinkWithLtoO0(ctx, ctx.Module().(*Module))
+}
+
+// setLinkWithLtoO0 sets LinkWithLtoO0 once LtoEnabled is final. It reads Eng only where the module
+// links with LTO enabled: static and header libraries do not link, and Soong does not link
+// prebuilts.
+func (lto *lto) setLinkWithLtoO0(ctx android.BaseModuleContext, module *Module) {
+	links := !module.staticLibrary() && !module.Header() && !module.IsPrebuilt()
+	// Do not perform costly LTO optimizations for Eng builds of modules the build variant applies
+	// to.
+	lto.Properties.LinkWithLtoO0 = Bool(lto.Properties.Lto_O0) ||
+		lto.Properties.LtoEnabled && links && ctx.Config().EngFor(module)
 }
 
 func (lto *lto) flags(ctx ModuleContext, flags Flags) Flags {
@@ -109,9 +124,7 @@ func (lto *lto) flags(ctx ModuleContext, flags Flags) Flags {
 		ltoCFlags := []string{"-flto=thin", "-fsplit-lto-unit"}
 		var ltoLdFlags []string
 
-		// Do not perform costly LTO optimizations for Eng builds of modules the build variant
-		// applies to.
-		if Bool(lto.Properties.Lto_O0) || ctx.Config().EngFor(ctx.Module()) {
+		if lto.Properties.LinkWithLtoO0 {
 			ltoLdFlags = append(ltoLdFlags, "-Wl,--lto-O0")
 		}
 
@@ -254,6 +267,7 @@ func (l *ltoTransitionMutator) Mutate(ctx android.BottomUpMutatorContext, variat
 		default:
 			panic(fmt.Errorf("unknown variation %s", variation))
 		}
+		m.lto.setLinkWithLtoO0(ctx, m)
 		// Non-default variations are never installed.
 		m.Properties.PreventInstall = true
 		m.Properties.HideFromMake = true

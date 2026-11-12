@@ -154,9 +154,18 @@ func (c Config) RunningInsideUnitTest() bool {
 // If both ENABLE_HIDDENAPI_FLAGS=true and UNSAFE_DISABLE_HIDDENAPI_FLAGS=true, then
 // ENABLE_HIDDENAPI_FLAGS=true will be triggered and hiddenapi checks will be considered enabled.
 func (c Config) DisableHiddenApiChecks() bool {
+	return c.disableHiddenApiChecks(c.Eng())
+}
+
+// DisableHiddenApiChecksFor returns DisableHiddenApiChecks as the module variant sees it, see
+// EngFor.
+func (c Config) DisableHiddenApiChecksFor(module Module) bool {
+	return c.disableHiddenApiChecks(c.EngFor(module))
+}
+
+func (c Config) disableHiddenApiChecks(eng bool) bool {
 	return !c.IsEnvTrue("ENABLE_HIDDENAPI_FLAGS") &&
-		(c.IsEnvTrue("UNSAFE_DISABLE_HIDDENAPI_FLAGS") ||
-			Bool(c.productVariables.Eng))
+		(c.IsEnvTrue("UNSAFE_DISABLE_HIDDENAPI_FLAGS") || eng)
 }
 
 // DisableVerifyOverlaps returns true if verify_overlaps is skipped.
@@ -1659,28 +1668,34 @@ func (c *config) AlwaysUsePrebuiltSdks() bool {
 	return Bool(c.productVariables.Always_use_prebuilt_sdks)
 }
 
-func (c *config) MinimizeJavaDebugInfo() bool {
-	return Bool(c.productVariables.MinimizeJavaDebugInfo) && !Bool(c.productVariables.Eng)
+// MinimizeJavaDebugInfoFor returns whether javac of the module variant leaves out the debug
+// information for local variables.
+func (c *config) MinimizeJavaDebugInfoFor(module Module) bool {
+	return Bool(c.productVariables.MinimizeJavaDebugInfo) && !c.EngFor(module)
 }
 
+// Debuggable returns the product variable for code outside module variants. Module code reads
+// DebuggableFor, which adds it to the output folder name of the module variant.
 func (c *config) Debuggable() bool {
 	return Bool(c.productVariables.Debuggable)
 }
 
+// Eng returns the product variable for code outside module variants. Module code reads EngFor,
+// which adds it to the output folder name of the module variant.
 func (c *config) Eng() bool {
 	return Bool(c.productVariables.Eng)
 }
 
 // DebuggableFor returns Debuggable as the module variant sees it: false where the build variant
-// does not apply to the module variant.
+// does not apply to the module variant. It records the value read, see RecordBuildTypeRead.
 func (c *config) DebuggableFor(module Module) bool {
-	return c.Debuggable() && TargetBuildVariantAppliesTo(module)
+	return module.base().readBuildTypeValue(c, BuildTypeDebuggable)
 }
 
 // EngFor returns Eng as the module variant sees it: false where the build variant does not apply
-// to the module variant.
+// to the module variant. It records the value read, see RecordBuildTypeRead.
 func (c *config) EngFor(module Module) bool {
-	return c.Eng() && TargetBuildVariantAppliesTo(module)
+	return module.base().readBuildTypeValue(c, BuildTypeEng)
 }
 
 func (c *config) BuildType() string {

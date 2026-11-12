@@ -4366,6 +4366,15 @@ func (c *Module) IntermPathForModuleOut() android.OptionalPath {
 	return c.outputFile
 }
 
+// UsesDependencyOutputs reports whether the commands of the module use the outputs of a dependency
+// with the tag. A static library archives only its own objects, so its shared library dependencies
+// contribute exported headers and flags, not their build outputs.
+func (c *Module) UsesDependencyOutputs(tag blueprint.DependencyTag) bool {
+	return !(c.static() && IsSharedDepTag(tag))
+}
+
+var _ android.DependencyOutputUse = (*Module)(nil)
+
 func (c *Module) static() bool {
 	if static, ok := c.linker.(interface {
 		static() bool

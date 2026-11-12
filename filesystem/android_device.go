@@ -277,6 +277,10 @@ var customPartitionDepTag customPartitionDepTagType
 var fileListCheckDepTag fileListCheckDepTagType
 
 func (a *androidDevice) DepsMutator(ctx android.BottomUpMutatorContext) {
+	// misc_info.txt contains the build type. The treble labeling test is told whether the build is
+	// debuggable.
+	android.RecordBuildTypeRead(ctx, android.BuildTypeDebuggable)
+	android.RecordBuildTypeRead(ctx, android.BuildTypeEng)
 	addDependencyIfDefined := func(dep *string) {
 		if dep != nil {
 			ctx.AddDependency(ctx.Module(), filesystemDepTag, proptools.String(dep))
@@ -1522,9 +1526,9 @@ func (a *androidDevice) createFastbootInfo(ctx android.ModuleContext) android.Pa
 // TODO (b/399788119): Complete the migration of misc_info.txt
 func (a *androidDevice) addMiscInfo(ctx android.ModuleContext) android.Path {
 	buildType := func() string {
-		if ctx.Config().Eng() {
+		if ctx.Config().EngFor(ctx.Module()) {
 			return "eng"
-		} else if ctx.Config().Debuggable() {
+		} else if ctx.Config().DebuggableFor(ctx.Module()) {
 			return "userdebug"
 		} else {
 			return "user"
@@ -2115,7 +2119,7 @@ func (a *androidDevice) buildTrebleLabelingTest(ctx android.ModuleContext) andro
 			cmd.Flag("--treat_as_warnings")
 		}
 
-		if ctx.Config().Debuggable() {
+		if ctx.Config().DebuggableFor(ctx.Module()) {
 			cmd.Flag("--debuggable")
 		}
 

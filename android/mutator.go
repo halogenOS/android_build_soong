@@ -26,6 +26,7 @@ import (
 //   run depsMutator
 //   run PostDeps mutators
 //   run FinalDeps mutators (TransitionMutators disallowed in this phase)
+//   run buildTypeFolderMutator
 //   continue on to GenerateAndroidBuildActions
 
 // collateGloballyRegisteredMutators constructs the list of mutators that have been registered
@@ -60,6 +61,8 @@ func collateRegisteredMutators(prePartial, preArch, preDeps, postDeps, postApex,
 
 	mctx.finalPhase = true
 	register(finalDeps)
+
+	register([]RegisterMutatorFunc{registerBuildTypeFolderMutator})
 
 	return mctx.mutators
 }

@@ -154,7 +154,7 @@ func (b *platformBootclasspathModule) DepsMutator(ctx android.BottomUpMutatorCon
 }
 
 func (b *platformBootclasspathModule) hiddenAPIDepsMutator(ctx android.BottomUpMutatorContext) {
-	if ctx.Config().DisableHiddenApiChecks() {
+	if ctx.Config().DisableHiddenApiChecksFor(ctx.Module()) {
 		return
 	}
 
@@ -330,7 +330,7 @@ func (b *platformBootclasspathModule) generateHiddenAPIBuildActions(ctx android.
 	// Don't run any hiddenapi rules if hidden api checks are disabled. This is a performance
 	// optimization that can be used to reduce the incremental build time but as its name suggests it
 	// can be unsafe to use, e.g. when the changes affect anything that goes on the bootclasspath.
-	if ctx.Config().DisableHiddenApiChecks() {
+	if ctx.Config().DisableHiddenApiChecksFor(ctx.Module()) {
 		createEmptyHiddenApiFiles()
 		return bootDexJarByModule
 	}

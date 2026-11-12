@@ -17,6 +17,7 @@ package android
 import (
 	"fmt"
 	"reflect"
+	"sync"
 
 	"github.com/google/blueprint"
 )
@@ -110,6 +111,7 @@ type ModuleFactory func() Module
 func ModuleFactoryAdaptor(factory ModuleFactory) blueprint.ModuleFactory {
 	return func() (blueprint.Module, []interface{}) {
 		module := factory()
+		module.base().buildTypeValuesReadMutex = &sync.Mutex{}
 		return module, module.GetProperties()
 	}
 }

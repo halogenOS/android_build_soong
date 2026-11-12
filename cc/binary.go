@@ -231,6 +231,7 @@ func newBinary(hod android.HostOrDeviceSupported) (*Module, *binaryDecorator) {
 // on properties of this binary.
 func (binary *binaryDecorator) linkerInit(ctx BaseModuleContext) {
 	binary.baseLinker.linkerInit(ctx)
+	binary.stripper.RecordBuildTypeReads(ctx)
 
 	if ctx.Os().Linux() && ctx.Host() {
 		// Unless explicitly specified otherwise, host static binaries are built with -static

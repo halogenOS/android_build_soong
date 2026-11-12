@@ -46,7 +46,7 @@ func (afdo *afdo) props() []interface{} {
 
 func (afdo *afdo) begin(ctx BaseModuleContext) {
 	// Disable on eng builds for faster build.
-	if ctx.Config().Eng() {
+	if afdo.Properties.Afdo && ctx.Config().EngFor(ctx.Module()) {
 		afdo.Properties.Afdo = false
 	}
 	// Disable for native coverage builds.

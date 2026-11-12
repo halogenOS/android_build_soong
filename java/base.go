@@ -938,11 +938,18 @@ func (j *Module) useKsp() bool {
 
 func (j *Module) deps(ctx android.BottomUpMutatorContext) {
 	j.dexpreopter.DepsMutator(ctx)
+	// Reading the value before the output folder is named puts the build type values read by javac
+	// in the folder name.
+	_ = ctx.Config().MinimizeJavaDebugInfoFor(ctx.Module())
 	j.setOptimizeForceDisabled(proptools.Bool(j.properties.Is_stubs_module))
 	if ctx.Device() {
 		j.linter.deps(ctx)
 
 		compileDex := proptools.Bool(j.properties.Installable) || proptools.Bool(j.dexProperties.Compile_dex)
+		if compileDex {
+			j.dexer.recordBuildTypeReads(ctx)
+			j.hiddenAPI.recordBuildTypeReads(ctx)
+		}
 		addR8DexDeps := compileDex && !j.dexer.isOptimizeForceDisabled(ctx)
 		sdkDeps(ctx, android.SdkContext(j), addR8DexDeps)
 
@@ -1204,7 +1211,7 @@ func (j *Module) collectJavacFlags(
 		}
 	}
 
-	if ctx.Config().MinimizeJavaDebugInfo() && !ctx.Host() && !needsDebugInfo {
+	if !ctx.Host() && !needsDebugInfo && ctx.Config().MinimizeJavaDebugInfoFor(ctx.Module()) {
 		// For non-host binaries, override the -g flag passed globally to remove
 		// local variable debug info to reduce disk and memory usage.
 		javacFlags = append(javacFlags, "-g:source,lines")

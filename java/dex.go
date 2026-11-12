@@ -253,9 +253,14 @@ func (d *dexer) isOptimizeForceDisabled(ctx android.EarlyModuleContext) bool {
 	return proptools.Bool(d.dexProperties.Optimize.Force_disabled_with_source_stubs) && !ctx.Config().BuildFromTextStub()
 }
 
+// recordBuildTypeReads records, in a mutator, the build type values read by compileDex.
+func (d *dexer) recordBuildTypeReads(ctx android.BottomUpMutatorContext) {
+	android.RecordBuildTypeRead(ctx, android.BuildTypeEng)
+}
+
 func (d *dexer) effectiveOptimizeEnabled(ctx android.ModuleContext) bool {
 	// For eng builds, if Optimize.D8_on_eng is true, then disable optimization.
-	if ctx.Config().Eng() && proptools.Bool(d.dexProperties.Optimize.D8_on_eng) {
+	if proptools.Bool(d.dexProperties.Optimize.D8_on_eng) && ctx.Config().EngFor(ctx.Module()) {
 		return false
 	}
 	if d.isOptimizeForceDisabled(ctx) {
@@ -266,7 +271,7 @@ func (d *dexer) effectiveOptimizeEnabled(ctx android.ModuleContext) bool {
 }
 
 func (d *dexer) resourceShrinkingEnabled(ctx android.ModuleContext) bool {
-	if ctx.Config().Eng() || !d.effectiveOptimizeEnabled(ctx) {
+	if ctx.Config().EngFor(ctx.Module()) || !d.effectiveOptimizeEnabled(ctx) {
 		return false
 	}
 	shrinkResources := d.dexProperties.Optimize.Shrink_resources.GetOrDefault(ctx, false)
@@ -644,7 +649,7 @@ func (d *dexer) dexCommonFlags(ctx android.ModuleContext,
 		flags = append(flags, "--debug")
 	} else if requestReleaseMode {
 		flags = append(flags, "--release")
-	} else if ctx.Config().Eng() {
+	} else if ctx.Config().EngFor(ctx.Module()) {
 		flags = append(flags, "--debug")
 	} else if !d.effectiveOptimizeEnabled(ctx) && d.dexProperties.Optimize.EnabledByDefault {
 		// D8 uses --debug by default, whereas R8 uses --release by default.

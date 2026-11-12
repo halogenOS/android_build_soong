@@ -216,7 +216,7 @@ func (singleton *projectGeneratorSingleton) addCrate(ctx android.SingletonContex
 			CheckTarget:        rustInfo.CompilerInfo.CheckTarget.String(),
 			SourceDir:          ctx.ModuleDir(module),
 			TargetProduct:      ctx.Config().DeviceProduct(),
-			TargetBuildVariant: targetBuildVariantName(ctx.Config()),
+			TargetBuildVariant: targetBuildVariantName(ctx.Config().Eng(), ctx.Config().Debuggable()),
 		}
 		singleton.targetMappings = append(singleton.targetMappings, mapping)
 	}

@@ -2314,6 +2314,8 @@ func (module *SdkLibraryImport) ComponentDepsMutator(ctx android.BottomUpMutator
 
 // Add other dependencies as normal.
 func (module *SdkLibraryImport) DepsMutator(ctx android.BottomUpMutatorContext) {
+	// The variants for prebuilt APEXes initialize the hidden API.
+	module.hiddenAPI.recordBuildTypeReads(ctx)
 
 	implName := module.implLibraryModuleName()
 	if ctx.OtherModuleExists(implName) {

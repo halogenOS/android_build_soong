@@ -924,6 +924,7 @@ func (library *libraryDecorator) linkerInit(ctx BaseModuleContext) {
 	}
 	library.baseInstaller.location = location
 	library.baseLinker.linkerInit(ctx)
+	library.stripper.RecordBuildTypeReads(ctx)
 	// Let baseLinker know whether this variant is for stubs or not, so that
 	// it can omit things that are not required for linking stubs.
 	library.baseLinker.dynamicProperties.BuildStubs = library.BuildStubs()

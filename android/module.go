@@ -24,6 +24,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/google/blueprint"
 	"github.com/google/blueprint/depset"
@@ -599,6 +600,10 @@ type baseProperties struct {
 	// vintf_fragment Modules required from this module.
 	Vintf_fragment_modules proptools.Configurable[[]string] `android:"path"`
 
+	// The build type values read by the commands of this module variant. They appear in its output
+	// folder name where they are true.
+	Build_type_values_read buildTypeSet `blueprint:"mutated"`
+
 	// List of module names that are prevented from being installed when this module gets
 	// installed.
 	Overrides []string
@@ -916,6 +921,11 @@ type ModuleBase struct {
 	variableProperties      interface{}
 	hostAndDeviceProperties hostAndDeviceProperties
 	hostCrossProperties     hostCrossProperties
+
+	// buildTypeValuesReadMutex protects baseProperties.Build_type_values_read. Other module variants
+	// evaluate the selects of this module variant, so several goroutines write the values read. It
+	// is a pointer because module types copy ModuleBase by value. ModuleFactoryAdaptor creates it.
+	buildTypeValuesReadMutex *sync.Mutex
 
 	// Arch specific versions of structs in GetProperties() prior to
 	// initialization in InitAndroidArchModule, lets call it `generalProperties`.

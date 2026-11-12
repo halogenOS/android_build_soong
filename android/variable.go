@@ -934,14 +934,17 @@ func VariableMutator(mctx BottomUpMutatorContext) {
 	variableValues := reflect.ValueOf(a.variableProperties).Elem().FieldByName("Product_variables")
 
 	productVariables := reflect.ValueOf(&mctx.Config().productVariables).Elem()
-	targetBuildVariantApplies := TargetBuildVariantAppliesTo(module)
 
 	for i := 0; i < variableValues.NumField(); i++ {
 		variableValue := variableValues.Field(i)
 		name := variableValues.Type().Field(i).Name
-		property := "product_variables." + proptools.PropertyNameForField(name)
+		propertyName := proptools.PropertyNameForField(name)
+		property := "product_variables." + propertyName
 
-		if !targetBuildVariantApplies && (name == "Debuggable" || name == "Eng") {
+		if buildTypeValue, ok := parseBuildTypeValue(propertyName); ok {
+			if !variableValue.IsZero() && a.readBuildTypeValue(mctx.Config().config, buildTypeValue) {
+				a.setVariableProperties(mctx, property, variableValue, true)
+			}
 			continue
 		}
 

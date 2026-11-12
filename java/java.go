@@ -2732,6 +2732,8 @@ func (al *ApiLibrary) addValidation(ctx android.ModuleContext, cmd *android.Rule
 }
 
 func (al *ApiLibrary) DepsMutator(ctx android.BottomUpMutatorContext) {
+	al.dexer.recordBuildTypeReads(ctx)
+	al.hiddenAPI.recordBuildTypeReads(ctx)
 	apiContributions := al.properties.Api_contributions
 	addValidations := !ctx.Config().IsEnvTrue("DISABLE_STUB_VALIDATION") &&
 		!ctx.Config().IsEnvTrue("WITHOUT_CHECK_API") &&
@@ -3234,8 +3236,12 @@ func (j *Import) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddVariationDependencies(nil, staticLibTag, j.properties.Static_libs.GetOrDefault(ctx, nil)...)
 
 	j.setOptimizeForceDisabled(proptools.Bool(j.properties.Is_stubs_module))
+	// The variants for prebuilt APEXes initialize the hidden API without dex, and the APEX of a
+	// variant is known only after this mutator.
+	j.hiddenAPI.recordBuildTypeReads(ctx)
 
 	if ctx.Device() && Bool(j.dexProperties.Compile_dex) {
+		j.dexer.recordBuildTypeReads(ctx)
 		addR8DexDeps := !j.isOptimizeForceDisabled(ctx)
 		sdkDeps(ctx, android.SdkContext(j), addR8DexDeps)
 	}

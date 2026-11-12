@@ -372,16 +372,17 @@ func rustEnvVars(ctx android.ModuleContext, deps PathDeps, crateName string, car
 
 	// TODO: Remove, there are existing users.
 	if android.TargetBuildVariantAppliesTo(ctx.Module()) {
-		envVars["TARGET_BUILD_VARIANT"] = targetBuildVariantName(ctx.Config())
+		envVars["TARGET_BUILD_VARIANT"] = targetBuildVariantName(
+			ctx.Config().EngFor(ctx.Module()), ctx.Config().DebuggableFor(ctx.Module()))
 	}
 
 	return envVars
 }
 
-func targetBuildVariantName(config android.Config) string {
-	if config.Eng() {
+func targetBuildVariantName(eng, debuggable bool) string {
+	if eng {
 		return "eng"
-	} else if config.Debuggable() {
+	} else if debuggable {
 		return "userdebug"
 	}
 	return "user"

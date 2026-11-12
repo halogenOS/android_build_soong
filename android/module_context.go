@@ -215,6 +215,10 @@ type ModuleContext interface {
 
 	ModuleSubDir() string
 
+	// ModuleOutSubDir returns the folder of the module variant under its output directory: the
+	// variant name, followed by the build type values depended on by its commands.
+	ModuleOutSubDir() string
+
 	Variable(pctx PackageContext, name, value string)
 	Rule(pctx PackageContext, name string, params blueprint.RuleParams, argNames ...string) blueprint.Rule
 	// Similar to blueprint.ModuleContext.Build, but takes Paths instead of []string,
@@ -545,6 +549,14 @@ func (m *moduleContext) GetDirectDepProxyWithTag(name string, tag blueprint.Depe
 
 func (m *moduleContext) ModuleSubDir() string {
 	return m.bp.ModuleSubDir()
+}
+
+func (m *moduleContext) ModuleOutSubDir() string {
+	folder, ok := ModuleProvider(m, buildTypeFolderProvider)
+	if !ok {
+		panic(errBuildTypeFolderMissing(m.ModuleName()))
+	}
+	return folder.OutSubDir
 }
 
 func (m *moduleContext) InstallInData() bool {
