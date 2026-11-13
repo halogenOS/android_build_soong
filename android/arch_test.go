@@ -392,9 +392,9 @@ func TestArchMutator(t *testing.T) {
 		{
 			name: "host-only",
 			preparer: FixtureModifyConfig(func(config Config) {
-				config.BuildOSTarget = Target{}
-				config.BuildOSCommonTarget = Target{}
-				config.Targets[Android] = nil
+				config.CompileTargets().BuildOSTarget = Target{}
+				config.CompileTargets().BuildOSCommonTarget = Target{}
+				config.CompileTargets().Targets[Android] = nil
 			}),
 			fooVariants:         nil,
 			barVariants:         buildOSVariants,
@@ -690,7 +690,7 @@ func TestArchProperties(t *testing.T) {
 			name: "windows",
 			goOS: "linux",
 			preparer: FixtureModifyConfig(func(config Config) {
-				config.Targets[Windows] = []Target{
+				config.CompileTargets().Targets[Windows] = []Target{
 					{
 						Os:        Windows,
 						Arch:      Arch{ArchType: X86_64},

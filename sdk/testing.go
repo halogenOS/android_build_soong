@@ -78,7 +78,7 @@ var prepareForSdkTest = android.GroupFixturePreparers(
 	android.FixtureModifyConfig(func(config android.Config) {
 		// Add windows as a default disable OS to test behavior when some OS variants
 		// are disabled.
-		config.Targets[android.Windows] = []android.Target{
+		config.CompileTargets().Targets[android.Windows] = []android.Target{
 			{
 				Os:           android.Windows,
 				Arch:         android.Arch{ArchType: android.X86_64},

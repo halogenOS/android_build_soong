@@ -1978,7 +1978,7 @@ func PathForHostInstall(ctx PathContext, pathComponents ...string) InstallPath {
 // PathForDeviceFirstInstall returns an InstallPath representing the install path for a device file
 // in the first arch folder. Equivalent to $(TARGET_OUT) from make.
 func PathForDeviceFirstInstall(ctx PathContext, pathComponents ...string) InstallPath {
-	return pathForInstall(ctx, ctx.Config().AndroidFirstDeviceTarget.Os, ctx.Config().AndroidFirstDeviceTarget.Arch.ArchType, "", pathComponents...)
+	return pathForInstall(ctx, ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Os, ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Arch.ArchType, "", pathComponents...)
 }
 
 func osAndArch(ctx ModuleInstallPathContext) (OsType, ArchType) {
@@ -2019,7 +2019,7 @@ func pathForInstall(ctx PathContext, os OsType, arch ArchType, partition string,
 	var partitionPaths []string
 
 	if os.Class == Device {
-		partitionPaths = []string{"target", "product", *ctx.Config().deviceNameToInstall, partition}
+		partitionPaths = []string{"target", "product", ctx.Config().installDeviceName(), partition}
 	} else {
 		osName := os.String()
 		if os == Linux {

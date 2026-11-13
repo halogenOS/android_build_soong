@@ -152,7 +152,7 @@ func TestCmdPrefix(t *testing.T) {
 			name:    "nativebridge",
 			variant: "android_native_bridge_arm_armv7-a-neon",
 			preparer: android.FixtureModifyConfig(func(config android.Config) {
-				config.Targets[android.Android] = []android.Target{
+				config.CompileTargets().Targets[android.Android] = []android.Target{
 					{
 						Os:           android.Android,
 						Arch:         android.Arch{ArchType: android.X86, ArchVariant: "silvermont", Abi: []string{"armeabi-v7a"}},

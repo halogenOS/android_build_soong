@@ -606,7 +606,7 @@ func TestHostCommonData(t *testing.T) {
 	`)
 
 	foo := ctx.ModuleForTests(t, "foo", "android_common").Module().(*Test)
-	host := ctx.ModuleForTests(t, "host", ctx.Config().BuildOSCommonTarget.String()).Module().(*Library)
+	host := ctx.ModuleForTests(t, "host", ctx.Config().CompileTargets().BuildOSCommonTarget.String()).Module().(*Library)
 
 	if g, w := foo.data.RelativeToTop().Strings(), []string{host.outputFile.RelativeToTop().String()}; !slices.Equal(g, w) {
 		t.Errorf("expected test data %q, got %q\n", w, g)

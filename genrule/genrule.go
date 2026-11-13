@@ -274,7 +274,7 @@ func toolDepsMutator(ctx android.BottomUpMutatorContext) {
 			if m := android.SrcIsModule(tool); m != "" {
 				tool = m
 			}
-			ctx.AddFarVariationDependencies(ctx.Config().BuildOSTarget.Variations(), tag, tool)
+			ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), tag, tool)
 		}
 	}
 }

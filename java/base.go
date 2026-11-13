@@ -974,19 +974,19 @@ func (j *Module) deps(ctx android.BottomUpMutatorContext) {
 
 	j.usesLibrary.depsFromLibs(ctx, libDeps)
 
-	ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), pluginTag, j.properties.Plugins...)
-	ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), kotlinPluginTag, j.properties.Kotlin_plugins...)
-	ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), exportedPluginTag, j.properties.Exported_plugins...)
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), pluginTag, j.properties.Plugins...)
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), kotlinPluginTag, j.properties.Kotlin_plugins...)
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), exportedPluginTag, j.properties.Exported_plugins...)
 
 	if j.properties.Strict_deps != nil && (*j.properties.Strict_deps == "warn" || *j.properties.Strict_deps == "error") {
-		ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), javaStrictDepsPluginTag, "soong_java_strict_deps_plugin")
-		ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), kotlinStrictDepsPluginTag, "soong_kotlin_strict_deps_plugin")
+		ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), javaStrictDepsPluginTag, "soong_java_strict_deps_plugin")
+		ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), kotlinStrictDepsPluginTag, "soong_kotlin_strict_deps_plugin")
 	}
 
 	epEnabled := j.properties.Errorprone.Enabled
 	if (ctx.Config().RunErrorProne() && epEnabled == nil) || Bool(epEnabled) {
-		ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), errorpronePluginTag, "error_prone_plugin")
-		ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), errorpronePluginTag, j.properties.Errorprone.Extra_check_modules...)
+		ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), errorpronePluginTag, "error_prone_plugin")
+		ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), errorpronePluginTag, j.properties.Errorprone.Extra_check_modules...)
 	}
 
 	android.ProtoDeps(ctx, &j.protoProperties)
@@ -1019,10 +1019,10 @@ func (j *Module) deps(ctx android.BottomUpMutatorContext) {
 	incremental := j.incrementalKotlin(ctx.Config())
 	if j.useCompose(ctx) {
 		if incremental {
-			ctx.AddVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), composeEmbeddablePluginTag,
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), composeEmbeddablePluginTag,
 				"kotlin-compose-compiler-embeddable-plugin")
 		}
-		ctx.AddVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), composePluginTag,
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), composePluginTag,
 			"kotlin-compose-compiler-plugin")
 	}
 

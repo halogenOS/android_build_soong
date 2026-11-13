@@ -56,7 +56,7 @@ func findScreenDensity(densities []screenDensity, name string) (screenDensity, b
 // TARGET_SCREEN_DENSITY, else PRODUCT_AAPT_PREF_CONFIG, else mdpi. Either variable contains a bucket
 // name, ldpi or tvdpi, or dots per inch with or without the suffix "dpi".
 func ScreenDensityBucket(config Config) (string, error) {
-	variable, value := "TARGET_SCREEN_DENSITY", config.ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.TargetScreenDensity
+	variable, value := "TARGET_SCREEN_DENSITY", readProductVariable(config, &config.productVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.TargetScreenDensity)
 	if value == "" {
 		variable, value = "PRODUCT_AAPT_PREF_CONFIG", config.ProductAAPTPreferredConfig()
 	}

@@ -74,7 +74,7 @@ var propertyContextsDepTag propertyContextsDepTagType
 
 func (a *androidDevice) hostInitVerifierCheckDepsMutator(ctx android.BottomUpMutatorContext) {
 	for _, typ := range hostInitVerifierPartitionsToCheck {
-		firstVariations := ctx.Config().AndroidFirstDeviceTarget.Variations()
+		firstVariations := ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations()
 		ctx.AddVariationDependencies(firstVariations, passwdFileDepTag, passwdFileModuleName(typ))
 		ctx.AddVariationDependencies(firstVariations, propertyContextsDepTag, propertyContextsModuleName(typ))
 	}

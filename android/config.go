@@ -74,6 +74,21 @@ const productVariablesFileName = "soong.variables"
 // A Config object represents the entire build configuration for Android.
 type Config struct {
 	*config
+
+	// reads records the configuration reads of the module or singleton this Config was handed to.
+	// It is nil outside of a module or singleton.
+	reads *ConfigReads
+}
+
+// recordingReadsInto returns c recording every configuration read it serves into reads.
+func (c Config) recordingReadsInto(reads *ConfigReads) Config {
+	c.reads = reads
+	return c
+}
+
+// DeviceConfig returns the device configuration, recording its reads where c records them.
+func (c Config) DeviceConfig() DeviceConfig {
+	return DeviceConfig{deviceConfig: c.deviceConfig, reads: c.reads}
 }
 
 type SoongBuildMode int
@@ -106,7 +121,7 @@ const (
 const testKeyDir = "build/make/target/product/security"
 
 func (c Config) genericConfig() Config {
-	return Config{c.config.genericConfigField}
+	return Config{config: c.config.genericConfigField, reads: c.reads}
 }
 
 // SoongOutDir returns the build output directory for the configuration.
@@ -199,11 +214,11 @@ func (c Config) ActionSandboxMetrics() *blueprint.SandboxMetrics {
 // value will define the ELF segment alignment for binaries (executables and
 // shared libraries).
 func (c Config) MaxPageSizeSupported() string {
-	return String(c.config.productVariables.DeviceMaxPageSizeSupported)
+	return String(readProductVariable(c, &c.config.productVariables.DeviceMaxPageSizeSupported))
 }
 
 func (c Config) DeviceCheckPrebuiltMaxPageSize() bool {
-	return Bool(c.config.productVariables.DeviceCheckPrebuiltMaxPageSize)
+	return Bool(readProductVariable(c, &c.config.productVariables.DeviceCheckPrebuiltMaxPageSize))
 }
 
 // NoBionicPageSizeMacro returns true when AOSP is page size agnostic.
@@ -211,27 +226,27 @@ func (c Config) DeviceCheckPrebuiltMaxPageSize() bool {
 // Returns false when AOSP is NOT page size agnostic.
 // This means that bionic's macro PAGE_SIZE is defined.
 func (c Config) NoBionicPageSizeMacro() bool {
-	return Bool(c.config.productVariables.DeviceNoBionicPageSizeMacro)
+	return Bool(readProductVariable(c, &c.config.productVariables.DeviceNoBionicPageSizeMacro))
 }
 
 // The release version passed to aconfig, derived from RELEASE_VERSION
 func (c Config) ReleaseVersion() string {
-	return c.config.productVariables.ReleaseVersion
+	return readProductVariable(c, &c.config.productVariables.ReleaseVersion)
 }
 
 // The aconfig value set passed to aconfig, derived from RELEASE_VERSION
 func (c Config) ReleaseAconfigValueSets() []string {
-	return c.config.productVariables.ReleaseAconfigValueSets
+	return readProductVariable(c, &c.config.productVariables.ReleaseAconfigValueSets)
 }
 
 // If native modules should have symbols stripped by default. Default false, enabled for build tools
 func (c Config) StripByDefault() bool {
-	return proptools.Bool(c.config.productVariables.StripByDefault)
+	return proptools.Bool(readProductVariable(c, &c.config.productVariables.StripByDefault))
 }
 
 func (c Config) ReleaseAconfigExtraReleaseConfigs() []string {
 	result := []string{}
-	if val, ok := c.config.productVariables.BuildFlags["RELEASE_ACONFIG_EXTRA_RELEASE_CONFIGS"]; ok {
+	if val, ok := c.GetBuildFlag("RELEASE_ACONFIG_EXTRA_RELEASE_CONFIGS"); ok {
 		if len(val) > 0 {
 			// Remove any duplicates from the list.
 			found := make(map[string]bool)
@@ -249,7 +264,7 @@ func (c Config) ReleaseAconfigExtraReleaseConfigs() []string {
 func (c Config) ReleaseAconfigExtraReleaseConfigsValueSets() map[string][]string {
 	result := make(map[string][]string)
 	for _, rcName := range c.ReleaseAconfigExtraReleaseConfigs() {
-		if value, ok := c.config.productVariables.BuildFlags["RELEASE_ACONFIG_VALUE_SETS_"+rcName]; ok {
+		if value, ok := c.GetBuildFlag("RELEASE_ACONFIG_VALUE_SETS_" + rcName); ok {
 			result[rcName] = strings.Split(value, " ")
 		}
 	}
@@ -259,7 +274,7 @@ func (c Config) ReleaseAconfigExtraReleaseConfigsValueSets() map[string][]string
 // The flag default permission value passed to aconfig
 // derived from RELEASE_ACONFIG_FLAG_DEFAULT_PERMISSION
 func (c Config) ReleaseAconfigFlagDefaultPermission() string {
-	return c.config.productVariables.ReleaseAconfigFlagDefaultPermission
+	return readProductVariable(c, &c.config.productVariables.ReleaseAconfigFlagDefaultPermission)
 }
 
 func (c Config) ReleaseBuildClangVersion(defaultVersion string) string {
@@ -279,8 +294,8 @@ func (c Config) ReleaseBuildCppStdVersion(defaultVersion string) string {
 // The flag indicating behavior for the tree wrt building modules or using prebuilts
 // derived from RELEASE_DEFAULT_MODULE_BUILD_FROM_SOURCE
 func (c Config) ReleaseDefaultModuleBuildFromSource() bool {
-	return c.config.productVariables.ReleaseDefaultModuleBuildFromSource == nil ||
-		Bool(c.config.productVariables.ReleaseDefaultModuleBuildFromSource)
+	return readProductVariable(c, &c.config.productVariables.ReleaseDefaultModuleBuildFromSource) == nil ||
+		Bool(readProductVariable(c, &c.config.productVariables.ReleaseDefaultModuleBuildFromSource))
 }
 
 func (c Config) ReleaseDefaultUpdatableModuleVersion() string {
@@ -291,48 +306,48 @@ func (c Config) ReleaseDefaultUpdatableModuleVersion() string {
 }
 
 func (c Config) ReleaseDisableVerifyOverlaps() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_DISABLE_VERIFY_OVERLAPS_CHECK")
+	return c.GetBuildFlagBool("RELEASE_DISABLE_VERIFY_OVERLAPS_CHECK")
 }
 
 // Enables flagged apis annotated with READ_WRITE aconfig flags to be included in the stubs
 // and hiddenapi flags so that they are accessible at runtime
 func (c Config) ReleaseExportRuntimeApis() bool {
-	return Bool(c.config.productVariables.ExportRuntimeApis)
+	return Bool(readProductVariable(c, &c.config.productVariables.ExportRuntimeApis))
 }
 
 // Enables ABI monitoring of NDK libraries
 func (c Config) ReleaseNdkAbiMonitored() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_NDK_ABI_MONITORED")
+	return c.GetBuildFlagBool("RELEASE_NDK_ABI_MONITORED")
 }
 
 func (c Config) ReleaseHiddenApiExportableStubs() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_HIDDEN_API_EXPORTABLE_STUBS") ||
-		Bool(c.config.productVariables.HiddenapiExportableStubs)
+	return c.GetBuildFlagBool("RELEASE_HIDDEN_API_EXPORTABLE_STUBS") ||
+		Bool(readProductVariable(c, &c.config.productVariables.HiddenapiExportableStubs))
 }
 
 // Enable read flag from new storage
 func (c Config) ReleaseCreateAconfigStorageFile() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_CREATE_ACONFIG_STORAGE_FILE")
+	return c.GetBuildFlagBool("RELEASE_CREATE_ACONFIG_STORAGE_FILE")
 }
 
 func (c Config) ReleaseUseSystemFeatureBuildFlags() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_USE_SYSTEM_FEATURE_BUILD_FLAGS")
+	return c.GetBuildFlagBool("RELEASE_USE_SYSTEM_FEATURE_BUILD_FLAGS")
 }
 
 func (c Config) ReleaseUseSystemFeatureXmlForUnavailableFeatures() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_USE_SYSTEM_FEATURE_XML_FOR_UNAVAILABLE_FEATURES")
+	return c.GetBuildFlagBool("RELEASE_USE_SYSTEM_FEATURE_XML_FOR_UNAVAILABLE_FEATURES")
 }
 
 func (c Config) ReleaseUseSparseEncoding() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_SOONG_SPARSE_ENCODING")
+	return c.GetBuildFlagBool("RELEASE_SOONG_SPARSE_ENCODING")
 }
 
 func (c Config) ReleaseUseUncompressedFonts() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_SOONG_UNCOMPRESSED_FONTS")
+	return c.GetBuildFlagBool("RELEASE_SOONG_UNCOMPRESSED_FONTS")
 }
 
 func (c Config) ReleaseUseFnoCommonFor3pCode() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_SOONG_FNO_COMMON_FOR_3P_CODE")
+	return c.GetBuildFlagBool("RELEASE_SOONG_FNO_COMMON_FOR_3P_CODE")
 }
 
 func (c Config) ReleaseAconfigStorageVersion() string {
@@ -366,6 +381,10 @@ func (c Config) ReleaseRemoveBetaFlagsFromAconfigFlagsPb() bool {
 // may be multiple devices being built.
 type DeviceConfig struct {
 	*deviceConfig
+
+	// reads records the configuration reads of the module or singleton this DeviceConfig was
+	// handed to. It is nil outside of a module or singleton.
+	reads *ConfigReads
 }
 
 // VendorConfig represents the configuration for vendor-specific behavior.
@@ -398,32 +417,16 @@ type config struct {
 	dexpreoptGlobalConfig     []byte
 	dexpreoptGlobalConfigHash proptools.Hash
 
-	// BuildOS stores the OsType for the OS that the build is running on.
+	// BuildOS stores the OsType for the OS that the build is running on. Plugins outside Soong read
+	// this field directly, so reading it records nothing.
 	BuildOS OsType
-
 	// BuildArch stores the ArchType for the CPU that the build is running on.
 	BuildArch ArchType
 
-	Targets                  map[OsType][]Target
-	BuildOSTarget            Target // the Target for tools run on the build machine
-	BuildOSCommonTarget      Target // the Target for common (java) tools run on the build machine
-	AndroidCommonTarget      Target // the Target for common modules for the Android device
-	AndroidFirstDeviceTarget Target // the first Target for modules for the Android device
-	AndroidLFITarget         Target
-
-	// deviceSideTargets are the Android targets of the device-side images, for the device's CPU, or
-	// nil where these are the same as Targets[Android], the targets of the system-side images.
-	deviceSideTargets []Target
-	// archVariationsBySide maps each image side and requested arch variation to the variation used
-	// on that side, see translateArchVariationToSide. It is nil with nil deviceSideTargets.
-	archVariationsBySide map[ImageSide]map[string]string
+	compileTargets configComputedValue[*CompileTargets]
 
 	// Flags for Partial Compile, derived from SOONG_PARTIAL_COMPILE.
-	partialCompileFlags partialCompileFlags
-
-	// multilibConflicts for an ArchType is true if there is earlier configured
-	// device architecture with the same multilib value.
-	multilibConflicts map[ArchType]bool
+	partialCompileFlags configComputedValue[partialCompileFlags]
 
 	deviceConfig *deviceConfig
 
@@ -475,7 +478,7 @@ type config struct {
 
 	// InstallPath requires the device name.
 	// This is only for the installPath.
-	deviceNameToInstall *string
+	deviceNameToInstall configComputedValue[*string]
 
 	// Copy of this config struct but some product-specific variables are
 	// replaced with the generic configuration values.
@@ -485,7 +488,7 @@ type config struct {
 	// when not running Soong tests.
 	modulesForTests *modulesForTests
 
-	buildUUIDFile string
+	buildUUIDFile configComputedValue[string]
 }
 
 type partialCompileFlags struct {
@@ -578,7 +581,7 @@ type jsonConfigurable interface {
 // To add a new feature to the list, add the field in the struct
 // `partialCompileFlags` above, and then add the name of the field in the
 // switch statement below.
-func (c *config) parsePartialCompileFlags(isEngBuild bool) (partialCompileFlags, error) {
+func (c Config) parsePartialCompileFlags(isEngBuild bool) (partialCompileFlags, error) {
 	if !isEngBuild {
 		return partialCompileFlags{}, nil
 	}
@@ -825,11 +828,10 @@ func initConfig(cmdArgs CmdArgs, availableEnv map[string]string) (*config, error
 
 		env: availableEnv,
 
-		outDir:            cmdArgs.OutDir,
-		soongOutDir:       cmdArgs.SoongOutDir,
-		runGoTests:        cmdArgs.RunGoTests,
-		katiSuffix:        cmdArgs.KatiSuffix,
-		multilibConflicts: make(map[ArchType]bool),
+		outDir:      cmdArgs.OutDir,
+		soongOutDir: cmdArgs.SoongOutDir,
+		runGoTests:  cmdArgs.RunGoTests,
+		katiSuffix:  cmdArgs.KatiSuffix,
 
 		moduleListFile: cmdArgs.ModuleListFile,
 		fs:             pathtools.NewOsFs(absSrcDir),
@@ -868,66 +870,22 @@ func initConfig(cmdArgs CmdArgs, availableEnv map[string]string) (*config, error
 		return &config{}, err
 	}
 
-	determineBuildOS(newConfig)
-
-	// Sets up the map of target OSes to the finer grained compilation targets
-	// that are configured from the product variables.
-	targets, deviceSideTargets, err := decodeTargetProductVariables(newConfig)
+	newConfig.BuildOS = determineBuildOS(Config{config: newConfig})
+	newConfig.BuildArch = determineBuildArch()
+	newConfig.compileTargets = computeFromConfig(Config{config: newConfig}, func(c Config) *CompileTargets {
+		var targets *CompileTargets
+		targets, err = computeCompileTargets(c)
+		return targets
+	})
 	if err != nil {
 		return &config{}, err
 	}
 
-	newConfig.partialCompileFlags, err = newConfig.parsePartialCompileFlags(newConfig.Eng())
-	if err != nil {
-		return &config{}, err
-	}
-
-	// Make the CommonOS OsType available for all products.
-	targets[CommonOS] = []Target{commonTargetMap[CommonOS.Name]}
-
-	var archConfig []archConfig
-	if newConfig.NdkAbis() {
-		archConfig = getNdkAbisConfig()
-	} else if newConfig.AmlAbis() {
-		archConfig = getAmlAbisConfig()
-	}
-
-	if archConfig != nil {
-		androidTargets, err := decodeAndroidArchSettings(archConfig)
-		if err != nil {
-			return &config{}, err
-		}
-		targets[Android] = androidTargets
-	} else {
-		// Only the product's own targets have a device side. Builds for the fixed ABI lists above
-		// compile every image for those.
-		newConfig.deviceSideTargets = deviceSideTargets
-	}
-
-	multilib := make(map[string]bool)
-	for _, target := range targets[Android] {
-		if seen := multilib[target.Arch.ArchType.Multilib]; seen {
-			newConfig.multilibConflicts[target.Arch.ArchType] = true
-		}
-		multilib[target.Arch.ArchType.Multilib] = true
-	}
-
-	// Map of OS to compilation targets.
-	newConfig.Targets = targets
-
-	// Compilation targets for host tools.
-	newConfig.BuildOSTarget = newConfig.Targets[newConfig.BuildOS][0]
-	newConfig.BuildOSCommonTarget = getCommonTargets(newConfig.Targets[newConfig.BuildOS])[0]
-
-	// Compilation targets for Android.
-	if len(newConfig.Targets[Android]) > 0 {
-		newConfig.AndroidCommonTarget = getCommonTargets(newConfig.Targets[Android])[0]
-		newConfig.AndroidFirstDeviceTarget = FirstTarget(newConfig.Targets[Android], "lib64", "lib32")[0]
-		newConfig.AndroidLFITarget = findLFITarget(newConfig.Targets[Android])
-	}
-
-	newConfig.archVariationsBySide, err = mapArchVariationsToSides(newConfig.Targets[Android],
-		newConfig.deviceSideTargets)
+	newConfig.partialCompileFlags = computeFromConfig(Config{config: newConfig}, func(c Config) partialCompileFlags {
+		var flags partialCompileFlags
+		flags, err = c.parsePartialCompileFlags(c.Eng())
+		return flags
+	})
 	if err != nil {
 		return &config{}, err
 	}
@@ -943,16 +901,18 @@ func initConfig(cmdArgs CmdArgs, availableEnv map[string]string) (*config, error
 	}
 	setBuildMode(cmdArgs.DocFile, GenerateDocFile)
 
-	newConfig.productVariables.Build_from_text_stub = boolPtr(newConfig.BuildFromTextStub())
+	newConfig.productVariables.Build_from_text_stub = boolPtr(Config{config: newConfig}.BuildFromTextStub())
 
-	newConfig.deviceNameToInstall = newConfig.productVariables.DeviceName
+	newConfig.deviceNameToInstall = computeDeviceNameToInstall(newConfig)
 
-	targetProduct := String(newConfig.productVariables.DeviceProduct)
-	buildUUIDFileSuffix := ""
-	if targetProduct != "" {
-		buildUUIDFileSuffix = "-" + targetProduct
-	}
-	newConfig.buildUUIDFile = "build_uuid" + buildUUIDFileSuffix + ".txt"
+	newConfig.buildUUIDFile = computeFromConfig(Config{config: newConfig}, func(c Config) string {
+		targetProduct := String(readProductVariable(c, &c.productVariables.DeviceProduct))
+		buildUUIDFileSuffix := ""
+		if targetProduct != "" {
+			buildUUIDFileSuffix = "-" + targetProduct
+		}
+		return "build_uuid" + buildUUIDFileSuffix + ".txt"
+	})
 
 	newConfig.sandboxMetrics = &blueprint.SandboxMetrics{}
 
@@ -1017,6 +977,18 @@ func overrideGenericConfig(config *config) {
 	config.genericConfigField.deviceNameToInstall = config.deviceNameToInstall
 }
 
+// computeDeviceNameToInstall returns the device name in the install paths, recording its read.
+func computeDeviceNameToInstall(newConfig *config) configComputedValue[*string] {
+	return computeFromConfig(Config{config: newConfig}, func(c Config) *string {
+		return readProductVariable(c, &c.productVariables.DeviceName)
+	})
+}
+
+// installDeviceName returns the device name in the install paths.
+func (c Config) installDeviceName() string {
+	return *c.deviceNameToInstall.readBy(c)
+}
+
 // NewConfig creates a new Config object. It also loads the config file, if
 // found. The Config object includes a duplicated Config object in it for the
 // generic configuration that does not provide any product specific information.
@@ -1031,7 +1003,7 @@ func NewConfig(cmdArgs CmdArgs, availableEnv map[string]string) (Config, error) 
 	// Update product specific variables with the generic configuration.
 	overrideGenericConfig(config)
 
-	return Config{config}, err
+	return Config{config: config}, err
 }
 
 // mockFileSystem replaces all reads with accesses to the provided map of
@@ -1181,7 +1153,13 @@ func (c *config) CpPreserveSymlinksFlags() string {
 	}
 }
 
-func (c *config) Getenv(key string) string {
+func (c Config) Getenv(key string) string {
+	val := c.config.getenv(key)
+	c.reads.record(ConfigVariable{EnvironmentVariableKind, key}, val)
+	return val
+}
+
+func (c *config) getenv(key string) string {
 	var val string
 	var exists bool
 	c.envDeps.envLock.RLock()
@@ -1209,7 +1187,7 @@ func (c *config) Getenv(key string) string {
 	return val
 }
 
-func (c *config) GetenvWithDefault(key string, defaultValue string) string {
+func (c Config) GetenvWithDefault(key string, defaultValue string) string {
 	ret := c.Getenv(key)
 	if ret == "" {
 		return defaultValue
@@ -1217,22 +1195,22 @@ func (c *config) GetenvWithDefault(key string, defaultValue string) string {
 	return ret
 }
 
-func (c *config) IsEnvTrue(key string) bool {
+func (c Config) IsEnvTrue(key string) bool {
 	value := strings.ToLower(c.Getenv(key))
 	return value == "1" || value == "y" || value == "yes" || value == "on" || value == "true"
 }
 
-func (c *config) IsEnvFalse(key string) bool {
+func (c Config) IsEnvFalse(key string) bool {
 	value := strings.ToLower(c.Getenv(key))
 	return value == "0" || value == "n" || value == "no" || value == "off" || value == "false"
 }
 
-func (c *config) TargetsJava21() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_TARGET_JAVA_21")
+func (c Config) TargetsJava21() bool {
+	return c.GetBuildFlagBool("RELEASE_TARGET_JAVA_21")
 }
 
-func (c *config) BuildWithJdk25() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_BUILD_WITH_JDK_25")
+func (c Config) BuildWithJdk25() bool {
+	return c.GetBuildFlagBool("RELEASE_BUILD_WITH_JDK_25")
 }
 
 // EnvDeps returns the environment variables this build depends on. The first
@@ -1252,12 +1230,12 @@ func (c *config) ProductVariables() ProductVariables {
 	return c.productVariables
 }
 
-func (c *config) BuildId() string {
-	return String(c.productVariables.BuildId)
+func (c Config) BuildId() string {
+	return String(readProductVariable(c, &c.productVariables.BuildId))
 }
 
-func (c *config) DisplayBuildNumber() bool {
-	return Bool(c.productVariables.DisplayBuildNumber)
+func (c Config) DisplayBuildNumber() bool {
+	return Bool(readProductVariable(c, &c.productVariables.DisplayBuildNumber))
 }
 
 // BuildFingerprintFile returns the path to a text file containing metadata
@@ -1267,14 +1245,14 @@ func (c *config) DisplayBuildNumber() bool {
 // without depending on it. They will run whenever their other dependencies
 // require them to run and get the current build fingerprint. This ensures they
 // don't rebuild on every incremental build when the build number changes.
-func (c *config) BuildFingerprintFile(ctx PathContext) Path {
-	return PathForArbitraryOutput(ctx, "target", "product", *c.deviceNameToInstall, String(c.productVariables.BuildFingerprintFile))
+func (c Config) BuildFingerprintFile(ctx PathContext) Path {
+	return PathForArbitraryOutput(ctx, "target", "product", c.installDeviceName(), String(readProductVariable(c, &c.productVariables.BuildFingerprintFile)))
 }
 
 // BuildSystemFingerprintFile returns the path to a text file containing
 // metadata representing the current build's fingerprint for the system image.
-func (c *config) BuildSystemFingerprintFile(ctx PathContext) Path {
-	return PathForArbitraryOutput(ctx, "target", "product", *c.deviceNameToInstall, String(c.productVariables.BuildSystemFingerprintFile))
+func (c Config) BuildSystemFingerprintFile(ctx PathContext) Path {
+	return PathForArbitraryOutput(ctx, "target", "product", c.installDeviceName(), String(readProductVariable(c, &c.productVariables.BuildSystemFingerprintFile)))
 }
 
 // BuildNumberFile returns the path to a text file containing metadata
@@ -1284,20 +1262,20 @@ func (c *config) BuildSystemFingerprintFile(ctx PathContext) Path {
 // without depending on it. They will run whenever their other dependencies
 // require them to run and get the current build number. This ensures they don't
 // rebuild on every incremental build when the build number changes.
-func (c *config) BuildNumberFile(ctx PathContext) Path {
-	return PathForOutput(ctx, String(c.productVariables.BuildNumberFile))
+func (c Config) BuildNumberFile(ctx PathContext) Path {
+	return PathForOutput(ctx, String(readProductVariable(c, &c.productVariables.BuildNumberFile)))
 }
 
 // BuildUUIDFile returns the path to a text file containing metadata
 // representing the current build's UUID.
-func (c *config) BuildUUIDFile(ctx PathContext) Path {
-	return PathForOutput(ctx, c.buildUUIDFile)
+func (c Config) BuildUUIDFile(ctx PathContext) Path {
+	return PathForOutput(ctx, c.buildUUIDFile.readBy(c))
 }
 
 // BuildHostnameFile returns the path to a text file containing metadata
 // representing the current build's host name.
-func (c *config) BuildHostnameFile(ctx PathContext) Path {
-	return PathForOutput(ctx, String(c.productVariables.BuildHostnameFile))
+func (c Config) BuildHostnameFile(ctx PathContext) Path {
+	return PathForOutput(ctx, String(readProductVariable(c, &c.productVariables.BuildHostnameFile)))
 }
 
 // BuildThumbprintFile returns the path to a text file containing metadata
@@ -1307,11 +1285,11 @@ func (c *config) BuildHostnameFile(ctx PathContext) Path {
 // without depending on it. They will run whenever their other dependencies
 // require them to run and get the current build thumbprint. This ensures they
 // don't rebuild on every incremental build when the build thumbprint changes.
-func (c *config) BuildThumbprintFile(ctx PathContext) Path {
-	return PathForArbitraryOutput(ctx, "target", "product", *c.deviceNameToInstall, String(c.productVariables.BuildThumbprintFile))
+func (c Config) BuildThumbprintFile(ctx PathContext) Path {
+	return PathForArbitraryOutput(ctx, "target", "product", c.installDeviceName(), String(readProductVariable(c, &c.productVariables.BuildThumbprintFile)))
 }
 
-func (c *config) BuildDateFile(ctx PathContext) Path {
+func (c Config) BuildDateFile(ctx PathContext) Path {
 	buildDateFile := c.Getenv("BUILD_DATETIME_FILE")
 	relPath, err := filepath.Rel(ctx.Config().OutDir(), buildDateFile)
 	if err != nil {
@@ -1322,124 +1300,136 @@ func (c *config) BuildDateFile(ctx PathContext) Path {
 
 // DeviceName returns the name of the current device target.
 // TODO: take an AndroidModuleContext to select the device name for multi-device builds
-func (c *config) DeviceName() string {
+func (c Config) DeviceName() string {
 	if c.isGeneric {
 		// The config is called from a context of a module which returns true
 		// from UseGenericConfig(). This is not allowed.
 		panic("The DeviceName() function cannot be called when using the generic configuration. To call DeviceName(), ensure the module's UseGenericConfig() function returns \"false\".")
 	}
-	return *c.productVariables.DeviceName
+	return *readProductVariable(c, &c.productVariables.DeviceName)
+}
+
+// MakeSuffix returns the suffix of the names of the files written for Make.
+func (c Config) MakeSuffix() string {
+	return String(readProductVariable(c, &c.productVariables.Make_suffix))
+}
+
+// isFullManifest returns whether the source tree comes from a full manifest. Reduced manifest
+// branches commonly leave DeviceArch or DeviceName unset, and Soong has no other way to tell.
+func (c Config) isFullManifest() bool {
+	return readProductVariable(c, &c.productVariables.DeviceArch) != nil &&
+		readProductVariable(c, &c.productVariables.DeviceName) != nil
 }
 
 // DeviceProduct returns the current product target. There could be multiple of
 // these per device type.
 //
 // NOTE: Do not base conditional logic on this value. It may break product inheritance.
-func (c *config) DeviceProduct() string {
+func (c Config) DeviceProduct() string {
 	if c.isGeneric {
 		// The config is called from a context of a module which returns true
 		// from UseGenericConfig(). This is not allowed.
 		panic("The DeviceProduct() function cannot be called when using the generic configuration. To call DeviceProduct(), ensure the module's UseGenericConfig() function returns \"false\".")
 	}
-	return *c.productVariables.DeviceProduct
+	return *readProductVariable(c, &c.productVariables.DeviceProduct)
 }
 
 // HasDeviceProduct returns if the build has a product. A build will not
 // necessarily have a product when --skip-config is passed to soong, like it is
 // in prebuilts/build-tools/build-prebuilts.sh
-func (c *config) HasDeviceProduct() bool {
-	return c.productVariables.DeviceProduct != nil
+func (c Config) HasDeviceProduct() bool {
+	return readProductVariable(c, &c.productVariables.DeviceProduct) != nil
 }
 
-func (c *config) DeviceAbi() []string {
-	return c.productVariables.DeviceAbi
+func (c Config) DeviceAbi() []string {
+	return readProductVariable(c, &c.productVariables.DeviceAbi)
 }
 
-func (c *config) DeviceResourceOverlays() []string {
-	return c.productVariables.DeviceResourceOverlays
+func (c Config) DeviceResourceOverlays() []string {
+	return readProductVariable(c, &c.productVariables.DeviceResourceOverlays)
 }
 
-func (c *config) ProductResourceOverlays() []string {
-	return c.productVariables.ProductResourceOverlays
+func (c Config) ProductResourceOverlays() []string {
+	return readProductVariable(c, &c.productVariables.ProductResourceOverlays)
 }
 
-func (c *config) PlatformDisplayVersionName() string {
-	return String(c.productVariables.Platform_display_version_name)
+func (c Config) PlatformDisplayVersionName() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_display_version_name))
 }
 
-func (c *config) PlatformVersionName() string {
-	return String(c.productVariables.Platform_version_name)
+func (c Config) PlatformVersionName() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_version_name))
 }
 
-func (c *config) PlatformSdkVersion() ApiLevel {
-	return UncheckedFinalApiLevel(*c.productVariables.Platform_sdk_version)
+func (c Config) PlatformSdkVersion() ApiLevel {
+	return UncheckedFinalApiLevel(*readProductVariable(c, &c.productVariables.Platform_sdk_version))
 }
 
-func (c *config) PlatformSdkVersionFull() string {
-	return proptools.StringDefault(c.productVariables.Platform_sdk_version_full, "")
+func (c Config) PlatformSdkVersionFull() string {
+	return proptools.StringDefault(readProductVariable(c, &c.productVariables.Platform_sdk_version_full), "")
 }
 
-func (c *config) PlatformProspectiveSdkVersionFull() string {
-	return proptools.StringDefault(c.productVariables.Platform_prospective_sdk_version_full, "")
+func (c Config) PlatformProspectiveSdkVersionFull() string {
+	return proptools.StringDefault(readProductVariable(c, &c.productVariables.Platform_prospective_sdk_version_full), "")
 }
 
-func (c *config) RawPlatformSdkVersion() *int {
-	return c.productVariables.Platform_sdk_version
+func (c Config) RawPlatformSdkVersion() *int {
+	return readProductVariable(c, &c.productVariables.Platform_sdk_version)
 }
 
-func (c *config) PlatformSdkFinal() bool {
-	return Bool(c.productVariables.Platform_sdk_final)
+func (c Config) PlatformSdkFinal() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Platform_sdk_final))
 }
 
-func (c *config) PlatformSdkCodename() string {
-	return String(c.productVariables.Platform_sdk_codename)
+func (c Config) PlatformSdkCodename() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_sdk_codename))
 }
 
-func (c *config) PlatformSdkExtensionVersion() int {
+func (c Config) PlatformSdkExtensionVersion() int {
 	version := 1
-	if c.productVariables.Platform_sdk_extension_version != nil {
-		version = *c.productVariables.Platform_sdk_extension_version
+	if readProductVariable(c, &c.productVariables.Platform_sdk_extension_version) != nil {
+		version = *readProductVariable(c, &c.productVariables.Platform_sdk_extension_version)
 	}
 	return version
 }
 
-func (c *config) PlatformBaseSdkExtensionVersion() int {
-	return *c.productVariables.Platform_base_sdk_extension_version
+func (c Config) PlatformBaseSdkExtensionVersion() int {
+	return *readProductVariable(c, &c.productVariables.Platform_base_sdk_extension_version)
 }
 
-func (c *config) PlatformSecurityPatch() string {
-	return String(c.productVariables.Platform_security_patch)
+func (c Config) PlatformSecurityPatch() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_security_patch))
 }
 
-func (c *config) PlatformPreviewSdkVersion() string {
-	return String(c.productVariables.Platform_preview_sdk_version)
+func (c Config) PlatformPreviewSdkVersion() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_preview_sdk_version))
 }
 
-func (c *config) PlatformMinSupportedTargetSdkVersion() string {
-	var val, ok = c.productVariables.BuildFlags["RELEASE_PLATFORM_MIN_SUPPORTED_TARGET_SDK_VERSION"]
+func (c Config) PlatformMinSupportedTargetSdkVersion() string {
+	var val, ok = c.GetBuildFlag("RELEASE_PLATFORM_MIN_SUPPORTED_TARGET_SDK_VERSION")
 	if !ok {
 		return ""
 	}
 	return val
 }
 
-func (c *config) PlatformBaseOS() string {
-	return String(c.productVariables.Platform_base_os)
+func (c Config) PlatformBaseOS() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_base_os))
 }
 
-func (c *config) PlatformVersionLastStable() string {
-	return String(c.productVariables.Platform_version_last_stable)
+func (c Config) PlatformVersionLastStable() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_version_last_stable))
 }
 
-func (c *config) PlatformVersionKnownCodenames() string {
-	return String(c.productVariables.Platform_version_known_codenames)
+func (c Config) PlatformVersionKnownCodenames() string {
+	return String(readProductVariable(c, &c.productVariables.Platform_version_known_codenames))
 }
 
 func (c *config) MinSupportedSdkVersion() ApiLevel {
 	return UncheckedFinalApiLevel(21)
 }
 
-func (c *config) FinalApiLevels() []ApiLevel {
+func (c Config) FinalApiLevels() []ApiLevel {
 	var levels []ApiLevel
 	for i := 1; i <= c.PlatformSdkVersion().FinalOrFutureInt(); i++ {
 		levels = append(levels, UncheckedFinalApiLevel(i))
@@ -1447,7 +1437,7 @@ func (c *config) FinalApiLevels() []ApiLevel {
 	return levels
 }
 
-func (c *config) PreviewApiLevels() []ApiLevel {
+func (c Config) PreviewApiLevels() []ApiLevel {
 	var levels []ApiLevel
 	i := 0
 	for _, codename := range c.PlatformVersionActiveCodenames() {
@@ -1465,7 +1455,7 @@ func (c *config) PreviewApiLevels() []ApiLevel {
 	return levels
 }
 
-func (c *config) LatestPreviewApiLevel() ApiLevel {
+func (c Config) LatestPreviewApiLevel() ApiLevel {
 	level := NoneApiLevel
 	for _, l := range c.PreviewApiLevels() {
 		if l.GreaterThan(level) {
@@ -1475,7 +1465,7 @@ func (c *config) LatestPreviewApiLevel() ApiLevel {
 	return level
 }
 
-func (c *config) AllSupportedApiLevels() []ApiLevel {
+func (c Config) AllSupportedApiLevels() []ApiLevel {
 	var levels []ApiLevel
 	levels = append(levels, c.FinalApiLevels()...)
 	return append(levels, c.PreviewApiLevels()...)
@@ -1483,12 +1473,12 @@ func (c *config) AllSupportedApiLevels() []ApiLevel {
 
 // DefaultAppTargetSdk returns the API level that platform apps are targeting.
 // This converts a codename to the exact ApiLevel it represents.
-func (c *config) DefaultAppTargetSdk(ctx EarlyModuleContext) ApiLevel {
-	if Bool(c.productVariables.Platform_sdk_final) {
+func (c Config) DefaultAppTargetSdk(ctx EarlyModuleContext) ApiLevel {
+	if Bool(readProductVariable(c, &c.productVariables.Platform_sdk_final)) {
 		return c.PlatformSdkVersion()
 	}
 	codename := c.PlatformSdkCodename()
-	hostOnlyBuild := c.productVariables.DeviceArch == nil
+	hostOnlyBuild := readProductVariable(c, &c.productVariables.DeviceArch) == nil
 	if codename == "" {
 		// There are some host-only builds (those are invoked by build-prebuilts.sh) which
 		// don't set platform sdk codename. Platform sdk codename makes sense only when we
@@ -1506,54 +1496,54 @@ func (c *config) DefaultAppTargetSdk(ctx EarlyModuleContext) ApiLevel {
 }
 
 // This file is written by soong_ui, and sourced by rules that need a value for `SOONG_USE_PARTIAL_COMPILE`.
-func (c *config) UsePartialCompileFile(ctx PathContext) Path {
-	return PathForOutput(ctx, "use_partial_compile-"+*c.deviceNameToInstall+".sh")
+func (c Config) UsePartialCompileFile(ctx PathContext) Path {
+	return PathForOutput(ctx, "use_partial_compile-"+c.installDeviceName()+".sh")
 }
 
-func (c *config) PartialCompileFlags() partialCompileFlags {
-	return c.partialCompileFlags
+func (c Config) PartialCompileFlags() partialCompileFlags {
+	return c.partialCompileFlags.readBy(c)
 }
 
-func (c *config) AppsDefaultVersionName() string {
-	return String(c.productVariables.AppsDefaultVersionName)
+func (c Config) AppsDefaultVersionName() string {
+	return String(readProductVariable(c, &c.productVariables.AppsDefaultVersionName))
 }
 
 // Codenames that are active in the current lunch target.
-func (c *config) PlatformVersionActiveCodenames() []string {
-	return c.productVariables.Platform_version_active_codenames
+func (c Config) PlatformVersionActiveCodenames() []string {
+	return readProductVariable(c, &c.productVariables.Platform_version_active_codenames)
 }
 
 // All unreleased codenames.
-func (c *config) PlatformVersionAllPreviewCodenames() []string {
-	return c.productVariables.Platform_version_all_preview_codenames
+func (c Config) PlatformVersionAllPreviewCodenames() []string {
+	return readProductVariable(c, &c.productVariables.Platform_version_all_preview_codenames)
 }
 
-func (c *config) ProductAAPTConfig() []string {
-	return c.productVariables.AAPTConfig
+func (c Config) ProductAAPTConfig() []string {
+	return readProductVariable(c, &c.productVariables.AAPTConfig)
 }
 
-func (c *config) ProductAAPTPreferredConfig() string {
-	return String(c.productVariables.AAPTPreferredConfig)
+func (c Config) ProductAAPTPreferredConfig() string {
+	return String(readProductVariable(c, &c.productVariables.AAPTPreferredConfig))
 }
 
-func (c *config) ProductAAPTCharacteristics() string {
-	return String(c.productVariables.AAPTCharacteristics)
+func (c Config) ProductAAPTCharacteristics() string {
+	return String(readProductVariable(c, &c.productVariables.AAPTCharacteristics))
 }
 
-func (c *config) ProductAAPTPrebuiltDPI() []string {
-	return c.productVariables.AAPTPrebuiltDPI
+func (c Config) ProductAAPTPrebuiltDPI() []string {
+	return readProductVariable(c, &c.productVariables.AAPTPrebuiltDPI)
 }
 
-func (c *config) DefaultAppCertificateDir(ctx PathContext) SourcePath {
-	defaultCert := String(c.productVariables.DefaultAppCertificate)
+func (c Config) DefaultAppCertificateDir(ctx PathContext) SourcePath {
+	defaultCert := String(readProductVariable(c, &c.productVariables.DefaultAppCertificate))
 	if defaultCert != "" {
 		return PathForSource(ctx, filepath.Dir(defaultCert))
 	}
 	return PathForSource(ctx, testKeyDir)
 }
 
-func (c *config) DefaultAppCertificate(ctx PathContext) (pem, key SourcePath) {
-	defaultCert := String(c.productVariables.DefaultAppCertificate)
+func (c Config) DefaultAppCertificate(ctx PathContext) (pem, key SourcePath) {
+	defaultCert := String(readProductVariable(c, &c.productVariables.DefaultAppCertificate))
 	if defaultCert != "" {
 		return PathForSource(ctx, defaultCert+".x509.pem"), PathForSource(ctx, defaultCert+".pk8")
 	}
@@ -1561,17 +1551,17 @@ func (c *config) DefaultAppCertificate(ctx PathContext) (pem, key SourcePath) {
 	return defaultDir.Join(ctx, "testkey.x509.pem"), defaultDir.Join(ctx, "testkey.pk8")
 }
 
-func (c *config) DefaultSystemDevCertificate(ctx PathContext) (pem, key SourcePath) {
-	dir := String(c.productVariables.DefaultSystemDevCertificate)
+func (c Config) DefaultSystemDevCertificate(ctx PathContext) (pem, key SourcePath) {
+	dir := String(readProductVariable(c, &c.productVariables.DefaultSystemDevCertificate))
 	return PathForSource(ctx, dir+".x509.pem"), PathForSource(ctx, dir+".pk8")
 }
 
-func (c *config) ExtraOtaKeys(ctx PathContext, recovery bool) []SourcePath {
+func (c Config) ExtraOtaKeys(ctx PathContext, recovery bool) []SourcePath {
 	var otaKeys []string
 	if recovery {
-		otaKeys = c.productVariables.ExtraOtaRecoveryKeys
+		otaKeys = readProductVariable(c, &c.productVariables.ExtraOtaRecoveryKeys)
 	} else {
-		otaKeys = c.productVariables.ExtraOtaKeys
+		otaKeys = readProductVariable(c, &c.productVariables.ExtraOtaKeys)
 	}
 
 	otaPaths := make([]SourcePath, len(otaKeys))
@@ -1582,21 +1572,21 @@ func (c *config) ExtraOtaKeys(ctx PathContext, recovery bool) []SourcePath {
 	return otaPaths
 }
 
-func (c *config) ExtraOtaRecoveryKeys() []string {
-	return c.productVariables.ExtraOtaRecoveryKeys
+func (c Config) ExtraOtaRecoveryKeys() []string {
+	return readProductVariable(c, &c.productVariables.ExtraOtaRecoveryKeys)
 }
 
-func (c *config) BuildKeys() string {
-	defaultCert := String(c.productVariables.DefaultAppCertificate)
+func (c Config) BuildKeys() string {
+	defaultCert := String(readProductVariable(c, &c.productVariables.DefaultAppCertificate))
 	if defaultCert == "" || defaultCert == filepath.Join(testKeyDir, "testkey") {
 		return "test-keys"
 	}
 	return "dev-keys"
 }
 
-func (c *config) ApexKeyDir(ctx ModuleContext) SourcePath {
+func (c Config) ApexKeyDir(ctx ModuleContext) SourcePath {
 	// TODO(b/121224311): define another variable such as TARGET_APEX_KEY_OVERRIDE
-	defaultCert := String(c.productVariables.DefaultAppCertificate)
+	defaultCert := String(readProductVariable(c, &c.productVariables.DefaultAppCertificate))
 	if defaultCert == "" || filepath.Dir(defaultCert) == testKeyDir {
 		// When defaultCert is unset or is set to the testkeys path, use the APEX keys
 		// that is under the module dir
@@ -1607,8 +1597,8 @@ func (c *config) ApexKeyDir(ctx ModuleContext) SourcePath {
 }
 
 // Certificate for the NetworkStack sepolicy context
-func (c *config) MainlineSepolicyDevCertificatesDir(ctx ModuleContext) SourcePath {
-	cert := String(c.productVariables.MainlineSepolicyDevCertificates)
+func (c Config) MainlineSepolicyDevCertificatesDir(ctx ModuleContext) SourcePath {
+	cert := String(readProductVariable(c, &c.productVariables.MainlineSepolicyDevCertificates))
 	if cert != "" {
 		return PathForSource(ctx, cert)
 	}
@@ -1616,8 +1606,8 @@ func (c *config) MainlineSepolicyDevCertificatesDir(ctx ModuleContext) SourcePat
 }
 
 // Certificate for the Bluetooth module sepolicy context
-func (c *config) MainlineBluetoothSepolicyDevCertificatesDir(ctx ModuleContext) SourcePath {
-	cert := String(c.productVariables.MainlineBluetoothSepolicyDevCertificates)
+func (c Config) MainlineBluetoothSepolicyDevCertificatesDir(ctx ModuleContext) SourcePath {
+	cert := String(readProductVariable(c, &c.productVariables.MainlineBluetoothSepolicyDevCertificates))
 	if cert != "" {
 		return PathForSource(ctx, cert)
 	}
@@ -1625,8 +1615,8 @@ func (c *config) MainlineBluetoothSepolicyDevCertificatesDir(ctx ModuleContext) 
 }
 
 // Certificate for the Nfc module sepolicy context
-func (c *config) MainlineNfcSepolicyDevCertificatesDir(ctx ModuleContext) SourcePath {
-	cert := String(c.productVariables.MainlineNfcSepolicyDevCertificates)
+func (c Config) MainlineNfcSepolicyDevCertificatesDir(ctx ModuleContext) SourcePath {
+	cert := String(readProductVariable(c, &c.productVariables.MainlineNfcSepolicyDevCertificates))
 	if cert != "" {
 		return PathForSource(ctx, cert)
 	}
@@ -1636,122 +1626,164 @@ func (c *config) MainlineNfcSepolicyDevCertificatesDir(ctx ModuleContext) Source
 // AllowMissingDependencies configures Blueprint/Soong to not fail when modules
 // are configured to depend on non-existent modules. Note that this does not
 // affect missing input dependencies at the Ninja level.
-func (c *config) AllowMissingDependencies() bool {
-	return Bool(c.productVariables.Allow_missing_dependencies)
+func (c Config) AllowMissingDependencies() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Allow_missing_dependencies))
 }
 
 // Returns true if a full platform source tree cannot be assumed.
-func (c *config) UnbundledBuild() bool {
-	return Bool(c.productVariables.Unbundled_build)
+func (c Config) UnbundledBuild() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Unbundled_build))
 }
 
 // Returns true if building apps that aren't bundled with the platform.
 // UnbundledBuild() is always true when this is true.
-func (c *config) UnbundledBuildApps() []string {
-	return c.productVariables.Unbundled_build_apps
+func (c Config) UnbundledBuildApps() []string {
+	return readProductVariable(c, &c.productVariables.Unbundled_build_apps)
 }
 
 // Returns true if building apps that aren't bundled with the platform.
 // UnbundledBuild() is always true when this is true.
-func (c *config) HasUnbundledBuildApps() bool {
-	return len(c.productVariables.Unbundled_build_apps) > 0
+func (c Config) HasUnbundledBuildApps() bool {
+	return len(readProductVariable(c, &c.productVariables.Unbundled_build_apps)) > 0
 }
 
 // Returns true if building image that aren't bundled with the platform.
 // UnbundledBuild() is always true when this is true.
-func (c *config) UnbundledBuildImage() bool {
-	return Bool(c.productVariables.Unbundled_build_image)
+func (c Config) UnbundledBuildImage() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Unbundled_build_image))
 }
 
 // Returns true if building modules against prebuilt SDKs.
-func (c *config) AlwaysUsePrebuiltSdks() bool {
-	return Bool(c.productVariables.Always_use_prebuilt_sdks)
+func (c Config) AlwaysUsePrebuiltSdks() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Always_use_prebuilt_sdks))
 }
 
 // MinimizeJavaDebugInfoFor returns whether javac of the module variant leaves out the debug
 // information for local variables.
-func (c *config) MinimizeJavaDebugInfoFor(module Module) bool {
-	return Bool(c.productVariables.MinimizeJavaDebugInfo) && !c.EngFor(module)
+func (c Config) MinimizeJavaDebugInfoFor(module Module) bool {
+	return Bool(readProductVariable(c, &c.productVariables.MinimizeJavaDebugInfo)) && !c.EngFor(module)
 }
 
 // Debuggable returns the product variable for code outside module variants. Module code reads
 // DebuggableFor, which adds it to the output folder name of the module variant.
-func (c *config) Debuggable() bool {
-	return Bool(c.productVariables.Debuggable)
+func (c Config) Debuggable() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Debuggable))
+}
+
+// AdbKeys returns the path of the adb public keys file installed by debuggable builds.
+func (c Config) AdbKeys() string {
+	return String(readProductVariable(c, &c.productVariables.AdbKeys))
+}
+
+// ProductHostPackages returns the host modules that the product installs, PRODUCT_HOST_PACKAGES.
+func (c Config) ProductHostPackages() []string {
+	return readProductVariable(c, &c.productVariables.ProductHostPackages)
+}
+
+// ProductCopyFiles returns the "src:dest" pairs of PRODUCT_COPY_FILES.
+func (c Config) ProductCopyFiles() []string {
+	return readProductVariable(c, &c.productVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.ProductCopyFiles)
+}
+
+// PartitionVariables returns the variables that describe the partitions and images of the product,
+// recorded as one variable.
+func (c Config) PartitionVariables() PartitionVariables {
+	return readProductVariable(c, &c.productVariables.PartitionVarsForSoongMigrationOnlyDoNotUse)
+}
+
+// BoardPlatform returns TARGET_BOARD_PLATFORM.
+func (c Config) BoardPlatform() *string {
+	return readProductVariable(c, &c.productVariables.BoardPlatform)
+}
+
+// BoardKernelVersion returns BOARD_KERNEL_VERSION.
+func (c Config) BoardKernelVersion() *string {
+	return readProductVariable(c, &c.productVariables.BoardKernelVersion)
+}
+
+// NativeBridgeArch returns TARGET_NATIVE_BRIDGE_ARCH.
+func (c Config) NativeBridgeArch() *string {
+	return readProductVariable(c, &c.productVariables.NativeBridgeArch)
+}
+
+// BuildFlags returns every build flag with its value. Code that needs one flag reads it with
+// GetBuildFlag, which records that flag alone.
+func (c Config) BuildFlags() map[string]string {
+	return readProductVariable(c, &c.productVariables.BuildFlags)
 }
 
 // Eng returns the product variable for code outside module variants. Module code reads EngFor,
 // which adds it to the output folder name of the module variant.
-func (c *config) Eng() bool {
-	return Bool(c.productVariables.Eng)
+func (c Config) Eng() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Eng))
 }
 
 // DebuggableFor returns Debuggable as the module variant sees it: false where the build variant
 // does not apply to the module variant. It records the value read, see RecordBuildTypeRead.
-func (c *config) DebuggableFor(module Module) bool {
+func (c Config) DebuggableFor(module Module) bool {
 	return module.base().readBuildTypeValue(c, BuildTypeDebuggable)
 }
 
 // EngFor returns Eng as the module variant sees it: false where the build variant does not apply
 // to the module variant. It records the value read, see RecordBuildTypeRead.
-func (c *config) EngFor(module Module) bool {
+func (c Config) EngFor(module Module) bool {
 	return module.base().readBuildTypeValue(c, BuildTypeEng)
 }
 
-func (c *config) BuildType() string {
-	return String(c.productVariables.BuildType)
+func (c Config) BuildType() string {
+	return String(readProductVariable(c, &c.productVariables.BuildType))
 }
 
 // DevicePrimaryArchType returns the ArchType for the first configured device architecture, or
 // Common if there are no device architectures.
-func (c *config) DevicePrimaryArchType() ArchType {
-	if androidTargets := c.Targets[Android]; len(androidTargets) > 0 {
+func (c Config) DevicePrimaryArchType() ArchType {
+	if androidTargets := c.CompileTargets().Targets[Android]; len(androidTargets) > 0 {
 		return androidTargets[0].Arch.ArchType
 	}
 	return Common
 }
 
-func (c *config) SanitizeHost() []string {
-	return append([]string(nil), c.productVariables.SanitizeHost...)
+func (c Config) SanitizeHost() []string {
+	return append([]string(nil), readProductVariable(c, &c.productVariables.SanitizeHost)...)
 }
 
-func (c *config) SanitizeDevice() []string {
-	return append([]string(nil), c.productVariables.SanitizeDevice...)
+func (c Config) SanitizeDevice() []string {
+	return append([]string(nil), readProductVariable(c, &c.productVariables.SanitizeDevice)...)
 }
 
-func (c *config) SanitizeDeviceDiag() []string {
-	return append([]string(nil), c.productVariables.SanitizeDeviceDiag...)
+func (c Config) SanitizeDeviceDiag() []string {
+	return append([]string(nil), readProductVariable(c, &c.productVariables.SanitizeDeviceDiag)...)
 }
 
-func (c *config) SanitizeDeviceArch() []string {
-	return append([]string(nil), c.productVariables.SanitizeDeviceArch...)
+func (c Config) SanitizeDeviceArch() []string {
+	return append([]string(nil), readProductVariable(c, &c.productVariables.SanitizeDeviceArch)...)
 }
 
-func (c *config) EnableCFI() bool {
-	if c.productVariables.EnableCFI == nil {
+func (c Config) EnableCFI() bool {
+	if readProductVariable(c, &c.productVariables.EnableCFI) == nil {
 		return true
 	}
-	return *c.productVariables.EnableCFI
+	return *readProductVariable(c, &c.productVariables.EnableCFI)
 }
 
-func (c *config) DisableScudo() bool {
-	return Bool(c.productVariables.DisableScudo)
+func (c Config) DisableScudo() bool {
+	return Bool(readProductVariable(c, &c.productVariables.DisableScudo))
 }
 
-func (c *config) EnableXOM() bool {
+func (c Config) EnableXOM() bool {
 	// Use the Build Flag value if ENABLE_XOM is not set,
 	// otherwise use the value in product variables.
-	if c.productVariables.EnableXOM == nil {
+	if readProductVariable(c, &c.productVariables.EnableXOM) == nil {
 		return c.GetBuildFlagBool("RELEASE_BUILD_EXECUTE_ONLY_MEMORY")
-	} else if Bool(c.productVariables.EnableXOM) {
+	} else if Bool(readProductVariable(c, &c.productVariables.EnableXOM)) {
 		return true
 	} else {
 		return false
 	}
 }
 
-func (c *config) Android64() bool {
-	for _, t := range c.Targets[Android] {
+func (c Config) Android64() bool {
+	for _, t := range c.CompileTargets().Targets[Android] {
 		if t.Arch.ArchType.Multilib == "lib64" {
 			return true
 		}
@@ -1760,31 +1792,31 @@ func (c *config) Android64() bool {
 	return false
 }
 
-func (c *config) UseABFS() bool {
-	return Bool(c.productVariables.UseABFS)
+func (c Config) UseABFS() bool {
+	return Bool(readProductVariable(c, &c.productVariables.UseABFS))
 }
 
-func (c *config) UseRBE() bool {
-	return Bool(c.productVariables.UseRBE)
+func (c Config) UseRBE() bool {
+	return Bool(readProductVariable(c, &c.productVariables.UseRBE))
 }
 
-func (c *config) UseREWrapper() bool {
-	return Bool(c.productVariables.UseREWrapper)
+func (c Config) UseREWrapper() bool {
+	return Bool(readProductVariable(c, &c.productVariables.UseREWrapper))
 }
 
 // Return the container image used for RBE.
 //
 // This is found in build/make/core/rbe.mk, if not overridden elsewhere.
-func (c *config) RBEContainerImage() string {
-	return String(c.productVariables.RBEContainerImage)
+func (c Config) RBEContainerImage() string {
+	return String(readProductVariable(c, &c.productVariables.RBEContainerImage))
 }
 
 // Return true if we are using rewrapper **and** RBE.
-func (c *config) REWrapperRemoteBuild() bool {
+func (c Config) REWrapperRemoteBuild() bool {
 	return c.UseRBE() && c.UseREWrapper()
 }
 
-func (c *config) RunErrorProne() bool {
+func (c Config) RunErrorProne() bool {
 	return c.IsEnvTrue("RUN_ERROR_PRONE") || c.RunErrorProneInline()
 }
 
@@ -1792,19 +1824,19 @@ func (c *config) RunErrorProne() bool {
 // of the main javac compilation instead of its own separate compilation. This is good for CI
 // but bad for local development, because if you toggle errorprone+inline on/off it will repeatedly
 // clobber java files from the old configuration.
-func (c *config) RunErrorProneInline() bool {
+func (c Config) RunErrorProneInline() bool {
 	value := strings.ToLower(c.Getenv("RUN_ERROR_PRONE"))
 	return c.IsEnvTrue("RUN_ERROR_PRONE_INLINE") || value == "inline"
 }
 
 // XrefCorpusName returns the Kythe cross-reference corpus name.
-func (c *config) XrefCorpusName() string {
+func (c Config) XrefCorpusName() string {
 	return c.Getenv("XREF_CORPUS")
 }
 
 // XrefCuEncoding returns the compilation unit encoding to use for Kythe code
 // xrefs. Can be 'json' (default), 'proto' or 'all'.
-func (c *config) XrefCuEncoding() string {
+func (c Config) XrefCuEncoding() string {
 	if enc := c.Getenv("KYTHE_KZIP_ENCODING"); enc != "" {
 		return enc
 	}
@@ -1830,19 +1862,19 @@ func (c Config) XrefCuJavaSourceMax() string {
 
 }
 
-func (c *config) EmitXrefRules() bool {
+func (c Config) EmitXrefRules() bool {
 	return c.XrefCorpusName() != ""
 }
 
-func (c *config) ClangTidy() bool {
-	return Bool(c.productVariables.ClangTidy)
+func (c Config) ClangTidy() bool {
+	return Bool(readProductVariable(c, &c.productVariables.ClangTidy))
 }
 
-func (c *config) TidyChecks() string {
-	if c.productVariables.TidyChecks == nil {
+func (c Config) TidyChecks() string {
+	if readProductVariable(c, &c.productVariables.TidyChecks) == nil {
 		return ""
 	}
-	return *c.productVariables.TidyChecks
+	return *readProductVariable(c, &c.productVariables.TidyChecks)
 }
 
 func (c *config) LibartImgHostBaseAddress() string {
@@ -1853,16 +1885,16 @@ func (c *config) LibartImgDeviceBaseAddress() string {
 	return "0x70000000"
 }
 
-func (c *config) ArtUseReadBarrier() bool {
-	return Bool(c.productVariables.ArtUseReadBarrier)
+func (c Config) ArtUseReadBarrier() bool {
+	return Bool(readProductVariable(c, &c.productVariables.ArtUseReadBarrier))
 }
 
 // Enforce Runtime Resource Overlays for a module. RROs supersede static RROs,
 // but some modules still depend on it.
 //
 // More info: https://source.android.com/devices/architecture/rros
-func (c *config) EnforceRROForModule(name string) bool {
-	enforceList := c.productVariables.EnforceRROTargets
+func (c Config) EnforceRROForModule(name string) bool {
+	enforceList := readProductVariable(c, &c.productVariables.EnforceRROTargets)
 
 	if len(enforceList) > 0 {
 		if InList("*", enforceList) {
@@ -1873,48 +1905,48 @@ func (c *config) EnforceRROForModule(name string) bool {
 	return false
 }
 
-func (c *config) EnforceRROExcludedOverlay(path string) bool {
-	excluded := c.productVariables.EnforceRROExcludedOverlays
+func (c Config) EnforceRROExcludedOverlay(path string) bool {
+	excluded := readProductVariable(c, &c.productVariables.EnforceRROExcludedOverlays)
 	if len(excluded) > 0 {
 		return HasAnyPrefix(path, excluded)
 	}
 	return false
 }
 
-func (c *config) EnforceRROGlobally() bool {
-	enforceList := c.productVariables.EnforceRROTargets
+func (c Config) EnforceRROGlobally() bool {
+	enforceList := readProductVariable(c, &c.productVariables.EnforceRROTargets)
 	return InList("*", enforceList)
 }
 
-func (c *config) ExportedNamespaces() []string {
-	return append([]string(nil), c.productVariables.NamespacesToExport...)
+func (c Config) ExportedNamespaces() []string {
+	return append([]string(nil), readProductVariable(c, &c.productVariables.NamespacesToExport)...)
 }
 
-func (c *config) SourceRootDirs() []string {
-	return c.productVariables.SourceRootDirs
+func (c Config) SourceRootDirs() []string {
+	return readProductVariable(c, &c.productVariables.SourceRootDirs)
 }
 
-func (c *config) HostStaticBinaries() bool {
-	return Bool(c.productVariables.HostStaticBinaries)
+func (c Config) HostStaticBinaries() bool {
+	return Bool(readProductVariable(c, &c.productVariables.HostStaticBinaries))
 }
 
-func (c *config) UncompressPrivAppDex() bool {
-	return Bool(c.productVariables.UncompressPrivAppDex)
+func (c Config) UncompressPrivAppDex() bool {
+	return Bool(readProductVariable(c, &c.productVariables.UncompressPrivAppDex))
 }
 
-func (c *config) ModulesLoadedByPrivilegedModules() []string {
-	return c.productVariables.ModulesLoadedByPrivilegedModules
+func (c Config) ModulesLoadedByPrivilegedModules() []string {
+	return readProductVariable(c, &c.productVariables.ModulesLoadedByPrivilegedModules)
 }
 
 // DexpreoptGlobalConfigPath returns the path to the dexpreopt.config file in
 // the output directory, if it was created during the product configuration
 // phase by Kati.
-func (c *config) DexpreoptGlobalConfigPath(ctx PathContext) OptionalPath {
-	if c.productVariables.DexpreoptGlobalConfig == nil {
+func (c Config) DexpreoptGlobalConfigPath(ctx PathContext) OptionalPath {
+	if readProductVariable(c, &c.productVariables.DexpreoptGlobalConfig) == nil {
 		return OptionalPathForPath(nil)
 	}
 	return OptionalPathForPath(
-		pathForBuildToolDep(ctx, *c.productVariables.DexpreoptGlobalConfig))
+		pathForBuildToolDep(ctx, *readProductVariable(c, &c.productVariables.DexpreoptGlobalConfig)))
 }
 
 // ProductVariablesHash returns the hash of the contents of the product variables file that Kati
@@ -1926,8 +1958,8 @@ func (c *config) ProductVariablesHash() proptools.Hash {
 // DexpreoptGlobalConfigHash returns the hash of the contents of the dexpreopt.config file that Kati
 // writes during the product configuration phase, or false where the product configuration leaves
 // the file name unset.
-func (c *config) DexpreoptGlobalConfigHash() (proptools.Hash, bool) {
-	return c.dexpreoptGlobalConfigHash, c.productVariables.DexpreoptGlobalConfig != nil
+func (c Config) DexpreoptGlobalConfigHash() (proptools.Hash, bool) {
+	return c.dexpreoptGlobalConfigHash, readProductVariable(c, &c.productVariables.DexpreoptGlobalConfig) != nil
 }
 
 // DexpreoptGlobalConfig returns the raw byte contents of the dexpreopt global
@@ -1936,7 +1968,7 @@ func (c *config) DexpreoptGlobalConfigHash() (proptools.Hash, bool) {
 // also manually add a Ninja file dependency on the configuration file to the
 // rule that creates the main build.ninja file. This ensures that build.ninja is
 // regenerated correctly if dexpreopt.config changes.
-func (c *config) DexpreoptGlobalConfig(ctx PathContext) []byte {
+func (c Config) DexpreoptGlobalConfig(ctx PathContext) []byte {
 	path := c.DexpreoptGlobalConfigPath(ctx)
 	if !path.Valid() {
 		return nil
@@ -1945,27 +1977,27 @@ func (c *config) DexpreoptGlobalConfig(ctx PathContext) []byte {
 	return c.dexpreoptGlobalConfig
 }
 
-func (c *deviceConfig) WithDexpreopt() bool {
-	return c.config.productVariables.WithDexpreopt
+func (c DeviceConfig) WithDexpreopt() bool {
+	return readProductVariable(c, &c.config.productVariables.WithDexpreopt)
 }
 
 func (c *config) FrameworksBaseDirExists(ctx PathGlobContext) bool {
 	return ExistentPathForSource(ctx, "frameworks", "base", "Android.bp").Valid()
 }
 
-func (c *config) HasMultilibConflict(arch ArchType) bool {
-	return c.multilibConflicts[arch]
+func (c Config) HasMultilibConflict(arch ArchType) bool {
+	return c.CompileTargets().multilibConflicts[arch]
 }
 
-func (c *config) PrebuiltHiddenApiDir(_ PathContext) string {
-	return String(c.productVariables.PrebuiltHiddenApiDir)
+func (c Config) PrebuiltHiddenApiDir(_ PathContext) string {
+	return String(readProductVariable(c, &c.productVariables.PrebuiltHiddenApiDir))
 }
 
-func (c *config) VendorApiLevel() string {
-	return String(c.productVariables.VendorApiLevel)
+func (c Config) VendorApiLevel() string {
+	return String(readProductVariable(c, &c.productVariables.VendorApiLevel))
 }
 
-func (c *config) PrevVendorApiLevel() string {
+func (c Config) PrevVendorApiLevel() string {
 	vendorApiLevel, err := strconv.Atoi(c.VendorApiLevel())
 	if err != nil {
 		panic(fmt.Errorf("Cannot parse vendor API level %s to an integer: %s",
@@ -1989,146 +2021,146 @@ func IsTrunkStableVendorApiLevel(level string) bool {
 	return err == nil && levelInt >= 202404
 }
 
-func (c *config) VendorApiLevelFrozen() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_BOARD_API_LEVEL_FROZEN")
+func (c Config) VendorApiLevelFrozen() bool {
+	return c.GetBuildFlagBool("RELEASE_BOARD_API_LEVEL_FROZEN")
 }
 
-func (c *config) DisableNoticeXmlGeneration() bool {
+func (c Config) DisableNoticeXmlGeneration() bool {
 	return c.IsEnvTrue("DISABLE_NOTICE_XML_GENERATION")
 }
 
-func (c *config) CompatibilityTestcases() map[string]CompatibilityTestcaseJSON {
-	return c.productVariables.CompatibilityTestcases
+func (c Config) CompatibilityTestcases() map[string]CompatibilityTestcaseJSON {
+	return readProductVariable(c, &c.productVariables.CompatibilityTestcases)
 }
 
-func (c *deviceConfig) Arches() []Arch {
+func (c DeviceConfig) Arches() []Arch {
 	var arches []Arch
-	for _, target := range c.config.Targets[Android] {
+	for _, target := range (Config{config: c.config, reads: c.reads}).CompileTargets().Targets[Android] {
 		arches = append(arches, target.Arch)
 	}
 	return arches
 }
 
-func (c *deviceConfig) BinderBitness() string {
-	is32BitBinder := c.config.productVariables.Binder32bit
+func (c DeviceConfig) BinderBitness() string {
+	is32BitBinder := readProductVariable(c, &c.config.productVariables.Binder32bit)
 	if is32BitBinder != nil && *is32BitBinder {
 		return "32"
 	}
 	return "64"
 }
 
-func (c *deviceConfig) RecoveryPath() string {
-	if c.config.productVariables.RecoveryPath != nil {
-		return *c.config.productVariables.RecoveryPath
+func (c DeviceConfig) RecoveryPath() string {
+	if readProductVariable(c, &c.config.productVariables.RecoveryPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.RecoveryPath)
 	}
 	return "recovery"
 }
 
-func (c *deviceConfig) VendorPath() string {
-	if c.config.productVariables.VendorPath != nil {
-		return *c.config.productVariables.VendorPath
+func (c DeviceConfig) VendorPath() string {
+	if readProductVariable(c, &c.config.productVariables.VendorPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.VendorPath)
 	}
 	return "vendor"
 }
 
-func (c *deviceConfig) VendorDlkmPath() string {
-	if c.config.productVariables.VendorDlkmPath != nil {
-		return *c.config.productVariables.VendorDlkmPath
+func (c DeviceConfig) VendorDlkmPath() string {
+	if readProductVariable(c, &c.config.productVariables.VendorDlkmPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.VendorDlkmPath)
 	}
 	return "vendor_dlkm"
 }
 
-func (c *deviceConfig) BuildingVendorImage() bool {
-	return proptools.Bool(c.config.productVariables.BuildingVendorImage)
+func (c DeviceConfig) BuildingVendorImage() bool {
+	return proptools.Bool(readProductVariable(c, &c.config.productVariables.BuildingVendorImage))
 }
 
-func (c *deviceConfig) CurrentApiLevelForVendorModules() string {
-	return StringDefault(c.config.productVariables.DeviceCurrentApiLevelForVendorModules, "current")
+func (c DeviceConfig) CurrentApiLevelForVendorModules() string {
+	return StringDefault(readProductVariable(c, &c.config.productVariables.DeviceCurrentApiLevelForVendorModules), "current")
 }
 
-func (c *deviceConfig) ExtraVndkVersions() []string {
-	return c.config.productVariables.ExtraVndkVersions
+func (c DeviceConfig) ExtraVndkVersions() []string {
+	return readProductVariable(c, &c.config.productVariables.ExtraVndkVersions)
 }
 
-func (c *deviceConfig) SystemSdkVersions() []string {
-	return c.config.productVariables.DeviceSystemSdkVersions
+func (c DeviceConfig) SystemSdkVersions() []string {
+	return readProductVariable(c, &c.config.productVariables.DeviceSystemSdkVersions)
 }
 
-func (c *deviceConfig) PlatformSystemSdkVersions() []string {
-	return c.config.productVariables.Platform_systemsdk_versions
+func (c DeviceConfig) PlatformSystemSdkVersions() []string {
+	return readProductVariable(c, &c.config.productVariables.Platform_systemsdk_versions)
 }
 
-func (c *deviceConfig) OdmPath() string {
-	if c.config.productVariables.OdmPath != nil {
-		return *c.config.productVariables.OdmPath
+func (c DeviceConfig) OdmPath() string {
+	if readProductVariable(c, &c.config.productVariables.OdmPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.OdmPath)
 	}
 	return "odm"
 }
 
-func (c *deviceConfig) BuildingOdmImage() bool {
-	return proptools.Bool(c.config.productVariables.BuildingOdmImage)
+func (c DeviceConfig) BuildingOdmImage() bool {
+	return proptools.Bool(readProductVariable(c, &c.config.productVariables.BuildingOdmImage))
 }
 
-func (c *deviceConfig) OdmDlkmPath() string {
-	if c.config.productVariables.OdmDlkmPath != nil {
-		return *c.config.productVariables.OdmDlkmPath
+func (c DeviceConfig) OdmDlkmPath() string {
+	if readProductVariable(c, &c.config.productVariables.OdmDlkmPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.OdmDlkmPath)
 	}
 	return "odm_dlkm"
 }
 
-func (c *deviceConfig) ProductPath() string {
-	if c.config.productVariables.ProductPath != nil {
-		return *c.config.productVariables.ProductPath
+func (c DeviceConfig) ProductPath() string {
+	if readProductVariable(c, &c.config.productVariables.ProductPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.ProductPath)
 	}
 	return "product"
 }
 
-func (c *deviceConfig) BuildingProductImage() bool {
-	return proptools.Bool(c.config.productVariables.BuildingProductImage)
+func (c DeviceConfig) BuildingProductImage() bool {
+	return proptools.Bool(readProductVariable(c, &c.config.productVariables.BuildingProductImage))
 }
 
-func (c *deviceConfig) SystemExtPath() string {
-	if c.config.productVariables.SystemExtPath != nil {
-		return *c.config.productVariables.SystemExtPath
+func (c DeviceConfig) SystemExtPath() string {
+	if readProductVariable(c, &c.config.productVariables.SystemExtPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.SystemExtPath)
 	}
 	return "system_ext"
 }
 
-func (c *deviceConfig) SystemDlkmPath() string {
-	if c.config.productVariables.SystemDlkmPath != nil {
-		return *c.config.productVariables.SystemDlkmPath
+func (c DeviceConfig) SystemDlkmPath() string {
+	if readProductVariable(c, &c.config.productVariables.SystemDlkmPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.SystemDlkmPath)
 	}
 	return "system_dlkm"
 }
 
-func (c *deviceConfig) OemPath() string {
-	if c.config.productVariables.OemPath != nil {
-		return *c.config.productVariables.OemPath
+func (c DeviceConfig) OemPath() string {
+	if readProductVariable(c, &c.config.productVariables.OemPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.OemPath)
 	}
 	return "oem"
 }
 
-func (c *deviceConfig) UserdataPath() string {
-	if c.config.productVariables.UserdataPath != nil {
-		return *c.config.productVariables.UserdataPath
+func (c DeviceConfig) UserdataPath() string {
+	if readProductVariable(c, &c.config.productVariables.UserdataPath) != nil {
+		return *readProductVariable(c, &c.config.productVariables.UserdataPath)
 	}
 	return "data"
 }
 
-func (c *deviceConfig) BuildingUserdataImage() bool {
-	return proptools.Bool(c.config.productVariables.BuildingUserdataImage)
+func (c DeviceConfig) BuildingUserdataImage() bool {
+	return proptools.Bool(readProductVariable(c, &c.config.productVariables.BuildingUserdataImage))
 }
 
-func (c *deviceConfig) BuildingRecoveryImage() bool {
-	return proptools.Bool(c.config.productVariables.BuildingRecoveryImage)
+func (c DeviceConfig) BuildingRecoveryImage() bool {
+	return proptools.Bool(readProductVariable(c, &c.config.productVariables.BuildingRecoveryImage))
 }
 
-func (c *deviceConfig) BtConfigIncludeDir() string {
-	return String(c.config.productVariables.BtConfigIncludeDir)
+func (c DeviceConfig) BtConfigIncludeDir() string {
+	return String(readProductVariable(c, &c.config.productVariables.BtConfigIncludeDir))
 }
 
-func (c *deviceConfig) DeviceKernelHeaderDirs() []string {
-	return c.config.productVariables.DeviceKernelHeaders
+func (c DeviceConfig) DeviceKernelHeaderDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.DeviceKernelHeaders)
 }
 
 // JavaCoverageEnabledForPath returns whether Java code coverage is enabled for
@@ -2137,15 +2169,15 @@ func (c *deviceConfig) DeviceKernelHeaderDirs() []string {
 // enabled for any path which is part of this variable (and not part of the
 // JavaCoverageExcludePaths product variable). Value "*" in JavaCoveragePaths
 // represents any path.
-func (c *deviceConfig) JavaCoverageEnabledForPath(path string) bool {
+func (c DeviceConfig) JavaCoverageEnabledForPath(path string) bool {
 	coverage := false
-	if len(c.config.productVariables.JavaCoveragePaths) == 0 ||
-		InList("*", c.config.productVariables.JavaCoveragePaths) ||
-		HasAnyPrefix(path, c.config.productVariables.JavaCoveragePaths) {
+	if len(readProductVariable(c, &c.config.productVariables.JavaCoveragePaths)) == 0 ||
+		InList("*", readProductVariable(c, &c.config.productVariables.JavaCoveragePaths)) ||
+		HasAnyPrefix(path, readProductVariable(c, &c.config.productVariables.JavaCoveragePaths)) {
 		coverage = true
 	}
-	if coverage && len(c.config.productVariables.JavaCoverageExcludePaths) > 0 {
-		if HasAnyPrefix(path, c.config.productVariables.JavaCoverageExcludePaths) {
+	if coverage && len(readProductVariable(c, &c.config.productVariables.JavaCoverageExcludePaths)) > 0 {
+		if HasAnyPrefix(path, readProductVariable(c, &c.config.productVariables.JavaCoverageExcludePaths)) {
 			coverage = false
 		}
 	}
@@ -2153,21 +2185,21 @@ func (c *deviceConfig) JavaCoverageEnabledForPath(path string) bool {
 }
 
 // Returns true if gcov or clang coverage is enabled.
-func (c *deviceConfig) NativeCoverageEnabled() bool {
-	return Bool(c.config.productVariables.GcovCoverage) ||
-		Bool(c.config.productVariables.ClangCoverage)
+func (c DeviceConfig) NativeCoverageEnabled() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.GcovCoverage)) ||
+		Bool(readProductVariable(c, &c.config.productVariables.ClangCoverage))
 }
 
-func (c *deviceConfig) ClangCoverageEnabled() bool {
-	return Bool(c.config.productVariables.ClangCoverage)
+func (c DeviceConfig) ClangCoverageEnabled() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.ClangCoverage))
 }
 
-func (c *deviceConfig) ClangCoverageContinuousMode() bool {
-	return Bool(c.config.productVariables.ClangCoverageContinuousMode)
+func (c DeviceConfig) ClangCoverageContinuousMode() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.ClangCoverageContinuousMode))
 }
 
-func (c *deviceConfig) GcovCoverageEnabled() bool {
-	return Bool(c.config.productVariables.GcovCoverage)
+func (c DeviceConfig) GcovCoverageEnabled() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.GcovCoverage))
 }
 
 // NativeCoverageEnabledForPath returns whether (GCOV- or Clang-based) native
@@ -2175,28 +2207,28 @@ func (c *deviceConfig) GcovCoverageEnabled() bool {
 // given path unless it is part of the NativeCoveragePaths product variable (and
 // not part of the NativeCoverageExcludePaths product variable). Value "*" in
 // NativeCoveragePaths represents any path.
-func (c *deviceConfig) NativeCoverageEnabledForPath(path string) bool {
+func (c DeviceConfig) NativeCoverageEnabledForPath(path string) bool {
 	coverage := false
-	if len(c.config.productVariables.NativeCoveragePaths) > 0 {
-		if InList("*", c.config.productVariables.NativeCoveragePaths) || HasAnyPrefix(path, c.config.productVariables.NativeCoveragePaths) {
+	if len(readProductVariable(c, &c.config.productVariables.NativeCoveragePaths)) > 0 {
+		if InList("*", readProductVariable(c, &c.config.productVariables.NativeCoveragePaths)) || HasAnyPrefix(path, readProductVariable(c, &c.config.productVariables.NativeCoveragePaths)) {
 			coverage = true
 		}
 	}
-	if coverage && len(c.config.productVariables.NativeCoverageExcludePaths) > 0 {
-		if HasAnyPrefix(path, c.config.productVariables.NativeCoverageExcludePaths) {
+	if coverage && len(readProductVariable(c, &c.config.productVariables.NativeCoverageExcludePaths)) > 0 {
+		if HasAnyPrefix(path, readProductVariable(c, &c.config.productVariables.NativeCoverageExcludePaths)) {
 			coverage = false
 		}
 	}
 	return coverage
 }
 
-func (c *deviceConfig) PgoAdditionalProfileDirs() []string {
-	return c.config.productVariables.PgoAdditionalProfileDirs
+func (c DeviceConfig) PgoAdditionalProfileDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.PgoAdditionalProfileDirs)
 }
 
 // AfdoProfile returns fully qualified path associated to the given module name
-func (c *deviceConfig) AfdoProfile(name string) (string, error) {
-	for _, afdoProfile := range c.config.productVariables.AfdoProfiles {
+func (c DeviceConfig) AfdoProfile(name string) (string, error) {
+	for _, afdoProfile := range readProductVariable(c, &c.config.productVariables.AfdoProfiles) {
 		split := strings.Split(afdoProfile, ":")
 		if len(split) != 3 {
 			return "", fmt.Errorf("AFDO_PROFILES has invalid value: %s. "+
@@ -2209,39 +2241,39 @@ func (c *deviceConfig) AfdoProfile(name string) (string, error) {
 	return "", nil
 }
 
-func (c *deviceConfig) VendorSepolicyDirs() []string {
-	return c.config.productVariables.BoardVendorSepolicyDirs
+func (c DeviceConfig) VendorSepolicyDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.BoardVendorSepolicyDirs)
 }
 
-func (c *deviceConfig) OdmSepolicyDirs() []string {
-	return c.config.productVariables.BoardOdmSepolicyDirs
+func (c DeviceConfig) OdmSepolicyDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.BoardOdmSepolicyDirs)
 }
 
-func (c *deviceConfig) SystemExtPublicSepolicyDirs() []string {
-	return c.config.productVariables.SystemExtPublicSepolicyDirs
+func (c DeviceConfig) SystemExtPublicSepolicyDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.SystemExtPublicSepolicyDirs)
 }
 
-func (c *deviceConfig) SystemExtPrivateSepolicyDirs() []string {
-	return c.config.productVariables.SystemExtPrivateSepolicyDirs
+func (c DeviceConfig) SystemExtPrivateSepolicyDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.SystemExtPrivateSepolicyDirs)
 }
 
-func (c *deviceConfig) SepolicyM4Defs() []string {
-	return c.config.productVariables.BoardSepolicyM4Defs
+func (c DeviceConfig) SepolicyM4Defs() []string {
+	return readProductVariable(c, &c.config.productVariables.BoardSepolicyM4Defs)
 }
 
-func (c *deviceConfig) OverrideManifestPackageNameFor(name string) (manifestName string, overridden bool) {
-	return findOverrideValue(c.config.productVariables.ManifestPackageNameOverrides, name,
+func (c DeviceConfig) OverrideManifestPackageNameFor(name string) (manifestName string, overridden bool) {
+	return findOverrideValue(readProductVariable(c, &c.config.productVariables.ManifestPackageNameOverrides), name,
 		"invalid override rule %q in PRODUCT_MANIFEST_PACKAGE_NAME_OVERRIDES should be <module_name>:<manifest_name>")
 }
 
-func (c *deviceConfig) OverrideCertificateFor(name string) (certificatePath string, overridden bool) {
-	return findOverrideValue(c.config.productVariables.CertificateOverrides, name,
+func (c DeviceConfig) OverrideCertificateFor(name string) (certificatePath string, overridden bool) {
+	return findOverrideValue(readProductVariable(c, &c.config.productVariables.CertificateOverrides), name,
 		"invalid override rule %q in PRODUCT_CERTIFICATE_OVERRIDES should be <module_name>:<certificate_module_name>")
 }
 
-func (c *deviceConfig) OverridePackageNameFor(name string) string {
+func (c DeviceConfig) OverridePackageNameFor(name string) string {
 	newName, overridden := findOverrideValue(
-		c.config.productVariables.PackageNameOverrides,
+		readProductVariable(c, &c.config.productVariables.PackageNameOverrides),
 		name,
 		"invalid override rule %q in PRODUCT_PACKAGE_NAME_OVERRIDES should be <module_name>:<package_name>")
 	if overridden {
@@ -2267,221 +2299,240 @@ func findOverrideValue(overrides []string, name string, errorMsg string) (newVal
 	return "", false
 }
 
-func (c *deviceConfig) ApexGlobalMinSdkVersionOverride() string {
-	return String(c.config.productVariables.ApexGlobalMinSdkVersionOverride)
+func (c DeviceConfig) ApexGlobalMinSdkVersionOverride() string {
+	return String(readProductVariable(c, &c.config.productVariables.ApexGlobalMinSdkVersionOverride))
 }
 
-func (c *config) IntegerOverflowDisabledForPath(path string) bool {
-	if len(c.productVariables.IntegerOverflowExcludePaths) == 0 {
+func (c Config) IntegerOverflowDisabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.IntegerOverflowExcludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.IntegerOverflowExcludePaths)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.IntegerOverflowExcludePaths))
 }
 
-func (c *config) CFIDisabledForPath(path string) bool {
-	if len(c.productVariables.CFIExcludePaths) == 0 {
+func (c Config) CFIDisabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.CFIExcludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.CFIExcludePaths)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.CFIExcludePaths))
 }
 
-func (c *config) CFIEnabledForPath(path string) bool {
-	if len(c.productVariables.CFIIncludePaths) == 0 {
+func (c Config) CFIEnabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.CFIIncludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.CFIIncludePaths) && !c.CFIDisabledForPath(path)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.CFIIncludePaths)) && !c.CFIDisabledForPath(path)
 }
 
-func (c *config) MemtagHeapDisabledForPath(path string) bool {
-	if len(c.productVariables.MemtagHeapExcludePaths) == 0 {
+func (c Config) MemtagHeapDisabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.MemtagHeapExcludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.MemtagHeapExcludePaths)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.MemtagHeapExcludePaths))
 }
 
-func (c *config) MemtagHeapAsyncEnabledForPath(path string) bool {
-	if len(c.productVariables.MemtagHeapAsyncIncludePaths) == 0 {
+func (c Config) MemtagHeapAsyncEnabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.MemtagHeapAsyncIncludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.MemtagHeapAsyncIncludePaths) && !c.MemtagHeapDisabledForPath(path)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.MemtagHeapAsyncIncludePaths)) && !c.MemtagHeapDisabledForPath(path)
 }
 
-func (c *config) MemtagHeapSyncEnabledForPath(path string) bool {
-	if len(c.productVariables.MemtagHeapSyncIncludePaths) == 0 {
+func (c Config) MemtagHeapSyncEnabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.MemtagHeapSyncIncludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.MemtagHeapSyncIncludePaths) && !c.MemtagHeapDisabledForPath(path)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.MemtagHeapSyncIncludePaths)) && !c.MemtagHeapDisabledForPath(path)
 }
 
-func (c *config) HWASanDisabledForPath(path string) bool {
-	if len(c.productVariables.HWASanExcludePaths) == 0 {
+func (c Config) HWASanDisabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.HWASanExcludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.HWASanExcludePaths)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.HWASanExcludePaths))
 }
 
-func (c *config) HWASanEnabledForPath(path string) bool {
-	if len(c.productVariables.HWASanIncludePaths) == 0 {
+func (c Config) HWASanEnabledForPath(path string) bool {
+	if len(readProductVariable(c, &c.productVariables.HWASanIncludePaths)) == 0 {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.HWASanIncludePaths) && !c.HWASanDisabledForPath(path)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.HWASanIncludePaths)) && !c.HWASanDisabledForPath(path)
 }
 
-func (c *config) XOMDisabledForPath(path string) bool {
-	if c.productVariables.XOMExcludePaths == nil {
+func (c Config) XOMDisabledForPath(path string) bool {
+	if readProductVariable(c, &c.productVariables.XOMExcludePaths) == nil {
 		return false
 	}
-	return HasAnyPrefix(path, c.productVariables.XOMExcludePaths)
+	return HasAnyPrefix(path, readProductVariable(c, &c.productVariables.XOMExcludePaths))
 }
 
-func (c *config) VendorConfig(name string) VendorConfig {
-	return soongconfig.Config(c.productVariables.VendorVars[name])
+func (c Config) VendorConfig(name string) VendorConfig {
+	variables, _ := readMapEntry(c.reads, ConfigVariable{VendorNamespaceKind, name}, c.productVariables.VendorVars, name)
+	return soongconfig.Config(variables)
 }
 
-func (c *config) NdkAbis() bool {
-	return Bool(c.productVariables.Ndk_abis)
+// VendorVariable returns the vendor variable name of namespace and records its read.
+func (c Config) VendorVariable(namespace, name string) (string, bool) {
+	return readMapEntry(c.reads, vendorVariable(VendorVariableKind, namespace, name),
+		c.productVariables.VendorVars[namespace], name)
 }
 
-func (c *config) AmlAbis() bool {
-	return Bool(c.productVariables.Aml_abis)
+// VendorVariableType returns the type of the vendor variable name of namespace and records its
+// read. A variable without a type is a string.
+func (c Config) VendorVariableType(namespace, name string) string {
+	variableType, _ := readMapEntry(c.reads, vendorVariable(VendorVariableTypeKind, namespace, name),
+		c.productVariables.VendorVarTypes[namespace], name)
+	return variableType
 }
 
-func (c *config) ForceApexSymlinkOptimization() bool {
-	return Bool(c.productVariables.ForceApexSymlinkOptimization)
+func vendorVariable(kind ConfigVariableKind, namespace, name string) ConfigVariable {
+	return ConfigVariable{kind, namespace + "." + name}
 }
 
-func (c *config) ApexCompressionEnabled() bool {
-	return Bool(c.productVariables.CompressedApex) && !c.HasUnbundledBuildApps()
+func (c Config) NdkAbis() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Ndk_abis))
 }
 
-func (c *config) DefaultApexPayloadType() string {
-	return StringDefault(c.productVariables.DefaultApexPayloadType, "ext4")
+func (c Config) AmlAbis() bool {
+	return Bool(readProductVariable(c, &c.productVariables.Aml_abis))
 }
 
-func (c *config) DefaultApexPayloadErofsCompressor() string {
-	return String(c.productVariables.DefaultApexPayloadErofsCompressor)
+func (c Config) ForceApexSymlinkOptimization() bool {
+	return Bool(readProductVariable(c, &c.productVariables.ForceApexSymlinkOptimization))
 }
 
-func (c *config) DefaultApexPayloadErofsCompressHints(ctx PathContext) Path {
-	if String(c.productVariables.DefaultApexPayloadErofsCompressHints) == "" {
+func (c Config) ApexCompressionEnabled() bool {
+	return Bool(readProductVariable(c, &c.productVariables.CompressedApex)) && !c.HasUnbundledBuildApps()
+}
+
+func (c Config) DefaultApexPayloadType() string {
+	return StringDefault(readProductVariable(c, &c.productVariables.DefaultApexPayloadType), "ext4")
+}
+
+func (c Config) DefaultApexPayloadErofsCompressor() string {
+	return String(readProductVariable(c, &c.productVariables.DefaultApexPayloadErofsCompressor))
+}
+
+func (c Config) DefaultApexPayloadErofsCompressHints(ctx PathContext) Path {
+	if String(readProductVariable(c, &c.productVariables.DefaultApexPayloadErofsCompressHints)) == "" {
 		return nil
 	}
-	return PathForSource(ctx, *c.productVariables.DefaultApexPayloadErofsCompressHints)
+	return PathForSource(ctx, *readProductVariable(c, &c.productVariables.DefaultApexPayloadErofsCompressHints))
 }
 
-func (c *config) DefaultApexPayloadErofsPclusterSize() int64 {
-	return c.productVariables.DefaultApexPayloadErofsPclusterSize
+func (c Config) DefaultApexPayloadErofsPclusterSize() int64 {
+	return readProductVariable(c, &c.productVariables.DefaultApexPayloadErofsPclusterSize)
 }
 
-func (c *config) UseSoongSystemImage() bool {
-	return Bool(c.productVariables.UseSoongSystemImage)
+func (c Config) UseSoongSystemImage() bool {
+	return Bool(readProductVariable(c, &c.productVariables.UseSoongSystemImage))
 }
 
-func (c *config) SoongDefinedSystemImage() string {
+func (c Config) SoongDefinedSystemImage() string {
 	if c.UseSoongSystemImage() {
-		return String(c.productVariables.ProductSoongDefinedSystemImage)
+		return String(readProductVariable(c, &c.productVariables.ProductSoongDefinedSystemImage))
 	}
 	return ""
 }
 
-func (c *config) EnforceSystemCertificate() bool {
-	return Bool(c.productVariables.EnforceSystemCertificate)
+func (c Config) EnforceSystemCertificate() bool {
+	return Bool(readProductVariable(c, &c.productVariables.EnforceSystemCertificate))
 }
 
-func (c *config) EnforceSystemCertificateAllowList() []string {
-	return c.productVariables.EnforceSystemCertificateAllowList
+func (c Config) EnforceSystemCertificateAllowList() []string {
+	return readProductVariable(c, &c.productVariables.EnforceSystemCertificateAllowList)
 }
 
-func (c *config) EnforceProductPartitionInterface() bool {
-	return Bool(c.productVariables.EnforceProductPartitionInterface)
+func (c Config) EnforceProductPartitionInterface() bool {
+	return Bool(readProductVariable(c, &c.productVariables.EnforceProductPartitionInterface))
 }
 
-func (c *config) ProductHiddenAPIStubs() []string {
-	return c.productVariables.ProductHiddenAPIStubs
+func (c Config) ProductHiddenAPIStubs() []string {
+	return readProductVariable(c, &c.productVariables.ProductHiddenAPIStubs)
 }
 
-func (c *config) ProductHiddenAPIStubsSystem() []string {
-	return c.productVariables.ProductHiddenAPIStubsSystem
+func (c Config) ProductHiddenAPIStubsSystem() []string {
+	return readProductVariable(c, &c.productVariables.ProductHiddenAPIStubsSystem)
 }
 
-func (c *config) ProductHiddenAPIStubsTest() []string {
-	return c.productVariables.ProductHiddenAPIStubsTest
+func (c Config) ProductHiddenAPIStubsTest() []string {
+	return readProductVariable(c, &c.productVariables.ProductHiddenAPIStubsTest)
 }
 
 // ProductRemovedPackages returns the modules that the product keeps off the device, even where
 // another module requires them.
-func (c *config) ProductRemovedPackages() []string {
-	return c.productVariables.ProductRemovedPackages
+func (c Config) ProductRemovedPackages() []string {
+	return readProductVariable(c, &c.productVariables.ProductRemovedPackages)
 }
 
-func (c *deviceConfig) TargetFSConfigGen() []string {
-	return c.config.productVariables.TargetFSConfigGen
+func (c DeviceConfig) TargetFSConfigGen() []string {
+	return readProductVariable(c, &c.config.productVariables.TargetFSConfigGen)
 }
 
-func (c *config) ProductPublicSepolicyDirs() []string {
-	return c.productVariables.ProductPublicSepolicyDirs
+func (c Config) ProductPublicSepolicyDirs() []string {
+	return readProductVariable(c, &c.productVariables.ProductPublicSepolicyDirs)
 }
 
-func (c *config) ProductPrivateSepolicyDirs() []string {
-	return c.productVariables.ProductPrivateSepolicyDirs
+func (c Config) ProductPrivateSepolicyDirs() []string {
+	return readProductVariable(c, &c.productVariables.ProductPrivateSepolicyDirs)
 }
 
-func (c *deviceConfig) DeviceArch() string {
-	return String(c.config.productVariables.DeviceArch)
+func (c DeviceConfig) DeviceArch() string {
+	return String(readProductVariable(c, &c.config.productVariables.DeviceArch))
 }
 
-func (c *deviceConfig) DeviceArchVariant() string {
-	return String(c.config.productVariables.DeviceArchVariant)
+func (c DeviceConfig) DeviceArchVariant() string {
+	return String(readProductVariable(c, &c.config.productVariables.DeviceArchVariant))
 }
 
-func (c *deviceConfig) DeviceSecondaryArch() string {
-	return String(c.config.productVariables.DeviceSecondaryArch)
+func (c DeviceConfig) DeviceSecondaryArch() string {
+	return String(readProductVariable(c, &c.config.productVariables.DeviceSecondaryArch))
 }
 
-func (c *deviceConfig) DeviceSecondaryArchVariant() string {
-	return String(c.config.productVariables.DeviceSecondaryArchVariant)
+func (c DeviceConfig) DeviceSecondaryArchVariant() string {
+	return String(readProductVariable(c, &c.config.productVariables.DeviceSecondaryArchVariant))
 }
 
-func (c *deviceConfig) BoardUsesRecoveryAsBoot() bool {
-	return Bool(c.config.productVariables.BoardUsesRecoveryAsBoot)
+func (c DeviceConfig) BoardUsesRecoveryAsBoot() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.BoardUsesRecoveryAsBoot))
 }
 
-func (c *deviceConfig) BoardKernelBinaries() []string {
-	return c.config.productVariables.BoardKernelBinaries
+func (c DeviceConfig) BoardKernelBinaries() []string {
+	return readProductVariable(c, &c.config.productVariables.BoardKernelBinaries)
 }
 
-func (c *deviceConfig) BoardKernelModuleInterfaceVersions() []string {
-	return c.config.productVariables.BoardKernelModuleInterfaceVersions
+func (c DeviceConfig) BoardKernelModuleInterfaceVersions() []string {
+	return readProductVariable(c, &c.config.productVariables.BoardKernelModuleInterfaceVersions)
 }
 
-func (c *deviceConfig) BoardMoveRecoveryResourcesToVendorBoot() bool {
-	return Bool(c.config.productVariables.BoardMoveRecoveryResourcesToVendorBoot)
+func (c DeviceConfig) BoardMoveRecoveryResourcesToVendorBoot() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.BoardMoveRecoveryResourcesToVendorBoot))
 }
 
-func (c *deviceConfig) PlatformSepolicyVersion() string {
-	return String(c.config.productVariables.PlatformSepolicyVersion)
+func (c DeviceConfig) PlatformSepolicyVersion() string {
+	return String(readProductVariable(c, &c.config.productVariables.PlatformSepolicyVersion))
 }
 
-func (c *deviceConfig) PlatformSepolicyCompatVersions() []string {
-	return c.config.productVariables.PlatformSepolicyCompatVersions
+func (c DeviceConfig) PlatformSepolicyCompatVersions() []string {
+	return readProductVariable(c, &c.config.productVariables.PlatformSepolicyCompatVersions)
 }
 
-func (c *deviceConfig) BoardSepolicyVers() string {
-	if ver := String(c.config.productVariables.BoardSepolicyVers); ver != "" {
+func (c DeviceConfig) BoardSepolicyVers() string {
+	if ver := String(readProductVariable(c, &c.config.productVariables.BoardSepolicyVers)); ver != "" {
 		return ver
 	}
 	return c.PlatformSepolicyVersion()
 }
 
-func (c *deviceConfig) SystemExtSepolicyPrebuiltApiDirs() []string {
-	return c.config.productVariables.SystemExtSepolicyPrebuiltApiDirs
+func (c DeviceConfig) SystemExtSepolicyPrebuiltApiDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.SystemExtSepolicyPrebuiltApiDirs)
 }
 
-func (c *deviceConfig) ProductSepolicyPrebuiltApiDirs() []string {
-	return c.config.productVariables.ProductSepolicyPrebuiltApiDirs
+func (c DeviceConfig) ProductSepolicyPrebuiltApiDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.ProductSepolicyPrebuiltApiDirs)
 }
 
-func (c *deviceConfig) IsPartnerTrebleSepolicyTestEnabled() bool {
+func (c DeviceConfig) IsPartnerTrebleSepolicyTestEnabled() bool {
 	return len(c.SystemExtSepolicyPrebuiltApiDirs()) > 0 || len(c.ProductSepolicyPrebuiltApiDirs()) > 0
 }
 
@@ -2511,137 +2562,137 @@ func (c *deviceConfig) createDirsMapOnce(onceKey OnceKey, previous map[string]bo
 	return dirMap.(map[string]bool)
 }
 
-func (c *deviceConfig) ShippingApiLevel() ApiLevel {
-	if c.config.productVariables.Shipping_api_level == nil {
+func (c DeviceConfig) ShippingApiLevel() ApiLevel {
+	if readProductVariable(c, &c.config.productVariables.Shipping_api_level) == nil {
 		return NoneApiLevel
 	}
-	apiLevel, _ := strconv.Atoi(*c.config.productVariables.Shipping_api_level)
+	apiLevel, _ := strconv.Atoi(*readProductVariable(c, &c.config.productVariables.Shipping_api_level))
 	return UncheckedFinalApiLevel(apiLevel)
 }
 
-func (c *deviceConfig) BuildBrokenPluginValidation() []string {
-	return c.config.productVariables.BuildBrokenPluginValidation
+func (c DeviceConfig) BuildBrokenPluginValidation() []string {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenPluginValidation)
 }
 
-func (c *deviceConfig) BuildBrokenClangAsFlags() bool {
-	return c.config.productVariables.BuildBrokenClangAsFlags
+func (c DeviceConfig) BuildBrokenClangAsFlags() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenClangAsFlags)
 }
 
-func (c *deviceConfig) BuildBrokenClangCFlags() bool {
-	return c.config.productVariables.BuildBrokenClangCFlags
+func (c DeviceConfig) BuildBrokenClangCFlags() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenClangCFlags)
 }
 
-func (c *deviceConfig) BuildBrokenClangProperty() bool {
-	return c.config.productVariables.BuildBrokenClangProperty
+func (c DeviceConfig) BuildBrokenClangProperty() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenClangProperty)
 }
 
-func (c *deviceConfig) BuildBrokenEnforceSyspropOwner() bool {
-	return c.config.productVariables.BuildBrokenEnforceSyspropOwner
+func (c DeviceConfig) BuildBrokenEnforceSyspropOwner() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenEnforceSyspropOwner)
 }
 
-func (c *deviceConfig) BuildBrokenTrebleSyspropNeverallow() bool {
-	return c.config.productVariables.BuildBrokenTrebleSyspropNeverallow
+func (c DeviceConfig) BuildBrokenTrebleSyspropNeverallow() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenTrebleSyspropNeverallow)
 }
 
-func (c *deviceConfig) BuildDebugfsRestrictionsEnabled() bool {
-	return c.config.productVariables.BuildDebugfsRestrictionsEnabled
+func (c DeviceConfig) BuildDebugfsRestrictionsEnabled() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildDebugfsRestrictionsEnabled)
 }
 
-func (c *deviceConfig) RestrictsAshmemUsage() bool {
-	return c.config.productVariables.RestrictsAshmemUsage
+func (c DeviceConfig) RestrictsAshmemUsage() bool {
+	return readProductVariable(c, &c.config.productVariables.RestrictsAshmemUsage)
 }
 
-func (c *deviceConfig) BuildBrokenVendorPropertyNamespace() bool {
-	return c.config.productVariables.BuildBrokenVendorPropertyNamespace
+func (c DeviceConfig) BuildBrokenVendorPropertyNamespace() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenVendorPropertyNamespace)
 }
 
-func (c *deviceConfig) BuildBrokenInputDir(name string) bool {
-	return InList(name, c.config.productVariables.BuildBrokenInputDirModules)
+func (c DeviceConfig) BuildBrokenInputDir(name string) bool {
+	return InList(name, readProductVariable(c, &c.config.productVariables.BuildBrokenInputDirModules))
 }
 
-func (c *deviceConfig) BuildBrokenDontCheckSystemSdk() bool {
-	return c.config.productVariables.BuildBrokenDontCheckSystemSdk
+func (c DeviceConfig) BuildBrokenDontCheckSystemSdk() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenDontCheckSystemSdk)
 }
 
-func (c *deviceConfig) BuildBrokenDupSysprop() bool {
-	return c.config.productVariables.BuildBrokenDupSysprop
+func (c DeviceConfig) BuildBrokenDupSysprop() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenDupSysprop)
 }
 
-func (c *deviceConfig) BuildBrokenPrebuiltELFFiles() bool {
-	return c.config.productVariables.BuildBrokenPrebuiltELFFiles
+func (c DeviceConfig) BuildBrokenPrebuiltELFFiles() bool {
+	return readProductVariable(c, &c.config.productVariables.BuildBrokenPrebuiltELFFiles)
 }
 
-func (c *deviceConfig) RequiresInsecureExecmemForSwiftshader() bool {
-	return c.config.productVariables.RequiresInsecureExecmemForSwiftshader
+func (c DeviceConfig) RequiresInsecureExecmemForSwiftshader() bool {
+	return readProductVariable(c, &c.config.productVariables.RequiresInsecureExecmemForSwiftshader)
 }
 
-func (c *deviceConfig) Release_aidl_use_unfrozen() bool {
-	return Bool(c.config.productVariables.Release_aidl_use_unfrozen)
+func (c DeviceConfig) Release_aidl_use_unfrozen() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.Release_aidl_use_unfrozen))
 }
 
-func (c *config) SelinuxIgnoreNeverallows() bool {
-	return c.productVariables.SelinuxIgnoreNeverallows
+func (c Config) SelinuxIgnoreNeverallows() bool {
+	return readProductVariable(c, &c.productVariables.SelinuxIgnoreNeverallows)
 }
 
-func (c *deviceConfig) SepolicyFreezeTestExtraDirs() []string {
-	return c.config.productVariables.SepolicyFreezeTestExtraDirs
+func (c DeviceConfig) SepolicyFreezeTestExtraDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.SepolicyFreezeTestExtraDirs)
 }
 
-func (c *deviceConfig) SepolicyFreezeTestExtraPrebuiltDirs() []string {
-	return c.config.productVariables.SepolicyFreezeTestExtraPrebuiltDirs
+func (c DeviceConfig) SepolicyFreezeTestExtraPrebuiltDirs() []string {
+	return readProductVariable(c, &c.config.productVariables.SepolicyFreezeTestExtraPrebuiltDirs)
 }
 
-func (c *deviceConfig) GenerateAidlNdkPlatformBackend() bool {
-	return c.config.productVariables.GenerateAidlNdkPlatformBackend
+func (c DeviceConfig) GenerateAidlNdkPlatformBackend() bool {
+	return readProductVariable(c, &c.config.productVariables.GenerateAidlNdkPlatformBackend)
 }
 
-func (c *deviceConfig) AconfigContainerValidation() string {
-	return c.config.productVariables.AconfigContainerValidation
+func (c DeviceConfig) AconfigContainerValidation() string {
+	return readProductVariable(c, &c.config.productVariables.AconfigContainerValidation)
 }
 
-func (c *config) IgnorePrefer32OnDevice() bool {
-	return c.productVariables.IgnorePrefer32OnDevice
+func (c Config) IgnorePrefer32OnDevice() bool {
+	return readProductVariable(c, &c.productVariables.IgnorePrefer32OnDevice)
 }
 
-func (c *config) BootJars() []string {
-	return c.Once(earlyBootJarsKey, func() interface{} {
-		list := c.productVariables.BootJars.CopyOfJars()
-		return append(list, c.productVariables.ApexBootJars.CopyOfJars()...)
-	}).([]string)
+func (c Config) BootJars() []string {
+	return OnceFromConfig(c, earlyBootJarsKey, func(c Config) []string {
+		bootJars, apexBootJars := c.NonApexBootJars(), c.ApexBootJars()
+		return append(bootJars.CopyOfJars(), apexBootJars.CopyOfJars()...)
+	})
 }
 
-func (c *config) NonApexBootJars() ConfiguredJarList {
-	return c.productVariables.BootJars
+func (c Config) NonApexBootJars() ConfiguredJarList {
+	return readProductVariable(c, &c.productVariables.BootJars)
 }
 
-func (c *config) ApexBootJars() ConfiguredJarList {
-	return c.productVariables.ApexBootJars
+func (c Config) ApexBootJars() ConfiguredJarList {
+	return readProductVariable(c, &c.productVariables.ApexBootJars)
 }
 
-func (c *config) RBEWrapper() string {
+func (c Config) RBEWrapper() string {
 	return c.GetenvWithDefault("RBE_WRAPPER", remoteexec.DefaultWrapperPath)
 }
 
 // UseHostMusl returns true if the host target has been configured to build against musl libc.
-func (c *config) UseHostMusl() bool {
-	return Bool(c.productVariables.HostMusl)
+func (c Config) UseHostMusl() bool {
+	return Bool(readProductVariable(c, &c.productVariables.HostMusl))
 }
 
-func (c *config) JavaCoverageEnabled() bool {
+func (c Config) JavaCoverageEnabled() bool {
 	return c.IsEnvTrue("EMMA_INSTRUMENT") || c.IsEnvTrue("EMMA_INSTRUMENT_STATIC") || c.IsEnvTrue("EMMA_INSTRUMENT_FRAMEWORK")
 }
 
-func (c *deviceConfig) BuildFromSourceStub() bool {
-	return Bool(c.config.productVariables.BuildFromSourceStub)
+func (c DeviceConfig) BuildFromSourceStub() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.BuildFromSourceStub))
 }
 
-func (c *config) BuildFromTextStub() bool {
+func (c Config) BuildFromTextStub() bool {
 	// TODO: b/302320354 - Remove the coverage build specific logic once the
 	// robust solution for handling native properties in from-text stub build
 	// is implemented.
 	return !c.buildFromSourceStub &&
 		!c.JavaCoverageEnabled() &&
-		!c.deviceConfig.BuildFromSourceStub()
+		!c.DeviceConfig().BuildFromSourceStub()
 }
 
 func (c *config) SetBuildFromTextStub(b bool) {
@@ -2649,49 +2700,54 @@ func (c *config) SetBuildFromTextStub(b bool) {
 	c.productVariables.Build_from_text_stub = boolPtr(b)
 }
 
-func (c *deviceConfig) CheckVendorSeappViolations() bool {
-	return Bool(c.config.productVariables.CheckVendorSeappViolations)
+func (c DeviceConfig) CheckVendorSeappViolations() bool {
+	return Bool(readProductVariable(c, &c.config.productVariables.CheckVendorSeappViolations))
 }
 
-func (c *config) GetBuildFlag(name string) (string, bool) {
-	val, ok := c.productVariables.BuildFlags[name]
-	return val, ok
+func (c Config) GetBuildFlag(name string) (string, bool) {
+	return readMapEntry(c.reads, ConfigVariable{BuildFlagKind, name}, c.productVariables.BuildFlags, name)
 }
 
-func (c *config) GetBuildFlagBool(name string) bool {
-	return c.productVariables.GetBuildFlagBool(name)
+// GetBuildFlagType returns the type of the build flag name and records its read.
+func (c Config) GetBuildFlagType(name string) (string, bool) {
+	return readMapEntry(c.reads, ConfigVariable{BuildFlagTypeKind, name}, c.productVariables.BuildFlagTypes, name)
 }
 
-func (c *config) UseOptimizedResourceShrinkingByDefault() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_USE_OPTIMIZED_RESOURCE_SHRINKING_BY_DEFAULT")
+func (c Config) GetBuildFlagBool(name string) bool {
+	value, _ := c.GetBuildFlag(name)
+	return value == "true"
 }
 
-func (c *config) EnableAppOptimizationByDefault() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_R8_OPTIMIZE_BY_DEFAULT")
+func (c Config) UseOptimizedResourceShrinkingByDefault() bool {
+	return c.GetBuildFlagBool("RELEASE_USE_OPTIMIZED_RESOURCE_SHRINKING_BY_DEFAULT")
 }
 
-func (c *config) UseR8OnlyRuntimeVisibleAnnotations() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_R8_ONLY_RUNTIME_VISIBLE_ANNOTATIONS")
+func (c Config) EnableAppOptimizationByDefault() bool {
+	return c.GetBuildFlagBool("RELEASE_R8_OPTIMIZE_BY_DEFAULT")
 }
 
-func (c *config) UseR8StoreStoreFenceConstructorInlining() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_R8_STORE_STORE_FENCE_CONSTRUCTOR_INLINING")
+func (c Config) UseR8OnlyRuntimeVisibleAnnotations() bool {
+	return c.GetBuildFlagBool("RELEASE_R8_ONLY_RUNTIME_VISIBLE_ANNOTATIONS")
 }
 
-func (c *config) UseR8GlobalCheckNotNullFlags() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_R8_GLOBAL_CHECK_NOT_NULL_FLAGS")
+func (c Config) UseR8StoreStoreFenceConstructorInlining() bool {
+	return c.GetBuildFlagBool("RELEASE_R8_STORE_STORE_FENCE_CONSTRUCTOR_INLINING")
 }
 
-func (c *config) UseR8MinimizedSyntheticNames() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_R8_MINIMIZE_SYNTHETIC_NAMES")
+func (c Config) UseR8GlobalCheckNotNullFlags() bool {
+	return c.GetBuildFlagBool("RELEASE_R8_GLOBAL_CHECK_NOT_NULL_FLAGS")
 }
 
-func (c *config) UseDexV41() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_USE_DEX_V41")
+func (c Config) UseR8MinimizedSyntheticNames() bool {
+	return c.GetBuildFlagBool("RELEASE_R8_MINIMIZE_SYNTHETIC_NAMES")
 }
 
-func (c *config) OmitR8GlobalEnumKeeps() bool {
-	return c.productVariables.GetBuildFlagBool("RELEASE_R8_OMIT_GLOBAL_ENUM_KEEPS")
+func (c Config) UseDexV41() bool {
+	return c.GetBuildFlagBool("RELEASE_USE_DEX_V41")
+}
+
+func (c Config) OmitR8GlobalEnumKeeps() bool {
+	return c.GetBuildFlagBool("RELEASE_R8_OMIT_GLOBAL_ENUM_KEEPS")
 }
 
 var (
@@ -2739,7 +2795,7 @@ var (
 
 // Returns the list of _selected_ apex_contributions
 // Each mainline module will have one entry in the list
-func (c *config) AllApexContributions() []string {
+func (c Config) AllApexContributions() []string {
 	ret := []string{}
 	for _, f := range SortedKeys(mainlineApexContributionBuildFlagsToApexNames) {
 		if val, exists := c.GetBuildFlag(f); exists && val != "" {
@@ -2753,23 +2809,23 @@ func (c *config) AllMainlineApexNames() []string {
 	return SortedStringValues(mainlineApexContributionBuildFlagsToApexNames)
 }
 
-func (c *config) BuildIgnoreApexContributionContents() *bool {
-	return c.productVariables.BuildIgnoreApexContributionContents
+func (c Config) BuildIgnoreApexContributionContents() *bool {
+	return readProductVariable(c, &c.productVariables.BuildIgnoreApexContributionContents)
 }
 
-func (c *config) ProductLocales() []string {
-	return c.productVariables.ProductLocales
+func (c Config) ProductLocales() []string {
+	return readProductVariable(c, &c.productVariables.ProductLocales)
 }
 
-func (c *config) ProductDefaultWifiChannels() []string {
-	return c.productVariables.ProductDefaultWifiChannels
+func (c Config) ProductDefaultWifiChannels() []string {
+	return readProductVariable(c, &c.productVariables.ProductDefaultWifiChannels)
 }
 
-func (c *config) OemProperties() []string {
-	return c.productVariables.OemProperties
+func (c Config) OemProperties() []string {
+	return readProductVariable(c, &c.productVariables.OemProperties)
 }
 
-func (c *config) UseDebugArtFor(module Module) bool {
+func (c Config) UseDebugArtFor(module Module) bool {
 	// If the RELEASE_APEX_CONTRIBUTIONS_ART build flag is set to use a prebuilt ART apex
 	// then don't use the debug apex.
 	if val, ok := c.GetBuildFlag("RELEASE_APEX_CONTRIBUTIONS_ART"); ok && val != "" {
@@ -2779,101 +2835,101 @@ func (c *config) UseDebugArtFor(module Module) bool {
 	// If the ArtTargetIncludeDebugBuild product variable is set then return its value.
 	// The prebuilt APEX check overrides this to be tolerant wrt build logic
 	// that sets PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD regardless of module source.
-	if c.productVariables.ArtTargetIncludeDebugBuild != nil {
-		return Bool(c.productVariables.ArtTargetIncludeDebugBuild)
+	if readProductVariable(c, &c.productVariables.ArtTargetIncludeDebugBuild) != nil {
+		return Bool(readProductVariable(c, &c.productVariables.ArtTargetIncludeDebugBuild))
 	}
 
 	// Default to the debug apex for eng builds.
 	return c.EngFor(module)
 }
 
-func (c *config) SystemPropFiles(ctx PathContext) Paths {
-	return PathsForSource(ctx, c.productVariables.SystemPropFiles)
+func (c Config) SystemPropFiles(ctx PathContext) Paths {
+	return PathsForSource(ctx, readProductVariable(c, &c.productVariables.SystemPropFiles))
 }
 
-func (c *config) SystemExtPropFiles(ctx PathContext) Paths {
-	return PathsForSource(ctx, c.productVariables.SystemExtPropFiles)
+func (c Config) SystemExtPropFiles(ctx PathContext) Paths {
+	return PathsForSource(ctx, readProductVariable(c, &c.productVariables.SystemExtPropFiles))
 }
 
-func (c *config) ProductPropFiles(ctx PathContext) Paths {
-	return PathsForSource(ctx, c.productVariables.ProductPropFiles)
+func (c Config) ProductPropFiles(ctx PathContext) Paths {
+	return PathsForSource(ctx, readProductVariable(c, &c.productVariables.ProductPropFiles))
 }
 
-func (c *config) OdmPropFiles(ctx PathContext) Paths {
-	return PathsForSource(ctx, c.productVariables.OdmPropFiles)
+func (c Config) OdmPropFiles(ctx PathContext) Paths {
+	return PathsForSource(ctx, readProductVariable(c, &c.productVariables.OdmPropFiles))
 }
 
-func (c *config) VendorPropFiles(ctx PathContext) Paths {
-	return PathsForSource(ctx, c.productVariables.VendorPropFiles)
+func (c Config) VendorPropFiles(ctx PathContext) Paths {
+	return PathsForSource(ctx, readProductVariable(c, &c.productVariables.VendorPropFiles))
 }
 
 // BoardKernelBuildModule returns the module reference that BOARD_KERNEL_BUILD_MODULE gives, the
 // qualified name of the module that builds the device's kernel, or an empty string.
-func (c *config) BoardKernelBuildModule() string {
-	return String(c.productVariables.BoardKernelBuildModule)
+func (c Config) BoardKernelBuildModule() string {
+	return String(readProductVariable(c, &c.productVariables.BoardKernelBuildModule))
 }
 
-func (c *config) DeviceFrameworkCompatibilityMatrixFile() []string {
-	return c.productVariables.DeviceFrameworkCompatibilityMatrixFile
+func (c Config) DeviceFrameworkCompatibilityMatrixFile() []string {
+	return readProductVariable(c, &c.productVariables.DeviceFrameworkCompatibilityMatrixFile)
 }
 
-func (c *config) DeviceProductCompatibilityMatrixFile() []string {
-	return c.productVariables.DeviceProductCompatibilityMatrixFile
+func (c Config) DeviceProductCompatibilityMatrixFile() []string {
+	return readProductVariable(c, &c.productVariables.DeviceProductCompatibilityMatrixFile)
 }
 
-func (c *config) BoardAvbEnable() bool {
-	return Bool(c.productVariables.BoardAvbEnable)
+func (c Config) BoardAvbEnable() bool {
+	return Bool(readProductVariable(c, &c.productVariables.BoardAvbEnable))
 }
 
-func (c *config) BoardAvbSystemAddHashtreeFooterArgs() []string {
-	return c.productVariables.BoardAvbSystemAddHashtreeFooterArgs
+func (c Config) BoardAvbSystemAddHashtreeFooterArgs() []string {
+	return readProductVariable(c, &c.productVariables.BoardAvbSystemAddHashtreeFooterArgs)
 }
 
 // Returns true if RELEASE_INSTALL_APEX_SYSTEMSERVER_DEXPREOPT_SAME_PARTITION is set to true.
 // If true, dexpreopt files of apex system server jars will be installed in the same partition as the parent apex.
 // If false, all these files will be installed in /system partition.
 func (c Config) InstallApexSystemServerDexpreoptSamePartition() bool {
-	return c.config.productVariables.GetBuildFlagBool("RELEASE_INSTALL_APEX_SYSTEMSERVER_DEXPREOPT_SAME_PARTITION")
+	return c.GetBuildFlagBool("RELEASE_INSTALL_APEX_SYSTEMSERVER_DEXPREOPT_SAME_PARTITION")
 }
 
-func (c *config) DeviceMatrixFile() []string {
-	return c.productVariables.DeviceMatrixFile
+func (c Config) DeviceMatrixFile() []string {
+	return readProductVariable(c, &c.productVariables.DeviceMatrixFile)
 }
 
-func (c *config) ProductManifestFiles() []string {
-	return c.productVariables.ProductManifestFiles
+func (c Config) ProductManifestFiles() []string {
+	return readProductVariable(c, &c.productVariables.ProductManifestFiles)
 }
 
-func (c *config) SystemManifestFile() []string {
-	return c.productVariables.SystemManifestFile
+func (c Config) SystemManifestFile() []string {
+	return readProductVariable(c, &c.productVariables.SystemManifestFile)
 }
 
-func (c *config) SystemExtManifestFiles() []string {
-	return c.productVariables.SystemExtManifestFiles
+func (c Config) SystemExtManifestFiles() []string {
+	return readProductVariable(c, &c.productVariables.SystemExtManifestFiles)
 }
 
-func (c *config) DeviceManifestFiles() []string {
-	return c.productVariables.DeviceManifestFiles
+func (c Config) DeviceManifestFiles() []string {
+	return readProductVariable(c, &c.productVariables.DeviceManifestFiles)
 }
 
-func (c *config) DeviceManifestSkus() []string {
-	return c.productVariables.DeviceManifestSkus
+func (c Config) DeviceManifestSkus() []string {
+	return readProductVariable(c, &c.productVariables.DeviceManifestSkus)
 }
 
-func (c *config) OdmManifestFiles() []string {
-	return c.productVariables.OdmManifestFiles
+func (c Config) OdmManifestFiles() []string {
+	return readProductVariable(c, &c.productVariables.OdmManifestFiles)
 }
 
-func (c *config) OdmManifestSkus() []string {
-	return c.productVariables.OdmManifestSkus
+func (c Config) OdmManifestSkus() []string {
+	return readProductVariable(c, &c.productVariables.OdmManifestSkus)
 }
 
-func (c *config) EnforceSELinuxTrebleLabeling() bool {
-	return Bool(c.productVariables.EnforceSELinuxTrebleLabeling)
+func (c Config) EnforceSELinuxTrebleLabeling() bool {
+	return Bool(readProductVariable(c, &c.productVariables.EnforceSELinuxTrebleLabeling))
 }
 
-func (c *config) SELinuxTrebleLabelingTrackingListFile(ctx PathContext) Path {
-	path := String(c.productVariables.SELinuxTrebleLabelingTrackingListFile)
+func (c Config) SELinuxTrebleLabelingTrackingListFile(ctx PathContext) Path {
+	path := String(readProductVariable(c, &c.productVariables.SELinuxTrebleLabelingTrackingListFile))
 	if path == "" {
 		return nil
 	}
@@ -2881,6 +2937,6 @@ func (c *config) SELinuxTrebleLabelingTrackingListFile(ctx PathContext) Path {
 	return PathForSource(ctx, path)
 }
 
-func (c *config) BuildOTAPackage() bool {
-	return Bool(c.productVariables.BuildOTAPackage)
+func (c Config) BuildOTAPackage() bool {
+	return Bool(readProductVariable(c, &c.productVariables.BuildOTAPackage))
 }

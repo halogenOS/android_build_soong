@@ -434,7 +434,7 @@ var allOsProvider = blueprint.NewMutatorProvider[*allOsInfo]("os_propagate")
 func moduleOSList(ctx ConfigContext, base *ModuleBase) []OsType {
 	var moduleOSList []OsType
 	for _, os := range osTypeList {
-		for _, t := range ctx.Config().Targets[os] {
+		for _, t := range ctx.Config().CompileTargets().Targets[os] {
 			if base.supportsTarget(t) {
 				moduleOSList = append(moduleOSList, os)
 				break
@@ -526,8 +526,8 @@ var productInstalledModulesKey = NewOnceKey("productInstalledModulesKey")
 // Equivalent to the following logic of fsgen.
 // https://source.corp.google.com/h/googleplex-android/platform/build/soong/+/0a8fd32f534804f4ea546eb2ff3e98d4f99ac377:fsgen/fsgen_mutators.go;l=184;bpv=1;bpt=0;drc=0a8fd32f534804f4ea546eb2ff3e98d4f99ac377
 func productInstalledModules(ctx BaseModuleContext, makefile string) *map[string]bool {
-	return ctx.Config().Once(productInstalledModulesKey, func() interface{} {
-		productPkg := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.ProductPackagesSet[makefile]
+	return OnceFromConfig(ctx.Config(), productInstalledModulesKey, func(config Config) *map[string]bool {
+		productPkg := readProductVariable(config, &config.productVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.ProductPackagesSet)[makefile]
 		allInstalledModules := make(map[string]bool)
 		addListEntriesToMap := func(l []string) {
 			for _, e := range l {
@@ -535,37 +535,38 @@ func productInstalledModules(ctx BaseModuleContext, makefile string) *map[string
 			}
 		}
 		addListEntriesToMap(productPkg.ProductPackages)
-		if ctx.Config().Debuggable() {
+		if config.Debuggable() {
 			addListEntriesToMap(productPkg.ProductPackagesDebug)
-			if ctx.Config().Eng() {
+			if config.Eng() {
 				addListEntriesToMap(productPkg.ProductPackagesEng)
 			}
-			if InList("address", ctx.Config().SanitizeDevice()) {
+			if InList("address", config.SanitizeDevice()) {
 				addListEntriesToMap(productPkg.ProductPackagesDebugAsan)
 			}
-			if ctx.Config().IsEnvTrue("EMMA_INSTRUMENT") {
+			if config.IsEnvTrue("EMMA_INSTRUMENT") {
 				addListEntriesToMap(productPkg.ProductPackagesDebugJavaCoverage)
 			}
 		}
-		if InList("arm64", []string{ctx.DeviceConfig().DeviceArch(), ctx.DeviceConfig().DeviceSecondaryArch()}) {
+		deviceConfig := config.DeviceConfig()
+		if InList("arm64", []string{deviceConfig.DeviceArch(), deviceConfig.DeviceSecondaryArch()}) {
 			addListEntriesToMap(productPkg.ProductPackagesArm64)
 
 		}
-		if UncheckedFinalApiLevel(29).GreaterThanOrEqualTo(ctx.DeviceConfig().ShippingApiLevel()) {
+		if UncheckedFinalApiLevel(29).GreaterThanOrEqualTo(deviceConfig.ShippingApiLevel()) {
 			addListEntriesToMap(productPkg.ProductPackagesShippingApiLevel29)
 		}
-		if UncheckedFinalApiLevel(33).GreaterThanOrEqualTo(ctx.DeviceConfig().ShippingApiLevel()) {
+		if UncheckedFinalApiLevel(33).GreaterThanOrEqualTo(deviceConfig.ShippingApiLevel()) {
 			addListEntriesToMap(productPkg.ProductPackagesShippingApiLevel33)
 		}
-		if UncheckedFinalApiLevel(34).GreaterThanOrEqualTo(ctx.DeviceConfig().ShippingApiLevel()) {
+		if UncheckedFinalApiLevel(34).GreaterThanOrEqualTo(deviceConfig.ShippingApiLevel()) {
 			addListEntriesToMap(productPkg.ProductPackagesShippingApiLevel34)
 		}
 		// host packages
-		addListEntriesToMap(ctx.Config().ProductVariables().ProductHostPackages)
+		addListEntriesToMap(readProductVariable(config, &config.productVariables.ProductHostPackages))
 
 		return &allInstalledModules
 
-	}).(*map[string]bool)
+	})
 }
 
 func (o *osTransitionMutator) splitAll(ctx BaseModuleContext) bool {
@@ -953,9 +954,9 @@ func (a *archTransitionMutator) Mutate(ctx BottomUpMutatorContext, variation str
 	if os == Darwin {
 		isUniversalBinary := allArchInfo.Multilib == "darwin_universal" && len(allArchInfo.Targets) == 2
 		isPrimary := variation == ctx.Config().BuildArch.String()
-		hasSecondaryConfigured := len(ctx.Config().Targets[Darwin]) > 1
+		hasSecondaryConfigured := len(ctx.Config().CompileTargets().Targets[Darwin]) > 1
 		if isUniversalBinary && isPrimary && hasSecondaryConfigured {
-			secondaryArch := ctx.Config().Targets[Darwin][1].Arch.String()
+			secondaryArch := ctx.Config().CompileTargets().Targets[Darwin][1].Arch.String()
 			variation := []blueprint.Variation{{Mutator: "arch", Variation: secondaryArch}}
 			ctx.AddVariationDependencies(variation, DarwinUniversalVariantTag, ctx.ModuleName())
 		}
@@ -1664,7 +1665,7 @@ func getArchProperties(ctx BaseModuleContext, archProperties interface{}, arch A
 	// },
 	if os.Class == Device {
 		if arch.ArchType == X86 && (hasArmAbi(arch) ||
-			hasArmAndroidArch(ctx.Config().Targets[Android])) {
+			hasArmAndroidArch(ctx.Config().CompileTargets().Targets[Android])) {
 			field := "Arm_on_x86"
 			userFriendlyField := "target.arm_on_x86"
 			if armOnX86Properties, ok := getChildPropertyStruct(ctx, targetProp, field, userFriendlyField); ok {
@@ -1672,7 +1673,7 @@ func getArchProperties(ctx BaseModuleContext, archProperties interface{}, arch A
 			}
 		}
 		if arch.ArchType == X86_64 && (hasArmAbi(arch) ||
-			hasArmAndroidArch(ctx.Config().Targets[Android])) {
+			hasArmAndroidArch(ctx.Config().CompileTargets().Targets[Android])) {
 			field := "Arm_on_x86_64"
 			userFriendlyField := "target.arm_on_x86_64"
 			if armOnX8664Properties, ok := getChildPropertyStruct(ctx, targetProp, field, userFriendlyField); ok {
@@ -1715,52 +1716,70 @@ func (m *ModuleBase) setArchProperties(ctx BottomUpMutatorContext) {
 	}
 }
 
-// determineBuildOS stores the OS and architecture used for host targets used during the build into
-// config based on the runtime OS and architecture determined by Go and the product configuration.
-func determineBuildOS(config *config) {
-	config.BuildOS = func() OsType {
-		switch runtime.GOOS {
-		case "linux":
-			if Bool(config.productVariables.HostMusl) || runtime.GOARCH == "arm64" {
-				return LinuxMusl
-			}
-			return Linux
-		case "darwin":
-			return Darwin
-		default:
-			panic(fmt.Sprintf("unsupported OS: %s", runtime.GOOS))
+// determineBuildOS returns the OS used for host targets used during the build, based on the
+// runtime OS determined by Go and the product configuration.
+func determineBuildOS(c Config) OsType {
+	switch runtime.GOOS {
+	case "linux":
+		if Bool(readProductVariable(c, &c.productVariables.HostMusl)) || runtime.GOARCH == "arm64" {
+			return LinuxMusl
 		}
-	}()
+		return Linux
+	case "darwin":
+		return Darwin
+	default:
+		panic(fmt.Sprintf("unsupported OS: %s", runtime.GOOS))
+	}
+}
 
-	config.BuildArch = func() ArchType {
-		switch runtime.GOOS {
-		case "linux":
-			switch runtime.GOARCH {
-			case "amd64":
-				return X86_64
-			case "arm64":
-				return Arm64
-			default:
-				panic(fmt.Sprintf("unsupported arch: %s", runtime.GOARCH))
-			}
-		case "darwin":
-			switch runtime.GOARCH {
-			case "amd64":
-				return X86_64
-			default:
-				panic(fmt.Sprintf("unsupported arch: %s", runtime.GOARCH))
-			}
+// determineBuildArch returns the architecture used for host targets used during the build, based
+// on the runtime OS and architecture determined by Go.
+func determineBuildArch() ArchType {
+	switch runtime.GOOS {
+	case "linux":
+		switch runtime.GOARCH {
+		case "amd64":
+			return X86_64
+		case "arm64":
+			return Arm64
 		default:
-			panic(fmt.Sprintf("unsupported OS: %s", runtime.GOOS))
+			panic(fmt.Sprintf("unsupported arch: %s", runtime.GOARCH))
 		}
-	}()
-
+	case "darwin":
+		switch runtime.GOARCH {
+		case "amd64":
+			return X86_64
+		default:
+			panic(fmt.Sprintf("unsupported arch: %s", runtime.GOARCH))
+		}
+	default:
+		panic(fmt.Sprintf("unsupported OS: %s", runtime.GOOS))
+	}
 }
 
 // Convert the arch product variables into a list of targets for each OsType, and into the targets
 // of the device-side images, or nil where these equal the Android targets.
-func decodeTargetProductVariables(config *config) (map[OsType][]Target, []Target, error) {
-	variables := config.productVariables
+func decodeTargetProductVariables(c Config, buildOS OsType) (map[OsType][]Target, []Target, error) {
+	variables := &c.productVariables
+	hostArch := readProductVariable(c, &variables.HostArch)
+	hostSecondaryArch := readProductVariable(c, &variables.HostSecondaryArch)
+	deviceArch := readProductVariable(c, &variables.DeviceArch)
+	deviceAbi := readProductVariable(c, &variables.DeviceAbi)
+	deviceSecondaryArch := readProductVariable(c, &variables.DeviceSecondaryArch)
+	deviceSecondaryAbi := readProductVariable(c, &variables.DeviceSecondaryAbi)
+	crossHost := readProductVariable(c, &variables.CrossHost)
+	crossHostArch := readProductVariable(c, &variables.CrossHostArch)
+	crossHostSecondaryArch := readProductVariable(c, &variables.CrossHostSecondaryArch)
+	nativeBridgeArch := readProductVariable(c, &variables.NativeBridgeArch)
+	nativeBridgeArchVariant := readProductVariable(c, &variables.NativeBridgeArchVariant)
+	nativeBridgeCpuVariant := readProductVariable(c, &variables.NativeBridgeCpuVariant)
+	nativeBridgeAbi := readProductVariable(c, &variables.NativeBridgeAbi)
+	nativeBridgeRelativePath := readProductVariable(c, &variables.NativeBridgeRelativePath)
+	nativeBridgeSecondaryArch := readProductVariable(c, &variables.NativeBridgeSecondaryArch)
+	nativeBridgeSecondaryArchVariant := readProductVariable(c, &variables.NativeBridgeSecondaryArchVariant)
+	nativeBridgeSecondaryCpuVariant := readProductVariable(c, &variables.NativeBridgeSecondaryCpuVariant)
+	nativeBridgeSecondaryAbi := readProductVariable(c, &variables.NativeBridgeSecondaryAbi)
+	nativeBridgeSecondaryRelativePath := readProductVariable(c, &variables.NativeBridgeSecondaryRelativePath)
 
 	targets := make(map[OsType][]Target)
 	var targetErr error
@@ -1795,9 +1814,9 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, []Target
 		hostCross := false
 		if target.os.Class == Host {
 			var osSupported bool
-			if target.os == config.BuildOS {
+			if target.os == buildOS {
 				osSupported = true
-			} else if config.BuildOS.Linux() && target.os.Linux() {
+			} else if buildOS.Linux() && target.os.Linux() {
 				// LinuxBionic and Linux are compatible
 				osSupported = true
 			} else {
@@ -1807,9 +1826,9 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, []Target
 			var archSupported bool
 			if arch.ArchType == Common {
 				archSupported = true
-			} else if arch.ArchType.Name == *variables.HostArch {
+			} else if arch.ArchType.Name == *hostArch {
 				archSupported = true
-			} else if variables.HostSecondaryArch != nil && arch.ArchType.Name == *variables.HostSecondaryArch {
+			} else if hostSecondaryArch != nil && arch.ArchType.Name == *hostSecondaryArch {
 				archSupported = true
 			} else {
 				archSupported = false
@@ -1845,19 +1864,19 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, []Target
 	deviceTargetConfigs := func(cpu archAndCpuVariants) []targetConfig {
 		configs := []targetConfig{{
 			os:                  Android,
-			archName:            *variables.DeviceArch,
+			archName:            *deviceArch,
 			archVariant:         cpu.archVariant,
 			cpuVariant:          cpu.cpuVariant,
-			abi:                 variables.DeviceAbi,
+			abi:                 deviceAbi,
 			nativeBridgeEnabled: NativeBridgeDisabled,
 		}}
-		if variables.DeviceSecondaryArch != nil && *variables.DeviceSecondaryArch != "" {
+		if deviceSecondaryArch != nil && *deviceSecondaryArch != "" {
 			configs = append(configs, targetConfig{
 				os:                  Android,
-				archName:            *variables.DeviceSecondaryArch,
+				archName:            *deviceSecondaryArch,
 				archVariant:         cpu.secondaryArchVariant,
 				cpuVariant:          cpu.secondaryCpuVariant,
-				abi:                 variables.DeviceSecondaryAbi,
+				abi:                 deviceSecondaryAbi,
 				nativeBridgeEnabled: NativeBridgeDisabled,
 			})
 		}
@@ -1866,47 +1885,47 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, []Target
 
 	var deviceSideTargets []Target
 
-	if variables.HostArch == nil {
+	if hostArch == nil {
 		return nil, nil, fmt.Errorf("No host primary architecture set")
 	}
 
 	// The primary host target, which must always exist.
-	addTarget(targetConfig{os: config.BuildOS, archName: *variables.HostArch, nativeBridgeEnabled: NativeBridgeDisabled})
+	addTarget(targetConfig{os: buildOS, archName: *hostArch, nativeBridgeEnabled: NativeBridgeDisabled})
 
 	// An optional secondary host target.
-	if variables.HostSecondaryArch != nil && *variables.HostSecondaryArch != "" {
-		addTarget(targetConfig{os: config.BuildOS, archName: *variables.HostSecondaryArch, nativeBridgeEnabled: NativeBridgeDisabled})
+	if hostSecondaryArch != nil && *hostSecondaryArch != "" {
+		addTarget(targetConfig{os: buildOS, archName: *hostSecondaryArch, nativeBridgeEnabled: NativeBridgeDisabled})
 	}
 
 	// Optional cross-compiled host targets, generally Windows.
-	if String(variables.CrossHost) != "" {
-		crossHostOs := osByName(*variables.CrossHost)
+	if String(crossHost) != "" {
+		crossHostOs := osByName(*crossHost)
 		if crossHostOs == NoOsType {
-			return nil, nil, fmt.Errorf("Unknown cross host OS %q", *variables.CrossHost)
+			return nil, nil, fmt.Errorf("Unknown cross host OS %q", *crossHost)
 		}
 
-		if String(variables.CrossHostArch) == "" {
+		if String(crossHostArch) == "" {
 			return nil, nil, fmt.Errorf("No cross-host primary architecture set")
 		}
 
 		// The primary cross-compiled host target.
-		addTarget(targetConfig{os: crossHostOs, archName: *variables.CrossHostArch, nativeBridgeEnabled: NativeBridgeDisabled})
+		addTarget(targetConfig{os: crossHostOs, archName: *crossHostArch, nativeBridgeEnabled: NativeBridgeDisabled})
 
 		// An optional secondary cross-compiled host target.
-		if variables.CrossHostSecondaryArch != nil && *variables.CrossHostSecondaryArch != "" {
-			addTarget(targetConfig{os: crossHostOs, archName: *variables.CrossHostSecondaryArch, nativeBridgeEnabled: NativeBridgeDisabled})
+		if crossHostSecondaryArch != nil && *crossHostSecondaryArch != "" {
+			addTarget(targetConfig{os: crossHostOs, archName: *crossHostSecondaryArch, nativeBridgeEnabled: NativeBridgeDisabled})
 		}
 	}
 
 	// Optional device targets
-	if variables.DeviceArch != nil && *variables.DeviceArch != "" {
+	if deviceArch != nil && *deviceArch != "" {
 		// The primary and the optional secondary device target of the system side.
-		for _, target := range deviceTargetConfigs(systemCpuVariants(variables)) {
+		for _, target := range deviceTargetConfigs(systemCpuVariants(c)) {
 			addTarget(target)
 		}
 
 		// The same targets for the device's CPU, which the device-side images compile for.
-		for _, target := range deviceTargetConfigs(deviceCpuVariants(variables)) {
+		for _, target := range deviceTargetConfigs(deviceCpuVariants(c)) {
 			decoded, err := decodeTarget(target)
 			if err != nil {
 				return nil, nil, fmt.Errorf("could not decode the device-side target of %s: %w",
@@ -1919,31 +1938,31 @@ func decodeTargetProductVariables(config *config) (map[OsType][]Target, []Target
 		}
 
 		// An optional NativeBridge device target.
-		if variables.NativeBridgeArch != nil && *variables.NativeBridgeArch != "" {
+		if nativeBridgeArch != nil && *nativeBridgeArch != "" {
 			addTarget(targetConfig{
 				os:                       Android,
-				archName:                 *variables.NativeBridgeArch,
-				archVariant:              variables.NativeBridgeArchVariant,
-				cpuVariant:               variables.NativeBridgeCpuVariant,
-				abi:                      variables.NativeBridgeAbi,
+				archName:                 *nativeBridgeArch,
+				archVariant:              nativeBridgeArchVariant,
+				cpuVariant:               nativeBridgeCpuVariant,
+				abi:                      nativeBridgeAbi,
 				nativeBridgeEnabled:      NativeBridgeEnabled,
-				nativeBridgeHostArchName: variables.DeviceArch,
-				nativeBridgeRelativePath: variables.NativeBridgeRelativePath,
+				nativeBridgeHostArchName: deviceArch,
+				nativeBridgeRelativePath: nativeBridgeRelativePath,
 			})
 		}
 
 		// An optional secondary NativeBridge device target.
-		if variables.DeviceSecondaryArch != nil && *variables.DeviceSecondaryArch != "" &&
-			variables.NativeBridgeSecondaryArch != nil && *variables.NativeBridgeSecondaryArch != "" {
+		if deviceSecondaryArch != nil && *deviceSecondaryArch != "" &&
+			nativeBridgeSecondaryArch != nil && *nativeBridgeSecondaryArch != "" {
 			addTarget(targetConfig{
 				os:                       Android,
-				archName:                 *variables.NativeBridgeSecondaryArch,
-				archVariant:              variables.NativeBridgeSecondaryArchVariant,
-				cpuVariant:               variables.NativeBridgeSecondaryCpuVariant,
-				abi:                      variables.NativeBridgeSecondaryAbi,
+				archName:                 *nativeBridgeSecondaryArch,
+				archVariant:              nativeBridgeSecondaryArchVariant,
+				cpuVariant:               nativeBridgeSecondaryCpuVariant,
+				abi:                      nativeBridgeSecondaryAbi,
 				nativeBridgeEnabled:      NativeBridgeEnabled,
-				nativeBridgeHostArchName: variables.DeviceSecondaryArch,
-				nativeBridgeRelativePath: variables.NativeBridgeSecondaryRelativePath,
+				nativeBridgeHostArchName: deviceSecondaryArch,
+				nativeBridgeRelativePath: nativeBridgeSecondaryRelativePath,
 			})
 		}
 	}

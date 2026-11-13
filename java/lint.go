@@ -228,7 +228,7 @@ func (l *linter) deps(ctx android.BottomUpMutatorContext) {
 
 	extraCheckModules = append(extraCheckModules, "AndroidGlobalLintChecker")
 
-	ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(),
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(),
 		extraLintCheckTag, extraCheckModules...)
 }
 

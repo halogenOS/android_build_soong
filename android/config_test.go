@@ -82,7 +82,7 @@ func TestProductConfigAnnotations(t *testing.T) {
 }
 
 func TestMissingVendorConfig(t *testing.T) {
-	c := &config{}
+	c := Config{config: &config{}}
 	if c.VendorConfig("test").Bool("not_set") {
 		t.Errorf("Expected false")
 	}
@@ -349,7 +349,7 @@ func TestPartialCompile(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.value, func(t *testing.T) {
 			config := mockConfig(test.value)
-			flags, _ := config.parsePartialCompileFlags(test.isEngBuild)
+			flags, _ := Config{config: config}.parsePartialCompileFlags(test.isEngBuild)
 			if flags != test.expected {
 				t.Errorf("expected %v found %v", test.expected, flags)
 			}

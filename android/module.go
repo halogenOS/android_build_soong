@@ -927,6 +927,10 @@ type ModuleBase struct {
 	// is a pointer because module types copy ModuleBase by value. ModuleFactoryAdaptor creates it.
 	buildTypeValuesReadMutex *sync.Mutex
 
+	// configReads records the configuration reads of this module variant. It is a pointer because
+	// module types copy ModuleBase by value. ModuleFactoryAdaptor creates it.
+	configReads *ConfigReads
+
 	// Arch specific versions of structs in GetProperties() prior to
 	// initialization in InitAndroidArchModule, lets call it `generalProperties`.
 	// The outer index has the same order as generalProperties and the inner index
@@ -1083,18 +1087,14 @@ func (m *ModuleBase) baseDepsMutator(ctx BottomUpMutatorContext) {
 	// Unfortunately, there's no way for Soong to correctly determine if it's running in a
 	// reduced manifest branch. Instead, here, we use the absence of DeviceArch or DeviceName as
 	// a strong signal, because that's very common across reduced manifest branches.
-	pv := ctx.Config().productVariables
-	fullManifest := pv.DeviceArch != nil && pv.DeviceName != nil
-	if fullManifest {
+	if ctx.Config().isFullManifest() {
 		addVintfFragmentDeps(ctx)
 	}
 }
 
 // required property can be overridden too; handle it separately
 func (m *ModuleBase) baseOverridablePropertiesDepsMutator(ctx BottomUpMutatorContext) {
-	pv := ctx.Config().productVariables
-	fullManifest := pv.DeviceArch != nil && pv.DeviceName != nil
-	if fullManifest {
+	if ctx.Config().isFullManifest() {
 		addRequiredDeps(ctx)
 	}
 }
@@ -1141,12 +1141,12 @@ func addRequiredDeps(ctx BottomUpMutatorContext) {
 	}
 
 	var deviceTargets []Target
-	deviceTargets = append(deviceTargets, ctx.Config().Targets[Android]...)
-	deviceTargets = append(deviceTargets, ctx.Config().AndroidCommonTarget)
+	deviceTargets = append(deviceTargets, ctx.Config().CompileTargets().Targets[Android]...)
+	deviceTargets = append(deviceTargets, ctx.Config().CompileTargets().AndroidCommonTarget)
 
 	var hostTargets []Target
-	hostTargets = append(hostTargets, ctx.Config().Targets[ctx.Config().BuildOS]...)
-	hostTargets = append(hostTargets, ctx.Config().BuildOSCommonTarget)
+	hostTargets = append(hostTargets, ctx.Config().CompileTargets().Targets[ctx.Config().BuildOS]...)
+	hostTargets = append(hostTargets, ctx.Config().CompileTargets().BuildOSCommonTarget)
 
 	if ctx.Device() {
 		for _, depName := range append(ctx.Module().RequiredModuleNames(ctx), ctx.Module().VintfFragmentModuleNames(ctx)...) {
@@ -1290,6 +1290,14 @@ func (m *ModuleBase) BaseModuleName() string {
 
 func (m *ModuleBase) base() *ModuleBase {
 	return m
+}
+
+var _ blueprint.ModuleWithClonedState = (*ModuleBase)(nil)
+
+// CopyStateToClone copies the configuration reads recorded so far into clone, a new variant or a
+// replacement of this module variant.
+func (m *ModuleBase) CopyStateToClone(clone blueprint.Module) {
+	clone.(Module).base().configReads.recordAll(m.configReads)
 }
 
 func (m *ModuleBase) qualifiedModuleId(ctx BaseModuleContext) qualifiedModuleName {
@@ -2013,7 +2021,7 @@ func (m *ModuleBase) earlyModuleContextFactory(ctx blueprint.EarlyModuleContext)
 	return earlyModuleContext{
 		EarlyModuleContext: ctx,
 		kind:               determineModuleKind(m, ctx),
-		config:             ctx.Config().(Config),
+		config:             ctx.Config().(Config).recordingReadsInto(m.configReads),
 	}
 }
 
@@ -2033,14 +2041,14 @@ func (m *ModuleBase) archModuleContextFactory(ctx archModuleContextFactoryContex
 	config := ctx.Config().(Config)
 	target := m.Target()
 	primaryArch := false
-	if len(config.Targets[target.Os]) <= 1 {
+	if len(config.CompileTargets().Targets[target.Os]) <= 1 {
 		primaryArch = true
 	} else {
-		primaryArch = target.Arch.ArchType == config.Targets[target.Os][0].Arch.ArchType
+		primaryArch = target.Arch.ArchType == config.CompileTargets().Targets[target.Os][0].Arch.ArchType
 	}
 	primaryNativeBridgeArch := false
 	if target.NativeBridge {
-		for _, t := range config.Targets[target.Os] {
+		for _, t := range config.CompileTargets().Targets[target.Os] {
 			if t.NativeBridge {
 				if target.Arch.ArchType == t.Arch.ArchType {
 					primaryNativeBridgeArch = true
@@ -2767,8 +2775,8 @@ func (m *ModuleBase) GenerateBuildActions(blueprintCtx blueprint.ModuleContext) 
 	if htp, ok := m.module.(HostToolProvider); ok &&
 		m.Enabled(ctx) &&
 		ctx.requiresFullInstall() &&
-		myTarget.OsVariation() == ctx.Config().BuildOSTarget.OsVariation() &&
-		(myTarget.ArchVariation() == ctx.Config().BuildOSTarget.ArchVariation() || myTarget.ArchVariation() == ctx.Config().BuildOSCommonTarget.ArchVariation()) &&
+		myTarget.OsVariation() == ctx.Config().CompileTargets().BuildOSTarget.OsVariation() &&
+		(myTarget.ArchVariation() == ctx.Config().CompileTargets().BuildOSTarget.ArchVariation() || myTarget.ArchVariation() == ctx.Config().CompileTargets().BuildOSCommonTarget.ArchVariation()) &&
 		// Only accept an exact match, or the coverage variation. On coverage builds,
 		// the coverage varition of host tools is what's installed. (but that should be fixed,
 		// as it makes coverage builds a lot slower)
@@ -3020,7 +3028,7 @@ func (m *ModuleBase) moduleInfoRegisterName(ctx ModuleContext, subName string) s
 		}
 	}
 	suffix := ""
-	arches := slices.Clone(ctx.Config().Targets[ctx.Os()])
+	arches := slices.Clone(ctx.Config().CompileTargets().Targets[ctx.Os()])
 	arches = slices.DeleteFunc(arches, func(target Target) bool {
 		return target.NativeBridge != ctx.Target().NativeBridge
 	})
@@ -3212,8 +3220,8 @@ func (e configurationEvalutor) EvaluateConfiguration(condition proptools.Configu
 			ctx.OtherModulePropertyErrorf(m, property, "release_flag requires 1 argument, found %d", condition.NumArgs())
 			return proptools.ConfigurableValueUndefined()
 		}
-		if ty, ok := ctx.Config().productVariables.BuildFlagTypes[condition.Arg(0)]; ok {
-			v := ctx.Config().productVariables.BuildFlags[condition.Arg(0)]
+		if ty, ok := ctx.Config().GetBuildFlagType(condition.Arg(0)); ok {
+			v, _ := ctx.Config().GetBuildFlag(condition.Arg(0))
 			switch ty {
 			case "unspecified", "obsolete":
 				return proptools.ConfigurableValueUndefined()
@@ -3262,31 +3270,24 @@ func (e configurationEvalutor) EvaluateConfiguration(condition proptools.Configu
 		}
 		namespace := condition.Arg(0)
 		variable := condition.Arg(1)
-		if n, ok := ctx.Config().productVariables.VendorVars[namespace]; ok {
-			if v, ok := n[variable]; ok {
-				ty := ""
-				if namespaces, ok := ctx.Config().productVariables.VendorVarTypes[namespace]; ok {
-					ty = namespaces[variable]
+		if v, ok := ctx.Config().VendorVariable(namespace, variable); ok {
+			switch ty := ctx.Config().VendorVariableType(namespace, variable); ty {
+			case "":
+				// strings are the default, we don't bother writing them to the soong variables json file
+				return proptools.ConfigurableValueString(v)
+			case "bool":
+				return proptools.ConfigurableValueBool(v == "true")
+			case "int":
+				i, err := strconv.ParseInt(v, 0, 64)
+				if err != nil {
+					ctx.OtherModulePropertyErrorf(m, property, "integer soong_config_variable was not an int: %q", v)
+					return proptools.ConfigurableValueUndefined()
 				}
-				switch ty {
-				case "":
-					// strings are the default, we don't bother writing them to the soong variables json file
-					return proptools.ConfigurableValueString(v)
-				case "bool":
-					return proptools.ConfigurableValueBool(v == "true")
-				case "int":
-					i, err := strconv.ParseInt(v, 0, 64)
-					if err != nil {
-						ctx.OtherModulePropertyErrorf(m, property, "integer soong_config_variable was not an int: %q", v)
-						return proptools.ConfigurableValueUndefined()
-					}
-					return proptools.ConfigurableValueInt(i)
-				case "string_list":
-					return proptools.ConfigurableValueStringList(strings.Split(v, " "))
-				default:
-					panic("unhandled soong config variable type: " + ty)
-				}
-
+				return proptools.ConfigurableValueInt(i)
+			case "string_list":
+				return proptools.ConfigurableValueStringList(strings.Split(v, " "))
+			default:
+				panic("unhandled soong config variable type: " + ty)
 			}
 		}
 		return proptools.ConfigurableValueUndefined()
@@ -3320,16 +3321,14 @@ func (e configurationEvalutor) EvaluateConfiguration(condition proptools.Configu
 			return proptools.ConfigurableValueUndefined()
 		}
 
-		if n, ok := ctx.Config().productVariables.VendorVars["boolean_var"]; ok {
-			if v, ok := n["for_testing"]; ok {
-				switch v {
-				case "true":
-					return proptools.ConfigurableValueBool(true)
-				case "false":
-					return proptools.ConfigurableValueBool(false)
-				default:
-					ctx.OtherModulePropertyErrorf(m, property, "testing:my_boolean_var can only be true or false, found %q", v)
-				}
+		if v, ok := ctx.Config().VendorVariable("boolean_var", "for_testing"); ok {
+			switch v {
+			case "true":
+				return proptools.ConfigurableValueBool(true)
+			case "false":
+				return proptools.ConfigurableValueBool(false)
+			default:
+				ctx.OtherModulePropertyErrorf(m, property, "testing:my_boolean_var can only be true or false, found %q", v)
 			}
 		}
 		return proptools.ConfigurableValueUndefined()

@@ -919,8 +919,8 @@ func (a *AndroidApp) jniBuildActions(jniLibs []jniLib, prebuiltJniPackages andro
 					//
 					// Work with the team to come up with a new format that handles multilib modules properly
 					// and change this.
-					if len(ctx.Config().Targets[android.Android]) == 1 ||
-						ctx.Config().AndroidFirstDeviceTarget.Arch.ArchType == jni.target.Arch.ArchType {
+					if len(ctx.Config().CompileTargets().Targets[android.Android]) == 1 ||
+						ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Arch.ArchType == jni.target.Arch.ArchType {
 						a.jniCoverageOutputs = append(a.jniCoverageOutputs, jni.coverageFile.Path())
 					}
 				}

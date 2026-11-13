@@ -312,9 +312,9 @@ func javaToolchain(ctx android.PathContext) android.SourcePath {
 var javaHomeKey = android.NewOnceKey("javaHome")
 
 func javaHome(ctx android.PathContext) android.SourcePath {
-	path := ctx.Config().Once(javaHomeKey, func() interface{} {
+	path := android.OnceFromConfig(ctx.Config(), javaHomeKey, func(config android.Config) string {
 		// This is set up and guaranteed by soong_ui
-		return ctx.Config().Getenv("ANDROID_JAVA_HOME")
-	}).(string)
+		return config.Getenv("ANDROID_JAVA_HOME")
+	})
 	return android.PathForSource(ctx, path)
 }

@@ -26,13 +26,13 @@ import (
 // supported through native bridge.
 func dexpreoptTargets(ctx android.PathContext) []android.Target {
 	var targets []android.Target
-	for _, target := range ctx.Config().Targets[android.Android] {
+	for _, target := range ctx.Config().CompileTargets().Targets[android.Android] {
 		if target.NativeBridge == android.NativeBridgeDisabled && !target.LFI {
 			targets = append(targets, target)
 		}
 	}
 	// We may also need the images on host in order to run host-based tests.
-	for _, target := range ctx.Config().Targets[ctx.Config().BuildOS] {
+	for _, target := range ctx.Config().CompileTargets().Targets[ctx.Config().BuildOS] {
 		targets = append(targets, target)
 	}
 
@@ -60,7 +60,7 @@ func genBootImageConfigRaw(ctx android.PathContext) map[string]*bootImageConfig 
 		mainlineBcpCompilerFilter = "speed-profile"
 	}
 
-	return ctx.Config().Once(bootImageConfigRawKey, func() interface{} {
+	return android.OnceFromPathContext(ctx, bootImageConfigRawKey, func(ctx android.PathContext) map[string]*bootImageConfig {
 		global := dexpreopt.GetGlobalConfig(ctx)
 
 		artBootImageName := "art"           // Keep this local to avoid accidental references.
@@ -109,12 +109,12 @@ func genBootImageConfigRaw(ctx android.PathContext) map[string]*bootImageConfig 
 			frameworkBootImageName: &frameworkCfg,
 			mainlineBootImageName:  &mainlineCfg,
 		}
-	}).(map[string]*bootImageConfig)
+	})
 }
 
 // Construct the global boot image configs.
 func genBootImageConfigs(ctx android.PathContext) map[string]*bootImageConfig {
-	return ctx.Config().Once(bootImageConfigKey, func() interface{} {
+	return android.OnceFromPathContext(ctx, bootImageConfigKey, func(ctx android.PathContext) map[string]*bootImageConfig {
 		targets := dexpreoptTargets(ctx)
 		deviceDir := android.PathForOutput(ctx, dexpreopt.GetDexpreoptDirName(ctx))
 
@@ -161,7 +161,7 @@ func genBootImageConfigs(ctx android.PathContext) map[string]*bootImageConfig {
 		}
 
 		return configs
-	}).(map[string]*bootImageConfig)
+	})
 }
 
 // calculateDepsRecursive calculates the dependencies of the given boot image config and all its

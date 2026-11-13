@@ -519,7 +519,7 @@ func getFinalCodenamesMap(config Config) (map[string]int, error) {
 	}
 	// This logic is replicated in starlark, if changing logic here update starlark code too
 	// https://cs.android.com/android/platform/superproject/+/main:build/bazel/rules/common/api.bzl;l=30;drc=231c7e8c8038fd478a79eb68aa5b9f5c64e0e061
-	result := config.Once(finalCodenamesMapKey, func() interface{} {
+	result := OnceFromConfig(config, finalCodenamesMapKey, func(config Config) resultStruct {
 		apiLevelsMap, err := getApiLevelsMapReleasedVersions()
 
 		// TODO: Differentiate "current" and "future".
@@ -533,12 +533,12 @@ func getFinalCodenamesMap(config Config) (map[string]int, error) {
 		// added in S, both of these are usable when building for "current" when
 		// neither R nor S are final, but the S APIs stop being available in a
 		// final R build.
-		if err == nil && Bool(config.productVariables.Platform_sdk_final) {
+		if err == nil && config.PlatformSdkFinal() {
 			apiLevelsMap["current"] = config.PlatformSdkVersion().FinalOrFutureInt()
 		}
 
 		return resultStruct{apiLevelsMap, err}
-	}).(resultStruct)
+	})
 	return result.result, result.err
 }
 
@@ -552,7 +552,7 @@ func GetApiLevelsMap(config Config) (map[string]int, error) {
 	}
 	// This logic is replicated in starlark, if changing logic here update starlark code too
 	// https://cs.android.com/android/platform/superproject/+/main:build/bazel/rules/common/api.bzl;l=23;drc=231c7e8c8038fd478a79eb68aa5b9f5c64e0e061
-	result := config.Once(apiLevelsMapKey, func() interface{} {
+	result := OnceFromConfig(config, apiLevelsMapKey, func(config Config) resultStruct {
 		apiLevelsMap, err := getApiLevelsMapReleasedVersions()
 		if err == nil {
 			for i, codename := range config.PlatformVersionAllPreviewCodenames() {
@@ -561,7 +561,7 @@ func GetApiLevelsMap(config Config) (map[string]int, error) {
 		}
 
 		return resultStruct{apiLevelsMap, err}
-	}).(resultStruct)
+	})
 	return result.result, result.err
 }
 

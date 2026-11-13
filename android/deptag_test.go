@@ -90,10 +90,10 @@ func TestInstallDependencyTag(t *testing.T) {
 
 	config := result.Config
 
-	hostFoo := result.ModuleForTests(t, "foo", config.BuildOSCommonTarget.String()).Description("install")
-	hostInstallDep := result.ModuleForTests(t, "install_dep", config.BuildOSCommonTarget.String()).Description("install")
-	hostTransitive := result.ModuleForTests(t, "transitive", config.BuildOSCommonTarget.String()).Description("install")
-	hostDep := result.ModuleForTests(t, "dep", config.BuildOSCommonTarget.String()).Description("install")
+	hostFoo := result.ModuleForTests(t, "foo", config.CompileTargets().BuildOSCommonTarget.String()).Description("install")
+	hostInstallDep := result.ModuleForTests(t, "install_dep", config.CompileTargets().BuildOSCommonTarget.String()).Description("install")
+	hostTransitive := result.ModuleForTests(t, "transitive", config.CompileTargets().BuildOSCommonTarget.String()).Description("install")
+	hostDep := result.ModuleForTests(t, "dep", config.CompileTargets().BuildOSCommonTarget.String()).Description("install")
 
 	if g, w := hostFoo.Implicits.Strings(), hostInstallDep.Output.String(); !InList(w, g) {
 		t.Errorf("expected host dependency %q, got %q", w, g)

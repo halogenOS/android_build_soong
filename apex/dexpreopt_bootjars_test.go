@@ -551,7 +551,7 @@ func TestDexpreoptBootZip(t *testing.T) {
 
 	ctx := android.PathContextForTesting(android.TestArchConfig("", nil, "", nil))
 	expectedInputs := []string{}
-	for _, target := range ctx.Config().Targets[android.Android] {
+	for _, target := range ctx.Config().CompileTargets().Targets[android.Android] {
 		for _, ext := range []string{".art", ".oat", ".vdex"} {
 			for _, suffix := range []string{"", "-foo", "-bar", "-baz"} {
 				expectedInputs = append(expectedInputs,

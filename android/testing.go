@@ -203,7 +203,7 @@ func PrepareForTestWithBuildFlag(flag, value string) FixturePreparer {
 // - Arm on X86 (native bridge)
 var PrepareForNativeBridgeEnabled = FixtureModifyConfig(
 	func(config Config) {
-		config.Targets[Android] = []Target{
+		config.CompileTargets().Targets[Android] = []Target{
 			{Os: Android, Arch: Arch{ArchType: X86_64, ArchVariant: "silvermont", Abi: []string{"arm64-v8a"}},
 				NativeBridge: NativeBridgeDisabled, NativeBridgeHostArchName: "", NativeBridgeRelativePath: ""},
 			{Os: Android, Arch: Arch{ArchType: X86, ArchVariant: "silvermont", Abi: []string{"armeabi-v7a"}},

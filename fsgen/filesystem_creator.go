@@ -188,7 +188,7 @@ func (f *filesystemCreator) UseGenericConfig() bool {
 }
 
 func generatedPartitions(ctx android.EarlyModuleContext) allGeneratedPartitionData {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 
 	var result allGeneratedPartitionData
 	addGenerated := func(ty string) {
@@ -294,7 +294,7 @@ func (f *filesystemCreator) createInternalModules(ctx android.LoadHookContext) {
 	// Create android_info.prop
 	f.createAndroidInfo(ctx)
 
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	dtbImg := createDtbImgFilegroup(ctx)
 
 	if buildingBootImage(partitionVars) {
@@ -448,7 +448,7 @@ func buildingSystemOtherImage(partitionVars android.PartitionVariables) bool {
 }
 
 func (f *filesystemCreator) createBootloader(ctx android.LoadHookContext) (string, bool) {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	var bootloaderSrc string
 	path := partitionVars.BootloaderFilePath
 
@@ -461,7 +461,7 @@ func (f *filesystemCreator) createBootloader(ctx android.LoadHookContext) (strin
 		return "", false
 	}
 
-	boardPlatform := proptools.String(ctx.Config().ProductVariables().BoardPlatform)
+	boardPlatform := proptools.String(ctx.Config().BoardPlatform())
 
 	bootloaderModuleName := generatedModuleName(ctx.Config(), "bootloader")
 	bootloaderProps := filesystem.PrebuiltBootloaderProperties{
@@ -485,7 +485,7 @@ func (f *filesystemCreator) createBootloader(ctx android.LoadHookContext) (strin
 }
 
 func (f *filesystemCreator) createTzsw(ctx android.LoadHookContext) (string, bool) {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	if len(partitionVars.BoardPrebuiltTzswImagePath) == 0 {
 		return "", false
 	}
@@ -505,7 +505,7 @@ func (f *filesystemCreator) createTzsw(ctx android.LoadHookContext) (string, boo
 }
 
 func (f *filesystemCreator) createReleaseToolsFilegroup(ctx android.LoadHookContext) (string, bool) {
-	releaseToolsDir := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.ReleaseToolsExtensionDir
+	releaseToolsDir := ctx.Config().PartitionVariables().ReleaseToolsExtensionDir
 	if releaseToolsDir == "" {
 		return "", false
 	}
@@ -525,7 +525,7 @@ func (f *filesystemCreator) createReleaseToolsFilegroup(ctx android.LoadHookCont
 }
 
 func (f *filesystemCreator) createFastbootInfoFilegroup(ctx android.LoadHookContext) (string, bool) {
-	fastbootInfoFile := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.BoardFastbootInfoFile
+	fastbootInfoFile := ctx.Config().PartitionVariables().BoardFastbootInfoFile
 	if fastbootInfoFile == "" {
 		return "", false
 	}
@@ -550,7 +550,7 @@ func (f *filesystemCreator) createDeviceModule(
 	vbmetaPartitions []string,
 	superImageSubPartitions []string,
 ) {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 
 	var vendorBlobsLicenseProp *string
 	if partitionVars.VendorBlobsLicense != "" {
@@ -667,7 +667,7 @@ func (f *filesystemCreator) createDeviceModule(
 		Ab_ota_partitions:                    partitionVars.AbOtaPartitions,
 		Ab_ota_postinstall_config:            partitionVars.AbOtaPostInstallConfig,
 		Android_info:                         proptools.StringPtr(generatedModuleName(ctx.Config(), "android_info.prop")),
-		Kernel_version:                       ctx.Config().ProductVariables().BoardKernelVersion,
+		Kernel_version:                       ctx.Config().BoardKernelVersion(),
 		Partial_ota_update_partitions:        partitionVars.BoardPartialOtaUpdatePartitionsList,
 		Flash_block_size:                     proptools.StringPtr(partitionVars.BoardFlashBlockSize),
 		Bootloader_in_update_package:         proptools.BoolPtr(partitionVars.BootloaderInUpdatePackage),
@@ -721,7 +721,7 @@ func (f *filesystemCreator) createDeviceModule(
 }
 
 func createRadioImg(ctx android.LoadHookContext) string {
-	radioFilePath := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.BoardRadioImagePath
+	radioFilePath := ctx.Config().PartitionVariables().BoardRadioImagePath
 	if radioFilePath == "" {
 		return ""
 	}
@@ -731,8 +731,8 @@ func createRadioImg(ctx android.LoadHookContext) string {
 	name := generatedModuleNameForPartition(ctx.Config(), "radio")
 	radioImgProps := filesystem.PrebuiltRadioImgProperties{
 		Src:               proptools.StringPtr(radioFilePath),
-		Ab_ota_partitions: ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.AbOtaRadioPartitions,
-		Unpack_tool:       proptools.StringPtr(fmt.Sprintf("vendor/google_devices/%s/prebuilts/misc_bins/unpack.py", proptools.String(ctx.Config().ProductVariables().BoardPlatform))),
+		Ab_ota_partitions: ctx.Config().PartitionVariables().AbOtaRadioPartitions,
+		Unpack_tool:       proptools.StringPtr(fmt.Sprintf("vendor/google_devices/%s/prebuilts/misc_bins/unpack.py", proptools.String(ctx.Config().BoardPlatform()))),
 	}
 
 	ctx.CreateModuleInDirectory(
@@ -750,11 +750,11 @@ func createRadioImg(ctx android.LoadHookContext) string {
 
 // Returns pvfmw properties if the product uses pvmfw.
 func getPvmfwProperties(ctx android.LoadHookContext) *filesystem.PvmfwProperties {
-	if !ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.BoardUsesPvmfwImage {
+	if !ctx.Config().PartitionVariables().BoardUsesPvmfwImage {
 		return nil
 	}
 	var partitionSize *int64
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	boardPvmfwPartitionSize := partitionVars.BoardPvmfwPartitionSize
 	if boardPvmfwPartitionSize != "" {
 		size, err := strconv.ParseInt(boardPvmfwPartitionSize, 0, 64)
@@ -785,7 +785,7 @@ func getPvmfwProperties(ctx android.LoadHookContext) *filesystem.PvmfwProperties
 }
 
 func createRamdisk16k(ctx android.LoadHookContext) string {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	kernelPath := partitionVars.BoardKernelPath16k
 	if kernelPath == "" {
 		return ""
@@ -819,7 +819,7 @@ func createRamdisk16k(ctx android.LoadHookContext) string {
 }
 
 func partitionSpecificFsProps(ctx android.EarlyModuleContext, partitions allGeneratedPartitionData, fsProps *filesystem.FilesystemProperties, partitionType string) {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	switch partitionType {
 	case "system":
 		fsProps.Build_logtags = proptools.BoolPtr(true)
@@ -1142,7 +1142,7 @@ func (f *filesystemCreator) createPartition(ctx android.LoadHookContext, partiti
 
 // Creates filegroups for the files specified in BOARD_(partition_)AVB_KEY_PATH
 func (f *filesystemCreator) createAvbKeyFilegroups(ctx android.LoadHookContext) {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	var files []string
 
 	if len(partitionVars.BoardAvbKeyPath) > 0 {
@@ -1211,7 +1211,7 @@ func (f *filesystemCreator) createBackgroundPicturesForRecovery(ctx android.Load
 
 // Creates filegroups for miscellaneous other files
 func (f *filesystemCreator) createMiscFilegroups(ctx android.LoadHookContext) {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 
 	if partitionVars.BoardErofsCompressorHints != "" {
 		dir := filepath.Dir(partitionVars.BoardErofsCompressorHints)
@@ -1239,7 +1239,7 @@ func (f *filesystemCreator) createProductConfigDistGenrules(ctx android.LoadHook
 		// Skip in soong+make builds to prevent duplicate dist rules.
 		return
 	}
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 
 	dstToSrcs := map[string]string{}
 	for _, entry := range partitionVars.AllDistSrcDstPairs {
@@ -1290,7 +1290,7 @@ func (f *filesystemCreator) createProductConfigDistGenrules(ctx android.LoadHook
 func (f *filesystemCreator) createPrebuiltKernelModules(ctx android.LoadHookContext, partitionType string) {
 	fsGenState := ctx.Config().Get(fsGenStateOnceKey).(*FsGenState)
 	name := generatedModuleName(ctx.Config(), fmt.Sprintf("%s-kernel-modules", partitionType))
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	commonProps := &struct {
 		Name                  *string
 		System_dlkm_specific  *bool
@@ -1435,7 +1435,7 @@ func (f *filesystemCreator) createAndroidInfo(ctx android.LoadHookContext) {
 	// Create a android_info for vendor
 	// The board info files might be in a directory outside the root soong namespace, so create
 	// the module in "."
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	androidInfoProps := &android.AndroidInfoProperties{
 
 		Board_info_files: partitionVars.BoardInfoFiles,
@@ -1534,7 +1534,7 @@ func createRecoveryBuildProp(ctx android.LoadHookContext) string {
 // The filegroup modules are then added to `linker_config_srcs` of the autogenerated vendor `android_filesystem`.
 func (f *filesystemCreator) createLinkerConfigSourceFilegroups(ctx android.LoadHookContext, partitionType string) []string {
 	ret := []string{}
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	var linkerConfigSrcs []string
 	if partitionType == "vendor" {
 		linkerConfigSrcs = android.FirstUniqueStrings(partitionVars.VendorLinkerConfigSrcs)
@@ -1581,7 +1581,7 @@ func generateBaseProps(namePtr *string, config android.Config) *filesystemBasePr
 	return &filesystemBaseProperty{
 		Name:                    namePtr,
 		Compile_multilib:        proptools.StringPtr("both"),
-		Native_bridge_supported: proptools.BoolPtr(config.ProductVariables().NativeBridgeArch != nil),
+		Native_bridge_supported: proptools.BoolPtr(config.NativeBridgeArch() != nil),
 		// The vbmeta modules are currently in the root directory and depend on the partitions
 		Visibility: []string{"//.", "//build/soong:__subpackages__"},
 		// Don't build this module on checkbuilds, the soong-built partitions are still in-progress
@@ -1593,7 +1593,7 @@ func generateBaseProps(namePtr *string, config android.Config) *filesystemBasePr
 func generateFsProps(ctx android.EarlyModuleContext, partitions allGeneratedPartitionData, partitionType string) (*filesystem.FilesystemProperties, bool) {
 	fsProps := &filesystem.FilesystemProperties{}
 
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	var avbInfo avbInfo
 	var fsType string
 	if strings.Contains(partitionType, "ramdisk") {
@@ -1730,7 +1730,7 @@ type avbInfo struct {
 }
 
 func getAvbInfo(config android.Config, partitionType string) avbInfo {
-	partitionVars := config.ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := config.PartitionVariables()
 	specificPartitionVars := partitionVars.PartitionQualifiedVariables[partitionType]
 	var result avbInfo
 	boardAvbEnable := partitionVars.BoardAvbEnable
@@ -1853,7 +1853,7 @@ func (f *filesystemCreator) DepsMutator(ctx android.BottomUpMutatorContext) {
 	}
 	for _, name := range ctx.Config().Get(fsGenStateOnceKey).(*FsGenState).soongGeneratedPartitions.names() {
 		if android.InList(ctx.Config().Get(fsGenStateOnceKey).(*FsGenState).soongGeneratedPartitions.typeForName(name), []string{"pvmfw", "tzsw"}) {
-			ctx.AddFarVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), generatedFilesystemDepTag, name)
+			ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), generatedFilesystemDepTag, name)
 		} else {
 			ctx.AddDependency(ctx.Module(), generatedFilesystemDepTag, name)
 		}

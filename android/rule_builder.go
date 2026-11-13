@@ -1448,9 +1448,9 @@ func (c *RuleBuilderCommand) getToolModule(tool string) ModuleProxy {
 			allowlisted: false,
 			errorFunc:   ctxType.Errorf,
 		}
-		toolModule = ctxType.GetModuleProxy(tool, ctxType.Config().BuildOSTarget.Variations())
+		toolModule = ctxType.GetModuleProxy(tool, ctxType.Config().CompileTargets().BuildOSTarget.Variations())
 		if toolModule.IsNil() {
-			toolModule = ctxType.GetModuleProxy(tool, ctxType.Config().BuildOSCommonTarget.Variations())
+			toolModule = ctxType.GetModuleProxy(tool, ctxType.Config().CompileTargets().BuildOSCommonTarget.Variations())
 		}
 	case builderContextForTests:
 		ctxInfo = ctxInfoStruct{

@@ -1686,7 +1686,7 @@ func (dbj *artBootImages) DepsMutator(ctx android.BottomUpMutatorContext) {
 	tag := bootclasspathDependencyTag{
 		typ: dexpreoptBootJar,
 	}
-	ctx.AddVariationDependencies(ctx.Config().AndroidCommonTarget.Variations(), tag, "dex_bootjars")
+	ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidCommonTarget.Variations(), tag, "dex_bootjars")
 }
 
 func (d *artBootImages) GenerateAndroidBuildActions(ctx android.ModuleContext) {

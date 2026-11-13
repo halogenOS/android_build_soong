@@ -1161,7 +1161,7 @@ type ctspHostSharedLibDeptagType struct {
 var ctspHostSharedLibDeptag = ctspHostSharedLibDeptagType{}
 
 func (m *compatibilityTestSuitePackage) DepsMutator(ctx android.BottomUpMutatorContext) {
-	variations := ctx.Config().BuildOSTarget.Variations()
+	variations := ctx.Config().CompileTargets().BuildOSTarget.Variations()
 	ctx.AddVariationDependencies(variations, ctspTradefedDeptag, proptools.String(m.properties.Tradefed))
 	ctx.AddVariationDependencies(variations, ctspHostJavaToolDeptag, proptools.String(m.properties.Tradefed)+"-tests")
 	ctx.AddVariationDependencies(variations, ctspHostJavaToolDeptag, "tradefed")
@@ -1308,7 +1308,7 @@ type tspHostJavaToolDeptagType struct {
 var tspHostJavaToolDeptag = tspHostJavaToolDeptagType{}
 
 func (t *testSuitePackage) DepsMutator(ctx android.BottomUpMutatorContext) {
-	variations := ctx.Config().BuildOSTarget.Variations()
+	variations := ctx.Config().CompileTargets().BuildOSTarget.Variations()
 	ctx.AddVariationDependencies(variations, tspHostJavaToolDeptag, t.properties.Host_java_tools...)
 }
 

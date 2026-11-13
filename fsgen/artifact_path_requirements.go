@@ -120,7 +120,7 @@ func printListAndError(ctx android.SingletonContext, offending []string, message
 }
 
 func (s *artifactPathRequirementsVerifierSingleton) GenerateBuildActions(ctx android.SingletonContext) {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	enforcement := partitionVars.EnforceArtifactPathRequirements
 	if !android.InList(enforcement, []string{"", "true", "false", "relaxed", "strict"}) {
 		ctx.Errorf("PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS must be one of [true, false, relaxed, strict], found: %s", enforcement)

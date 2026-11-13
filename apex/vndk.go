@@ -94,7 +94,7 @@ func apexVndkDepsMutator(mctx android.BottomUpMutatorContext) {
 				a.Disable()
 			} else {
 				mctx.AddVariationDependencies(
-					mctx.Config().AndroidFirstDeviceTarget.Variations(),
+					mctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(),
 					prebuiltTag,
 					cc.VndkLibrariesTxtModules(vndkVersion, mctx)...,
 				)

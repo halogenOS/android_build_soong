@@ -94,7 +94,7 @@ func (mt *librarySdkMemberType) AddDependencies(ctx android.SdkDependencyContext
 			// If not already computed then compute the list of native bridge targets.
 			if includeNativeBridgeTargets == nil {
 				includeNativeBridgeTargets = append([]android.Target{}, defaultTargets...)
-				allAndroidTargets := ctx.Config().Targets[android.Android]
+				allAndroidTargets := ctx.Config().CompileTargets().Targets[android.Android]
 				for _, possibleNativeBridgeTarget := range allAndroidTargets {
 					if possibleNativeBridgeTarget.NativeBridge == android.NativeBridgeEnabled {
 						includeNativeBridgeTargets = append(includeNativeBridgeTargets, possibleNativeBridgeTarget)

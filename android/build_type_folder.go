@@ -28,14 +28,14 @@ type BuildTypeValue struct {
 	// output folder name.
 	name     string
 	bit      buildTypeSet
-	isTrueIn func(*config) bool
+	isTrueIn func(Config) bool
 }
 
 var (
 	// BuildTypeDebuggable is true in userdebug and eng builds.
-	BuildTypeDebuggable = BuildTypeValue{name: "debuggable", bit: 1 << 0, isTrueIn: (*config).Debuggable}
+	BuildTypeDebuggable = BuildTypeValue{name: "debuggable", bit: 1 << 0, isTrueIn: Config.Debuggable}
 	// BuildTypeEng is true in eng builds.
-	BuildTypeEng = BuildTypeValue{name: "eng", bit: 1 << 1, isTrueIn: (*config).Eng}
+	BuildTypeEng = BuildTypeValue{name: "eng", bit: 1 << 1, isTrueIn: Config.Eng}
 
 	// allBuildTypeValues is in the order of the values in an output folder name.
 	allBuildTypeValues = []BuildTypeValue{BuildTypeDebuggable, BuildTypeEng}
@@ -58,7 +58,7 @@ func parseBuildTypeValue(name string) (BuildTypeValue, bool) {
 func trueBuildTypeValues(config Config) buildTypeSet {
 	var set buildTypeSet
 	for _, value := range allBuildTypeValues {
-		if value.isTrueIn(config.config) {
+		if value.isTrueIn(config) {
 			set |= value.bit
 		}
 	}
@@ -69,12 +69,12 @@ func trueBuildTypeValues(config Config) buildTypeSet {
 // reads value.
 func RecordBuildTypeRead(ctx BaseModuleContext, value BuildTypeValue) {
 	// GenerateAndroidBuildActions reads the value itself.
-	_ = ctx.Module().base().readBuildTypeValue(ctx.Config().config, value)
+	_ = ctx.Module().base().readBuildTypeValue(ctx.Config(), value)
 }
 
 // readBuildTypeValue returns value as the module variant sees it, false where the build variant
 // does not apply to the module variant, and records the value read.
-func (m *ModuleBase) readBuildTypeValue(config *config, value BuildTypeValue) bool {
+func (m *ModuleBase) readBuildTypeValue(config Config, value BuildTypeValue) bool {
 	if !TargetBuildVariantAppliesTo(m.module) {
 		return false
 	}

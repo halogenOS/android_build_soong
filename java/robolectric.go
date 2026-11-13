@@ -135,11 +135,11 @@ func (r *robolectricTest) DepsMutator(ctx android.BottomUpMutatorContext) {
 
 	ctx.AddVariationDependencies(nil, roboCoverageLibsTag, r.robolectricProperties.Coverage_libs...)
 
-	ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(),
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(),
 		roboRuntimesTag, "robolectric-android-all-prebuilts")
 
 	for _, lib := range r.robolectricProperties.Jni_libs.GetOrDefault(ctx, nil) {
-		ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), jniLibTag, lib)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), jniLibTag, lib)
 	}
 }
 
@@ -396,7 +396,7 @@ func (r *robolectricRuntimes) DepsMutator(ctx android.BottomUpMutatorContext) {
 }
 
 func (r *robolectricRuntimes) GenerateAndroidBuildActions(ctx android.ModuleContext) {
-	if ctx.Target().Os != ctx.Config().BuildOSCommonTarget.Os {
+	if ctx.Target().Os != ctx.Config().CompileTargets().BuildOSCommonTarget.Os {
 		return
 	}
 

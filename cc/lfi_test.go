@@ -23,8 +23,8 @@ import (
 var prepareForLfiTest = android.GroupFixturePreparers(
 	prepareForCcTest,
 	android.FixtureModifyConfig(func(config android.Config) {
-		config.AndroidLFITarget = config.Targets[android.Android][0]
-		config.AndroidLFITarget.LFI = true
+		config.CompileTargets().AndroidLFITarget = config.CompileTargets().Targets[android.Android][0]
+		config.CompileTargets().AndroidLFITarget.LFI = true
 	}),
 )
 

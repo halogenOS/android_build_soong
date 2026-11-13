@@ -91,7 +91,7 @@ func addPathDepsForProps(ctx BottomUpMutatorContext, props []interface{}) {
 	// device modules.
 	for _, s := range pathDeviceFirstProperties {
 		if m, t := SrcIsModuleWithTag(s); m != "" {
-			ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), sourceOrOutputDepTag(m, t), m)
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), sourceOrOutputDepTag(m, t), m)
 		}
 	}
 	// properties tagged path_device_first_prefer32 get the first 32 bit target if one is available,
@@ -99,9 +99,9 @@ func addPathDepsForProps(ctx BottomUpMutatorContext, props []interface{}) {
 	if len(pathDeviceFirstPrefer32Properties) > 0 {
 		var targets []Target
 		if ctx.Config().IgnorePrefer32OnDevice() {
-			targets, _ = decodeMultilibTargets("first", ctx.Config().Targets[Android], false)
+			targets, _ = decodeMultilibTargets("first", ctx.Config().CompileTargets().Targets[Android], false)
 		} else {
-			targets, _ = decodeMultilibTargets("first_prefer32", ctx.Config().Targets[Android], false)
+			targets, _ = decodeMultilibTargets("first_prefer32", ctx.Config().CompileTargets().Targets[Android], false)
 		}
 		if len(targets) == 0 {
 			ctx.ModuleErrorf("Could not find a first_prefer32 target")
@@ -116,25 +116,25 @@ func addPathDepsForProps(ctx BottomUpMutatorContext, props []interface{}) {
 	// properties tagged "path_device_common" get the device common variant
 	for _, s := range pathDeviceCommonProperties {
 		if m, t := SrcIsModuleWithTag(s); m != "" {
-			ctx.AddVariationDependencies(ctx.Config().AndroidCommonTarget.Variations(), sourceOrOutputDepTag(m, t), m)
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidCommonTarget.Variations(), sourceOrOutputDepTag(m, t), m)
 		}
 	}
 	// properties tagged "path_host_common" get the host common variant
 	for _, s := range pathHostCommonProperties {
 		if m, t := SrcIsModuleWithTag(s); m != "" {
-			ctx.AddVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), sourceOrOutputDepTag(m, t), m)
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), sourceOrOutputDepTag(m, t), m)
 		}
 	}
 	// properties tagged "path_host_first" get the host os variant
 	for _, s := range pathHostFirstProperties {
 		if m, t := SrcIsModuleWithTag(s); m != "" {
-			ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), sourceOrOutputDepTag(m, t), m)
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), sourceOrOutputDepTag(m, t), m)
 		}
 	}
 	// properties tagged "path_host_second" get the host 2nd os variant
 	if len(pathHostSecondProperties) > 0 {
 		var targets []Target
-		targets, _ = decodeMultilibTargets("32", ctx.Config().Targets[ctx.Config().BuildOS], false)
+		targets, _ = decodeMultilibTargets("32", ctx.Config().CompileTargets().Targets[ctx.Config().BuildOS], false)
 		// If a 32-bit host target exists, add the dependencies. Otherwise, do nothing.
 		// This is necessary to support host OSes like Darwin (macOS) that do not
 		// have a 32-bit multilib target.

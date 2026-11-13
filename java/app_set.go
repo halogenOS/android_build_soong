@@ -113,7 +113,7 @@ func SupportedAbis(ctx android.ModuleContext, excludeNativeBridgeAbis bool) []st
 	}
 
 	var result []string
-	for i, target := range ctx.Config().Targets[android.Android] {
+	for i, target := range ctx.Config().CompileTargets().Targets[android.Android] {
 		if target.NativeBridge == android.NativeBridgeEnabled && excludeNativeBridgeAbis {
 			continue
 		}

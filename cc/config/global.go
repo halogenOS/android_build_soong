@@ -614,17 +614,17 @@ type clangPathResult struct {
 }
 
 func clangPath(ctx android.PathContext) android.SourcePath {
-	res := ctx.Config().Once(clangPathKey, func() interface{} {
+	res := android.OnceFromConfig(ctx.Config(), clangPathKey, func(config android.Config) clangPathResult {
 		clangBase := ClangDefaultBase
-		if override := ctx.Config().Getenv("LLVM_PREBUILTS_BASE"); override != "" {
+		if override := config.Getenv("LLVM_PREBUILTS_BASE"); override != "" {
 			clangBase = override
 		}
-		clangVersion := ClangVersion(ctx)
-		if override := ctx.Config().Getenv("LLVM_PREBUILTS_VERSION"); override != "" {
+		clangVersion := config.ReleaseBuildClangVersion(ClangDefaultVersion)
+		if override := config.Getenv("LLVM_PREBUILTS_VERSION"); override != "" {
 			clangVersion = override
 		}
 		return clangPathResult{clangBase, clangVersion}
-	}).(clangPathResult)
+	})
 	return android.PathForSource(ctx, res.clangBase, ctx.Config().PrebuiltOS(), res.clangVersion)
 }
 

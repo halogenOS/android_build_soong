@@ -199,9 +199,9 @@ func TestAfdoDeps(t *testing.T) {
 	}
 
 	// Verify that the host variants don't enable afdo
-	libTestHost := result.ModuleForTests(t, "libTest", result.Config.BuildOSTarget.String()+"_shared")
-	libFooHost := result.ModuleForTests(t, "libFoo", result.Config.BuildOSTarget.String()+"_static_lto-thin")
-	libBarHost := result.ModuleForTests(t, "libBar", result.Config.BuildOSTarget.String()+"_static_lto-thin")
+	libTestHost := result.ModuleForTests(t, "libTest", result.Config.CompileTargets().BuildOSTarget.String()+"_shared")
+	libFooHost := result.ModuleForTests(t, "libFoo", result.Config.CompileTargets().BuildOSTarget.String()+"_static_lto-thin")
+	libBarHost := result.ModuleForTests(t, "libBar", result.Config.CompileTargets().BuildOSTarget.String()+"_static_lto-thin")
 
 	cFlags = libTestHost.Rule("cc").Args["cFlags"]
 	if strings.Contains(cFlags, profileSampleCFlag) {

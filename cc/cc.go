@@ -3471,7 +3471,7 @@ func (c *Module) DepsMutator(actx android.BottomUpMutatorContext) {
 
 	for _, gen := range deps.DeviceFirstGeneratedHeaders {
 		depTag := genHeaderDepTag
-		actx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), depTag, gen)
+		actx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), depTag, gen)
 	}
 
 	crtVariations := GetCrtVariations(ctx, c)
@@ -3490,7 +3490,7 @@ func (c *Module) DepsMutator(actx android.BottomUpMutatorContext) {
 
 	if c.converter != nil {
 		// Add a dependency on the modules listed in the 'Srcs' property.
-		variation := ctx.Config().AndroidFirstDeviceTarget.Variations()
+		variation := ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations()
 		actx.AddFarVariationDependencies(variation, deviceForHostDepTag, c.converter.getSrcs()...)
 	}
 

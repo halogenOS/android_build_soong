@@ -62,7 +62,7 @@ func TestDeviceForHost(t *testing.T) {
 	deviceImportModule := ctx.ModuleForTests(t, "device_import_module", "android_common")
 	deviceImportCombined := deviceImportModule.Output("local-combined/device_import_module.jar")
 
-	hostModule := ctx.ModuleForTests(t, "host_module", config.BuildOSCommonTarget.String())
+	hostModule := ctx.ModuleForTests(t, "host_module", config.CompileTargets().BuildOSCommonTarget.String())
 	hostJavac := hostModule.Output("javac/host_module.jar")
 	hostRes := hostModule.Output("res/host_module.jar")
 	combined := hostModule.Output("combined/host_module.jar")
@@ -136,12 +136,12 @@ func TestHostForDevice(t *testing.T) {
 
 	ctx, config := testJava(t, bp)
 
-	hostModule := ctx.ModuleForTests(t, "host_module", config.BuildOSCommonTarget.String())
+	hostModule := ctx.ModuleForTests(t, "host_module", config.CompileTargets().BuildOSCommonTarget.String())
 	hostJavac := hostModule.Output("javac/host_module.jar")
 	hostJavacHeader := hostModule.Output("local-javac-header/host_module.jar")
 	hostRes := hostModule.Output("res/host_module.jar")
 
-	hostImportModule := ctx.ModuleForTests(t, "host_import_module", config.BuildOSCommonTarget.String())
+	hostImportModule := ctx.ModuleForTests(t, "host_import_module", config.CompileTargets().BuildOSCommonTarget.String())
 	hostImportCombined := hostImportModule.Output("local-combined/host_import_module.jar")
 
 	deviceModule := ctx.ModuleForTests(t, "device_module", "android_common")

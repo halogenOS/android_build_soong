@@ -80,7 +80,7 @@ var _ android.ExcludeFromVisibilityEnforcementTag = systemServerJarDepTag
 // Adding the dependency allows the singleton module to determine whether an apex system server jar is system_ext specific.
 func (m *dexpreoptSystemserverCheck) DepsMutator(ctx android.BottomUpMutatorContext) {
 	global := dexpreopt.GetGlobalConfig(ctx)
-	targets := ctx.Config().Targets[android.Android]
+	targets := ctx.Config().CompileTargets().Targets[android.Android]
 
 	// The check should be skipped on unbundled builds because system server jars are not preopted on
 	// unbundled builds since the artifacts are installed into the system image, not the APEXes.
@@ -96,7 +96,7 @@ func (m *dexpreoptSystemserverCheck) GenerateAndroidBuildActions(ctx android.Mod
 		ctx.ModuleErrorf(`dexpreopt_systemserver_check can only be used by a single module named "dexpreopt_systemserver_check" in the root namespace.`)
 	}
 
-	targets := ctx.Config().Targets[android.Android]
+	targets := ctx.Config().CompileTargets().Targets[android.Android]
 
 	ctx.VisitDirectDepsProxyWithTag(systemServerJarDepTag, func(systemServerJar android.ModuleProxy) {
 		partition := "system"

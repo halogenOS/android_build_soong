@@ -233,7 +233,7 @@ func (l *ConfiguredJarList) MarshalJSON() ([]byte, error) {
 }
 
 func OverrideConfiguredJarLocationFor(cfg Config, apex string, jar string) (newApex string, newJar string) {
-	for _, entry := range cfg.productVariables.ConfiguredJarLocationOverrides {
+	for _, entry := range readProductVariable(cfg, &cfg.productVariables.ConfiguredJarLocationOverrides) {
 		tuple := strings.Split(entry, ":")
 		if len(tuple) != 4 {
 			panic("malformed configured jar location override '%s', expected format: <old_apex>:<old_jar>:<new_apex>:<new_jar>")

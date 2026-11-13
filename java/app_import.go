@@ -220,7 +220,7 @@ func (a *AndroidAppImport) processVariants(ctx android.DefaultableHookContext) {
 		MergePropertiesFromVariant(ctx, &a.properties, dpiProps, config.ProductAAPTPreferredConfig())
 	}
 	archProps := reflect.ValueOf(a.archVariants).Elem().FieldByName(ArchGroupName)
-	archType := ctx.Config().AndroidFirstDeviceTarget.Arch.ArchType
+	archType := ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Arch.ArchType
 	MergePropertiesFromVariant(ctx, &a.properties, archProps, archType.Name)
 
 	// Process "arch" includes "dpi_variants"

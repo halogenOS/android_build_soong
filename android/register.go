@@ -112,6 +112,7 @@ func ModuleFactoryAdaptor(factory ModuleFactory) blueprint.ModuleFactory {
 	return func() (blueprint.Module, []interface{}) {
 		module := factory()
 		module.base().buildTypeValuesReadMutex = &sync.Mutex{}
+		module.base().configReads = &ConfigReads{}
 		return module, module.GetProperties()
 	}
 }

@@ -986,7 +986,7 @@ func (a *apexBundle) DepsMutator(ctx android.BottomUpMutatorContext) {
 	}
 
 	// Common-arch dependencies come next
-	commonVariation := ctx.Config().AndroidCommonTarget.Variations()
+	commonVariation := ctx.Config().CompileTargets().AndroidCommonTarget.Variations()
 	ctx.AddFarVariationDependencies(commonVariation, rroTag, a.properties.Rros...)
 	ctx.AddFarVariationDependencies(commonVariation, bcpfTag, a.properties.Bootclasspath_fragments.GetOrDefault(ctx, nil)...)
 	ctx.AddFarVariationDependencies(commonVariation, fragmentInApexTag, a.properties.Bootclasspath_fragments.GetOrDefault(ctx, nil)...)
@@ -1022,7 +1022,7 @@ func (a *apexBundle) OverridablePropertiesDepsMutator(ctx android.BottomUpMutato
 		android.ExtractSourceDeps(ctx, a.overridableProperties.Allowed_files)
 	}
 
-	commonVariation := ctx.Config().AndroidCommonTarget.Variations()
+	commonVariation := ctx.Config().CompileTargets().AndroidCommonTarget.Variations()
 	ctx.AddFarVariationDependencies(commonVariation, androidAppTag, a.overridableProperties.Apps.GetOrDefault(ctx, nil)...)
 	ctx.AddFarVariationDependencies(commonVariation, bpfTag, a.overridableProperties.Bpfs.GetOrDefault(ctx, nil)...)
 	if prebuilts := a.overridableProperties.Prebuilts.GetOrDefault(ctx, nil); len(prebuilts) > 0 {

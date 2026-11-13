@@ -84,12 +84,12 @@ func HostForDeviceFactory() android.Module {
 var deviceHostConverterDepTag = dependencyTag{name: "device_host_converter"}
 
 func (d *DeviceForHost) DepsMutator(ctx android.BottomUpMutatorContext) {
-	ctx.AddFarVariationDependencies(ctx.Config().AndroidCommonTarget.Variations(),
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().AndroidCommonTarget.Variations(),
 		deviceHostConverterDepTag, d.properties.Libs...)
 }
 
 func (d *HostForDevice) DepsMutator(ctx android.BottomUpMutatorContext) {
-	ctx.AddFarVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(),
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(),
 		deviceHostConverterDepTag, d.properties.Libs...)
 }
 

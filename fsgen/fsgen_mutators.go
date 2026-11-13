@@ -182,7 +182,7 @@ type DeviceConfigContext interface {
 }
 
 func productInstalledModules(ctx DeviceConfigContext, makefile string) []string {
-	productPkg := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.ProductPackagesSet[makefile]
+	productPkg := ctx.Config().PartitionVariables().ProductPackagesSet[makefile]
 	allInstalledModules := productPkg.ProductPackages
 	if ctx.Config().Debuggable() {
 		allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesDebug...)
@@ -351,14 +351,14 @@ func createFsGenState(ctx android.LoadHookContext, generatedPrebuiltEtcModuleNam
 			}
 		}
 
-		if ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.BuildingSystemDlkmImage {
+		if ctx.Config().PartitionVariables().BuildingSystemDlkmImage {
 			(*fsGenState.fsDeps["system_dlkm"])["system_dlkm-build.prop"] = defaultDepCandidateProps(ctx.Config())
 		} else {
 			// system_dlkm build.prop is installed in system partition if system_dlkm.img is not available
 			(*fsGenState.fsDeps["system"])["system_dlkm-build.prop"] = defaultDepCandidateProps(ctx.Config())
 		}
 
-		if ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.BuildingOdmDlkmImage {
+		if ctx.Config().PartitionVariables().BuildingOdmDlkmImage {
 			(*fsGenState.fsDeps["odm_dlkm"])["odm_dlkm-build.prop"] = defaultDepCandidateProps(ctx.Config())
 		} else {
 			// odm_dlkm build.prop is installed in vendor partition if odm_dlkm.img is not available
@@ -367,7 +367,7 @@ func createFsGenState(ctx android.LoadHookContext, generatedPrebuiltEtcModuleNam
 
 		dtbo, dtbo16k := createPrebuiltDtboImages(ctx)
 		if bootOtas := createBootOtas16kModules(ctx, dtbo, dtbo16k); bootOtas != "" &&
-			ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.Board16kOtaMoveVendor {
+			ctx.Config().PartitionVariables().Board16kOtaMoveVendor {
 			(*fsGenState.fsDeps["vendor"])[bootOtas] = defaultDepCandidateProps(ctx.Config())
 		}
 

@@ -318,7 +318,7 @@ func TestInstall(t *testing.T) {
 	module := func(name string, host bool) TestingModule {
 		variant := "android_common"
 		if host {
-			variant = result.Config.BuildOSCommonTarget.String()
+			variant = result.Config.CompileTargets().BuildOSCommonTarget.String()
 		}
 		return result.ModuleForTests(t, name, variant)
 	}
@@ -436,7 +436,7 @@ func TestInstallKatiEnabled(t *testing.T) {
 		t.Helper()
 		variant := "android_common"
 		if host {
-			variant = result.Config.BuildOSCommonTarget.String()
+			variant = result.Config.CompileTargets().BuildOSCommonTarget.String()
 		}
 		return result.ModuleForTests(t, name, variant)
 	}

@@ -304,7 +304,7 @@ func (p *pathContextErrorCollector) Errorf(format string, args ...interface{}) {
 }
 
 func getGlobalConfigRaw(ctx android.PathContext) globalConfigAndRaw {
-	config := ctx.Config().Once(globalConfigOnceKey, func() interface{} {
+	config := android.OnceFromPathContext(ctx, globalConfigOnceKey, func(ctx android.PathContext) globalConfigAndRaw {
 		if data := ctx.Config().DexpreoptGlobalConfig(ctx); data != nil {
 			pathErrorCollectorCtx := &pathContextErrorCollector{PathContext: ctx}
 			globalConfig, err := ParseGlobalConfig(pathErrorCollectorCtx, data)
@@ -322,8 +322,8 @@ func getGlobalConfigRaw(ctx android.PathContext) globalConfigAndRaw {
 				DisablePreoptBootImages: true,
 				DisableGenerateProfile:  true,
 			}, nil, nil}
-		})
-	}).(globalConfigAndRaw)
+		}).(globalConfigAndRaw)
+	})
 
 	// Avoid non-deterministic errors by reporting cached path errors on all callers.
 	for _, err := range config.pathErrors {
@@ -494,7 +494,7 @@ var _ android.AllowDisabledModuleDependency = Dex2oatDepTag
 // android.RegistrationContext.FinalDepsMutators.
 func RegisterToolDeps(ctx android.BottomUpMutatorContext) {
 	dex2oatBin := dex2oatModuleName(ctx.Config())
-	v := ctx.Config().BuildOSTarget.Variations()
+	v := ctx.Config().CompileTargets().BuildOSTarget.Variations()
 	ctx.AddFarVariationDependencies(v, Dex2oatDepTag, dex2oatBin)
 }
 
@@ -593,9 +593,7 @@ var GlobalSoongConfigProvider = blueprint.NewProvider[*GlobalSoongConfig]()
 // GetGlobalSoongConfig creates a GlobalSoongConfig the first time it's called,
 // and later returns the same cached instance.
 func GetGlobalSoongConfig(ctx android.ModuleContext) *GlobalSoongConfig {
-	globalSoong := ctx.Config().Once(globalSoongConfigOnceKey, func() interface{} {
-		return createGlobalSoongConfig(ctx)
-	}).(*GlobalSoongConfig)
+	globalSoong := android.OnceFromModuleContext(ctx, globalSoongConfigOnceKey, createGlobalSoongConfig)
 
 	// Always resolve the tool path from the dependency, to ensure that every
 	// module has the dependency added properly.
@@ -853,7 +851,7 @@ func globalSoongConfigForTests(ctx android.BuilderContext) *GlobalSoongConfig {
 
 func GetDexpreoptDirName(ctx android.PathContext) string {
 	prefix := "dexpreopt_"
-	targets := ctx.Config().Targets[android.Android]
+	targets := ctx.Config().CompileTargets().Targets[android.Android]
 	if len(targets) > 0 {
 		return prefix + targets[0].Arch.ArchType.String()
 	}

@@ -1848,14 +1848,14 @@ func (j *TestHost) IsNativeCoverageNeeded(ctx cc.IsNativeCoverageNeededContext) 
 
 func (j *TestHost) addDataDeviceBinsDeps(ctx android.BottomUpMutatorContext) {
 	if len(j.testHostProperties.Data_device_bins_first) > 0 {
-		deviceVariations := ctx.Config().AndroidFirstDeviceTarget.Variations()
+		deviceVariations := ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations()
 		ctx.AddFarVariationDependencies(deviceVariations, dataDeviceBinsTag, j.testHostProperties.Data_device_bins_first...)
 	}
 
 	var maybeAndroid32Target *android.Target
 	var maybeAndroid64Target *android.Target
-	android32TargetList := android.FirstTarget(ctx.Config().Targets[android.Android], "lib32")
-	android64TargetList := android.FirstTarget(ctx.Config().Targets[android.Android], "lib64")
+	android32TargetList := android.FirstTarget(ctx.Config().CompileTargets().Targets[android.Android], "lib32")
+	android64TargetList := android.FirstTarget(ctx.Config().CompileTargets().Targets[android.Android], "lib64")
 	if len(android32TargetList) > 0 {
 		maybeAndroid32Target = &android32TargetList[0]
 	}
@@ -1865,7 +1865,7 @@ func (j *TestHost) addDataDeviceBinsDeps(ctx android.BottomUpMutatorContext) {
 
 	if len(j.testHostProperties.Data_device_bins_both) > 0 {
 		if maybeAndroid32Target == nil && maybeAndroid64Target == nil {
-			ctx.PropertyErrorf("data_device_bins_both", "no device targets available. Targets: %q", ctx.Config().Targets)
+			ctx.PropertyErrorf("data_device_bins_both", "no device targets available. Targets: %q", ctx.Config().CompileTargets().Targets)
 			return
 		}
 		if maybeAndroid32Target != nil {
@@ -1893,7 +1893,7 @@ func (j *TestHost) addDataDeviceBinsDeps(ctx android.BottomUpMutatorContext) {
 			)
 		} else {
 			if maybeAndroid64Target == nil {
-				ctx.PropertyErrorf("data_device_bins_prefer32", "no device targets available. Targets: %q", ctx.Config().Targets)
+				ctx.PropertyErrorf("data_device_bins_prefer32", "no device targets available. Targets: %q", ctx.Config().CompileTargets().Targets)
 				return
 			}
 			ctx.AddFarVariationDependencies(
@@ -1906,7 +1906,7 @@ func (j *TestHost) addDataDeviceBinsDeps(ctx android.BottomUpMutatorContext) {
 
 	if len(j.testHostProperties.Data_device_bins_32) > 0 {
 		if maybeAndroid32Target == nil {
-			ctx.PropertyErrorf("data_device_bins_32", "cannot find 32bit device target. Targets: %q", ctx.Config().Targets)
+			ctx.PropertyErrorf("data_device_bins_32", "cannot find 32bit device target. Targets: %q", ctx.Config().CompileTargets().Targets)
 			return
 		}
 		deviceVariations := maybeAndroid32Target.Variations()
@@ -1915,7 +1915,7 @@ func (j *TestHost) addDataDeviceBinsDeps(ctx android.BottomUpMutatorContext) {
 
 	if len(j.testHostProperties.Data_device_bins_64) > 0 {
 		if maybeAndroid64Target == nil {
-			ctx.PropertyErrorf("data_device_bins_64", "cannot find 64bit device target. Targets: %q", ctx.Config().Targets)
+			ctx.PropertyErrorf("data_device_bins_64", "cannot find 64bit device target. Targets: %q", ctx.Config().CompileTargets().Targets)
 			return
 		}
 		deviceVariations := maybeAndroid64Target.Variations()
@@ -2454,9 +2454,9 @@ func (j *Binary) DepsMutator(ctx android.BottomUpMutatorContext) {
 	// These dependencies ensure the installation rules will install the jar file when the
 	// wrapper is installed, and the jni libraries when the wrapper is installed.
 	if ctx.Os().Class == android.Host {
-		ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), jniInstallTag, j.binaryProperties.Jni_libs...)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), jniInstallTag, j.binaryProperties.Jni_libs...)
 	} else if ctx.Os().Class == android.Device {
-		ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), jniInstallTag, j.binaryProperties.Jni_libs...)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), jniInstallTag, j.binaryProperties.Jni_libs...)
 	} else {
 		ctx.ModuleErrorf("Unknown os class")
 	}

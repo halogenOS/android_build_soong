@@ -63,7 +63,7 @@ func TestJavaFuzz(t *testing.T) {
 		}
 		`)
 
-	osCommonTarget := result.Config.BuildOSCommonTarget.String()
+	osCommonTarget := result.Config.CompileTargets().BuildOSCommonTarget.String()
 
 	javac := result.ModuleForTests(t, "foo", osCommonTarget).Rule("javac")
 	combineJar := result.ModuleForTests(t, "foo", osCommonTarget).Description("for javac")

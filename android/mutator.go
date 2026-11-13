@@ -626,7 +626,7 @@ func (b *bottomUpMutatorContext) AddHostToolDependencies(tools ...string) {
 			continue
 		}
 		b.addedHostToolDeps[tool] = struct{}{}
-		b.AddFarVariationDependencies(b.Config().BuildOSTarget.Variations(), HostToolDepTag, tool)
+		b.AddFarVariationDependencies(b.Config().CompileTargets().BuildOSTarget.Variations(), HostToolDepTag, tool)
 	}
 }
 

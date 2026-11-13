@@ -70,10 +70,10 @@ func sbomArgs(ctx PathContext, scope sbomScope) map[string]string {
 	}
 	return map[string]string{
 		"outDir":               config.OutDir(),
-		"productOut":           filepath.Join("target", "product", String(config.productVariables.DeviceName)),
+		"productOut":           filepath.Join("target", "product", String(readProductVariable(config, &config.productVariables.DeviceName))),
 		"soongOut":             soongOut,
 		"buildFingerprintFile": config.BuildFingerprintFile(ctx).String(),
-		"productManufacturer":  config.ProductVariables().ProductManufacturer,
+		"productManufacturer":  readProductVariable(config, &config.productVariables.ProductManufacturer),
 		"installedFiles":       scope.installedFiles,
 		"unbundledModule":      scope.unbundledModule,
 	}

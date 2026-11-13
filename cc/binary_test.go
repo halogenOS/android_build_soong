@@ -105,7 +105,7 @@ func TestBinaryLibs(t *testing.T) {
 				android.OptionalFixturePreparer(testCase.preparer),
 			).RunTestWithBp(t, bp)
 
-			binFoo := result.ModuleForTests(t, "foo", result.Config.BuildOSTarget.String()).Rule("ld")
+			binFoo := result.ModuleForTests(t, "foo", result.Config.CompileTargets().BuildOSTarget.String()).Rule("ld")
 			var binFooSharedLibs []string
 			var binFooStaticLibs []string
 			for _, dep := range binFoo.Implicits {

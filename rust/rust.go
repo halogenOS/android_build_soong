@@ -2286,7 +2286,7 @@ func (mod *Module) DepsMutator(actx android.BottomUpMutatorContext) {
 	if mod.sourceProvider != nil {
 		if bindgen, ok := mod.sourceProvider.(*bindgenDecorator); ok &&
 			bindgen.Properties.Custom_bindgen != "" {
-			actx.AddFarVariationDependencies(ctx.Config().BuildOSTarget.Variations(), customBindgenDepTag,
+			actx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), customBindgenDepTag,
 				bindgen.Properties.Custom_bindgen)
 		}
 	}
@@ -2309,7 +2309,7 @@ func (mod *Module) DepsMutator(actx android.BottomUpMutatorContext) {
 	actx.AddVariationDependencies(nil, dataBinDepTag, deps.DataBins...)
 
 	// proc_macros are compiler plugins, and so we need the host arch variant as a dependendcy.
-	actx.AddFarVariationDependencies(ctx.Config().BuildOSTarget.Variations(), procMacroDepTag, deps.ProcMacros...)
+	actx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), procMacroDepTag, deps.ProcMacros...)
 
 	mod.afdo.addDep(ctx, actx)
 }

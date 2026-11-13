@@ -314,7 +314,7 @@ func (m *testModuleConfigHostModule) DepsMutator(ctx android.BottomUpMutatorCont
 		ctx.ModuleErrorf("'base' field must be set to a 'java_test_host' module")
 		return
 	}
-	ctx.AddVariationDependencies(ctx.Config().BuildOSCommonTarget.Variations(), testModuleConfigHostTag, *m.Base)
+	ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSCommonTarget.Variations(), testModuleConfigHostTag, *m.Base)
 }
 
 // File to write:

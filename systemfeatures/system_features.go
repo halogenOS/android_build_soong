@@ -67,7 +67,7 @@ func (m *javaSystemFeaturesSrcs) GenerateAndroidBuildActions(ctx android.ModuleC
 
 	// Collect all RELEASE_SYSTEM_FEATURE_$K:$V build flags into a list of "$K:$V" pairs.
 	var features []string
-	for k, v := range ctx.Config().ProductVariables().BuildFlags {
+	for k, v := range ctx.Config().BuildFlags() {
 		if strings.HasPrefix(k, "RELEASE_SYSTEM_FEATURE_") {
 			shortFeatureName := strings.TrimPrefix(k, "RELEASE_SYSTEM_FEATURE_")
 			features = append(features, fmt.Sprintf("%s:%s", shortFeatureName, v))
@@ -132,7 +132,7 @@ func JavaSystemFeaturesSrcsFactory() android.Module {
 func uniquePossibleFeatureXmlPaths(ctx android.ModuleContext) android.Paths {
 	dstPathSeen := make(map[string]bool)
 	var possibleSrcPaths []android.Path
-	for _, copyFilePair := range ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.ProductCopyFiles {
+	for _, copyFilePair := range ctx.Config().ProductCopyFiles() {
 		srcDstList := strings.Split(copyFilePair, ":")
 		// The length may be >2 (e.g., "$src:$dst:$owner"), but we only care
 		// that it has at least "$src:$dst".

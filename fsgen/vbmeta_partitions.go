@@ -65,7 +65,7 @@ var avbPartitions = []string{
 // vbmeta_system contains metadata about product, system, and system_ext. Using chained partitions,
 // that group of partitions can be updated independently from the other signed partitions.
 func (f *filesystemCreator) createVbmetaPartitions(ctx android.LoadHookContext, partitions allGeneratedPartitionData) []vbmetaModuleInfo {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	// Some products seem to have BuildingVbmetaImage as true even when BoardAvbEnable is false
 	if !partitionVars.BuildingVbmetaImage || !partitionVars.BoardAvbEnable {
 		return nil

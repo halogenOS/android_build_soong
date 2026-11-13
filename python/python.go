@@ -227,12 +227,12 @@ func (p *PythonLibraryModule) DepsMutator(ctx android.BottomUpMutatorContext) {
 	ctx.AddVariationDependencies(javaDataVariation, javaDataTag, p.properties.Java_data...)
 
 	if ctx.Host() {
-		ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), sharedLibTag, p.properties.Shared_libs...)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), sharedLibTag, p.properties.Shared_libs...)
 	} else if len(p.properties.Shared_libs) > 0 {
 		ctx.PropertyErrorf("shared_libs", "shared_libs is not supported for device builds")
 	}
 
-	p.AddDepsOnPythonLauncherAndStdlib(ctx, hostStdLibTag, hostLauncherTag, hostlauncherSharedLibTag, false, ctx.Config().BuildOSTarget)
+	p.AddDepsOnPythonLauncherAndStdlib(ctx, hostStdLibTag, hostLauncherTag, hostlauncherSharedLibTag, false, ctx.Config().CompileTargets().BuildOSTarget)
 
 	ctx.AddHostToolDependencies("aprotoc", "soong_zip")
 }

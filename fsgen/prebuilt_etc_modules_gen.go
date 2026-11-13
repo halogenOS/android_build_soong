@@ -115,7 +115,7 @@ func uniqueExistingProductCopyFileMap(ctx android.LoadHookContext) map[string][]
 	seen := make(map[string]bool)
 	filtered := make(map[string][]DestInfo)
 
-	for _, copyFilePair := range ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.ProductCopyFiles {
+	for _, copyFilePair := range ctx.Config().ProductCopyFiles() {
 		// PRODUCT_COPY_FILES format: 'src:dest:owner'.
 		// Ensure we have at least 'src:dest'. The 'owner' is optional or defaults.
 		srcDestList := strings.Split(copyFilePair, ":")
@@ -479,7 +479,7 @@ func createPrebuiltEtcModules(ctx android.LoadHookContext) (ret []string) {
 }
 
 func createAvbpubkeyModule(ctx android.LoadHookContext) bool {
-	partitionVars := ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse
+	partitionVars := ctx.Config().PartitionVariables()
 	if !(partitionVars.BuildingSystemOtherImage && partitionVars.BoardAvbEnable) {
 		// https://cs.android.com/android/platform/superproject/+/android-latest-release:build/make/core/Makefile;l=835;drc=8ab87941b1b9a3fc990cb1986e6245cf0af10a70
 		return false

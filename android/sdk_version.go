@@ -403,7 +403,7 @@ func (s SdkSpec) ValidateSystemSdk(ctx EarlyModuleContext) bool {
 
 	thisVerString := strconv.Itoa(thisVer.FinalOrPreviewInt())
 	if thisVer.IsPreview() {
-		thisVerString = *ctx.Config().productVariables.Platform_sdk_version_or_codename
+		thisVerString = *readProductVariable(ctx.Config(), &ctx.Config().productVariables.Platform_sdk_version_or_codename)
 	}
 
 	if !InList(thisVerString, supportedVersions) {

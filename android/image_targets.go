@@ -15,26 +15,28 @@ type archAndCpuVariants struct {
 
 // deviceCpuVariants returns the variants of the device's CPU, which the device-side images
 // compile for.
-func deviceCpuVariants(variables ProductVariables) archAndCpuVariants {
+func deviceCpuVariants(c Config) archAndCpuVariants {
+	variables := &c.productVariables
 	return archAndCpuVariants{
-		archVariant:          variables.DeviceArchVariant,
-		cpuVariant:           variables.DeviceCpuVariant,
-		secondaryArchVariant: variables.DeviceSecondaryArchVariant,
-		secondaryCpuVariant:  variables.DeviceSecondaryCpuVariant,
+		archVariant:          readProductVariable(c, &variables.DeviceArchVariant),
+		cpuVariant:           readProductVariable(c, &variables.DeviceCpuVariant),
+		secondaryArchVariant: readProductVariable(c, &variables.DeviceSecondaryArchVariant),
+		secondaryCpuVariant:  readProductVariable(c, &variables.DeviceSecondaryCpuVariant),
 	}
 }
 
 // systemCpuVariants returns the variants that the system-side images compile for. A product
 // without System* variants compiles every image for the device's CPU.
-func systemCpuVariants(variables ProductVariables) archAndCpuVariants {
-	if variables.SystemArchVariant == nil {
-		return deviceCpuVariants(variables)
+func systemCpuVariants(c Config) archAndCpuVariants {
+	variables := &c.productVariables
+	if readProductVariable(c, &variables.SystemArchVariant) == nil {
+		return deviceCpuVariants(c)
 	}
 	return archAndCpuVariants{
-		archVariant:          variables.SystemArchVariant,
-		cpuVariant:           variables.SystemCpuVariant,
-		secondaryArchVariant: variables.SystemSecondaryArchVariant,
-		secondaryCpuVariant:  variables.SystemSecondaryCpuVariant,
+		archVariant:          readProductVariable(c, &variables.SystemArchVariant),
+		cpuVariant:           readProductVariable(c, &variables.SystemCpuVariant),
+		secondaryArchVariant: readProductVariable(c, &variables.SystemSecondaryArchVariant),
+		secondaryCpuVariant:  readProductVariable(c, &variables.SystemSecondaryCpuVariant),
 	}
 }
 
@@ -43,11 +45,12 @@ func hasSameArchVariation(a, b Target) bool {
 }
 
 // FindTargetsForSide returns the targets that variants of the image side compile for on the OS.
-func (c *config) FindTargetsForSide(os OsType, side ImageSide) []Target {
-	if os == Android && side == ImageSideDevice && c.deviceSideTargets != nil {
-		return c.deviceSideTargets
+func (c Config) FindTargetsForSide(os OsType, side ImageSide) []Target {
+	targets := c.CompileTargets()
+	if os == Android && side == ImageSideDevice && targets.deviceSideTargets != nil {
+		return targets.deviceSideTargets
 	}
-	return c.Targets[os]
+	return targets.Targets[os]
 }
 
 // findLFITarget returns the LFI target of the targets, which uses the first 64-bit target, or the
@@ -99,8 +102,8 @@ func mapArchVariationsToSides(systemTargets, deviceSideTargets []Target) (map[Im
 // translateArchVariationToSide returns the arch variation that a variant of the image side uses for
 // a dependency that requests the variation. A dependency from the other side requests the variation
 // of a target of that side, and this side uses its own target of the same kind instead.
-func (c *config) translateArchVariationToSide(side ImageSide, variation string) string {
-	if translated, ok := c.archVariationsBySide[side][variation]; ok {
+func (c Config) translateArchVariationToSide(side ImageSide, variation string) string {
+	if translated, ok := c.CompileTargets().archVariationsBySide[side][variation]; ok {
 		return translated
 	}
 	return variation

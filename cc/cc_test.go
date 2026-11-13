@@ -2069,11 +2069,11 @@ func TestInstallSharedLibs(t *testing.T) {
 	config := TestConfig(t.TempDir(), android.Android, nil, bp, nil)
 	ctx := testCcWithConfig(t, config)
 
-	hostBin := ctx.ModuleForTests(t, "bin", config.BuildOSTarget.String()).Description("install")
-	hostShared := ctx.ModuleForTests(t, "libshared", config.BuildOSTarget.String()+"_shared").Description("install")
-	hostRuntime := ctx.ModuleForTests(t, "libruntime", config.BuildOSTarget.String()+"_shared").Description("install")
-	hostTransitive := ctx.ModuleForTests(t, "libtransitive", config.BuildOSTarget.String()+"_shared").Description("install")
-	hostTool := ctx.ModuleForTests(t, "tool", config.BuildOSTarget.String()).Description("install")
+	hostBin := ctx.ModuleForTests(t, "bin", config.CompileTargets().BuildOSTarget.String()).Description("install")
+	hostShared := ctx.ModuleForTests(t, "libshared", config.CompileTargets().BuildOSTarget.String()+"_shared").Description("install")
+	hostRuntime := ctx.ModuleForTests(t, "libruntime", config.CompileTargets().BuildOSTarget.String()+"_shared").Description("install")
+	hostTransitive := ctx.ModuleForTests(t, "libtransitive", config.CompileTargets().BuildOSTarget.String()+"_shared").Description("install")
+	hostTool := ctx.ModuleForTests(t, "tool", config.CompileTargets().BuildOSTarget.String()).Description("install")
 
 	if g, w := hostBin.Implicits.Strings(), hostShared.Output.String(); !android.InList(w, g) {
 		t.Errorf("expected host bin dependency %q, got %q", w, g)

@@ -27,7 +27,6 @@ import (
 
 	"github.com/google/blueprint"
 	"github.com/google/blueprint/pathtools"
-	"github.com/google/blueprint/proptools"
 )
 
 //go:generate go run ../../blueprint/gobtools/codegen
@@ -252,13 +251,13 @@ func (s *makeVarsSingleton) GenerateBuildActions(ctx SingletonContext) {
 	}
 
 	outFile := absolutePath(PathForOutput(ctx,
-		"make_vars"+proptools.String(ctx.Config().productVariables.Make_suffix)+".mk").String())
+		"make_vars"+ctx.Config().MakeSuffix()+".mk").String())
 
 	lateOutFile := absolutePath(PathForOutput(ctx,
-		"late"+proptools.String(ctx.Config().productVariables.Make_suffix)+".mk").String())
+		"late"+ctx.Config().MakeSuffix()+".mk").String())
 
 	installsFile := absolutePath(PathForOutput(ctx,
-		"installs"+proptools.String(ctx.Config().productVariables.Make_suffix)+".mk").String())
+		"installs"+ctx.Config().MakeSuffix()+".mk").String())
 
 	installCommandsFile := absolutePath(PathForOutput(ctx, "install_commands.json").String())
 
@@ -653,7 +652,7 @@ EXTRA_INSTALL_ZIPS :=
 }
 
 func (c *makeVarsContext) DeviceConfig() DeviceConfig {
-	return DeviceConfig{c.Config().deviceConfig}
+	return c.Config().DeviceConfig()
 }
 
 var ninjaDescaper = strings.NewReplacer("$$", "$")

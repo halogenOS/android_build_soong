@@ -358,8 +358,8 @@ func (a *androidDevice) DepsMutator(ctx android.BottomUpMutatorContext) {
 }
 
 func (a *androidDevice) addDepsForTargetFilesMetadata(ctx android.BottomUpMutatorContext) {
-	ctx.AddFarVariationDependencies(ctx.Config().BuildOSTarget.Variations(), targetFilesMetadataDepTag, "liblz4") // host variant
-	ctx.AddFarVariationDependencies(ctx.Config().AndroidCommonTarget.Variations(), fileContextsDepTag, "file_contexts_bin_gen")
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), targetFilesMetadataDepTag, "liblz4") // host variant
+	ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().AndroidCommonTarget.Variations(), fileContextsDepTag, "file_contexts_bin_gen")
 }
 
 func (a *androidDevice) UseGenericConfig() bool {
@@ -581,7 +581,7 @@ func (a *androidDevice) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 	// Add the host tools as deps
 	if !ctx.Config().KatiEnabled() && proptools.Bool(a.deviceProps.Main_device) {
-		for _, hostTool := range ctx.Config().ProductVariables().ProductHostPackages {
+		for _, hostTool := range ctx.Config().ProductHostPackages() {
 			ctx.Phony("droid", android.PathForPhony(ctx, hostTool+"-host"))
 		}
 		ctx.Phony("droid_targets", android.PathForPhony(ctx, "blueprint_tools"))

@@ -323,7 +323,7 @@ func TestPrebuilts(t *testing.T) {
 				PrepareForTestWithFilegroup,
 				// Add a Windows target to the configuration.
 				FixtureModifyConfig(func(config Config) {
-					config.Targets[Windows] = []Target{
+					config.CompileTargets().Targets[Windows] = []Target{
 						{
 							Os:        Windows,
 							Arch:      Arch{ArchType: X86_64},

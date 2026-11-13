@@ -123,7 +123,7 @@ func TestAndroidAppSet_Variants(t *testing.T) {
 					variables.Platform_sdk_version = &test.sdkVersion
 				}),
 				android.FixtureModifyConfig(func(config android.Config) {
-					config.Targets[android.Android] = test.targets
+					config.CompileTargets().Targets[android.Android] = test.targets
 				}),
 			).RunTestWithBp(t, bp)
 

@@ -80,12 +80,12 @@ var (
 func (p *testPackageZip) DepsMutator(ctx android.BottomUpMutatorContext) {
 	// adding tests property deps
 	for _, t := range p.properties.Tests.GetOrDefault(ctx, nil) {
-		ctx.AddVariationDependencies(ctx.Config().AndroidCommonTarget.Variations(), testPackageZipDepTag, t)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidCommonTarget.Variations(), testPackageZipDepTag, t)
 	}
 
 	// adding device_first_tests property deps
 	for _, t := range p.properties.Device_first_tests.GetOrDefault(ctx, nil) {
-		ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), testPackageZipDepTag, t)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), testPackageZipDepTag, t)
 	}
 
 	// adding device_both_tests property deps
@@ -93,32 +93,32 @@ func (p *testPackageZip) DepsMutator(ctx android.BottomUpMutatorContext) {
 
 	// adding host_tests property deps
 	for _, t := range p.properties.Host_tests.GetOrDefault(ctx, nil) {
-		ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), testPackageZipDepTag, t)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), testPackageZipDepTag, t)
 	}
 	// adding Tests_if_exist_host property deps
 	for _, t := range p.properties.Tests_if_exist_host.GetOrDefault(ctx, nil) {
 		if ctx.OtherModuleExists(t) {
-			ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), testPackageZipDepTag, t)
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), testPackageZipDepTag, t)
 		}
 	}
 
 	// adding Tests_if_exist_* property deps
 	for _, t := range p.properties.Tests_if_exist_common.GetOrDefault(ctx, nil) {
 		if ctx.OtherModuleExists(t) {
-			ctx.AddVariationDependencies(ctx.Config().AndroidCommonTarget.Variations(), testPackageZipDepTag, t)
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidCommonTarget.Variations(), testPackageZipDepTag, t)
 		}
 	}
 	for _, t := range p.properties.Tests_if_exist_device_first.GetOrDefault(ctx, nil) {
 		if ctx.OtherModuleExists(t) {
-			ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), testPackageZipDepTag, t)
+			ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), testPackageZipDepTag, t)
 		}
 	}
 	p.addDeviceBothDeps(ctx, true)
 }
 
 func (p *testPackageZip) addDeviceBothDeps(ctx android.BottomUpMutatorContext, checkIfExist bool) {
-	android32TargetList := android.FirstTarget(ctx.Config().Targets[android.Android], "lib32")
-	android64TargetList := android.FirstTarget(ctx.Config().Targets[android.Android], "lib64")
+	android32TargetList := android.FirstTarget(ctx.Config().CompileTargets().Targets[android.Android], "lib32")
+	android64TargetList := android.FirstTarget(ctx.Config().CompileTargets().Targets[android.Android], "lib64")
 	if len(android32TargetList) > 0 {
 		maybeAndroid32Target := &android32TargetList[0]
 		if checkIfExist {
@@ -202,9 +202,8 @@ func getAllTestModules(ctx android.ModuleContext) []android.ModuleProxy {
 func createOutput(ctx android.ModuleContext, pctx android.PackageContext) android.ModuleOutPath {
 	productOut := android.PathForModuleInPartitionInstall(ctx, "").String()
 	stagingDir := android.PathForModuleOut(ctx, "STAGING")
-	productVariables := ctx.Config().ProductVariables()
-	arch := proptools.String(productVariables.DeviceArch)
-	secondArch := proptools.String(productVariables.DeviceSecondaryArch)
+	arch := ctx.DeviceConfig().DeviceArch()
+	secondArch := ctx.DeviceConfig().DeviceSecondaryArch()
 
 	builder := android.NewRuleBuilder(pctx, ctx).SandboxDisabled()
 	builder.Command().Text("rm").Flag("-rf").Text(stagingDir.String())

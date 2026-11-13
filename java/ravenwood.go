@@ -151,7 +151,7 @@ func (r *ravenwoodTest) DepsMutator(ctx android.BottomUpMutatorContext) {
 			ctx.PropertyErrorf("jni_libs", "Ravenwood test module shouldn't include \"%s\"", lib)
 			continue
 		}
-		ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), jniLibTag, lib)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), jniLibTag, lib)
 	}
 
 	// Resources APK
@@ -463,7 +463,7 @@ func (r *ravenwoodLibgroup) DepsMutator(ctx android.BottomUpMutatorContext) {
 		ctx.AddVariationDependencies(nil, ravenwoodLibContentTag, lib)
 	}
 	for _, lib := range r.ravenwoodLibgroupProperties.Jni_libs.GetOrDefault(ctx, nil) {
-		ctx.AddVariationDependencies(ctx.Config().BuildOSTarget.Variations(), jniLibTag, lib)
+		ctx.AddVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(), jniLibTag, lib)
 	}
 	for _, lib := range r.ravenwoodLibgroupProperties.Subruntimes {
 		ctx.AddVariationDependencies(nil, ravenwoodLibSubruntimeTag, lib)

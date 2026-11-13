@@ -57,7 +57,7 @@ func ProtoDeps(ctx BottomUpMutatorContext, p *ProtoProperties) {
 	}
 
 	if plugin := String(p.Proto.Plugin); plugin != "" {
-		ctx.AddFarVariationDependencies(ctx.Config().BuildOSTarget.Variations(),
+		ctx.AddFarVariationDependencies(ctx.Config().CompileTargets().BuildOSTarget.Variations(),
 			ProtoPluginDepTag, "protoc-gen-"+plugin)
 	}
 }

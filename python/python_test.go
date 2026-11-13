@@ -392,7 +392,7 @@ func TestSharedLib(t *testing.T) {
 		t.Errorf("Expected got: %s, want: 0 errs", ctx.Errs)
 	}
 
-	mod, modOk := ctx.ModuleForTests(t, "py-lib-host", ctx.Config.BuildOSTarget.String()).Module().(*PythonLibraryModule)
+	mod, modOk := ctx.ModuleForTests(t, "py-lib-host", ctx.Config.CompileTargets().BuildOSTarget.String()).Module().(*PythonLibraryModule)
 	if !modOk {
 		t.Fatalf("py-lib-host is not Python library!")
 	}

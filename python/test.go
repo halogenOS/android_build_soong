@@ -133,7 +133,7 @@ func (p *PythonTestModule) addDataDeviceBinsDeps(ctx android.BottomUpMutatorCont
 	}
 
 	var maybeAndroidTarget *android.Target
-	androidTargetList := android.FirstTarget(ctx.Config().Targets[android.Android], filter)
+	androidTargetList := android.FirstTarget(ctx.Config().CompileTargets().Targets[android.Android], filter)
 	if len(androidTargetList) > 0 {
 		maybeAndroidTarget = &androidTargetList[0]
 	}

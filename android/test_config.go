@@ -74,9 +74,13 @@ func initTestConfig(buildDir string, env map[string]string) *config {
 		config: config,
 	}
 	config.TestProductVariables = &config.productVariables
-	config.deviceNameToInstall = config.TestProductVariables.DeviceName
+	config.deviceNameToInstall = computeDeviceNameToInstall(config)
 
-	determineBuildOS(config)
+	config.BuildOS = determineBuildOS(Config{config: config})
+	config.BuildArch = determineBuildArch()
+	config.compileTargets = computeFromConfig(Config{config: config}, func(Config) *CompileTargets {
+		return &CompileTargets{}
+	})
 
 	return config
 }
@@ -93,13 +97,14 @@ func TestConfig(buildDir string, env map[string]string, bp string, fs map[string
 	config.genericConfigField.mockFileSystem(bp, fs)
 	overrideGenericConfig(config)
 
-	return Config{config}
+	return Config{config: config}
 }
 
 func modifyTestConfigToSupportArchMutator(testConfig Config) {
 	config := testConfig.config
+	targets := testConfig.CompileTargets()
 
-	config.Targets = map[OsType][]Target{
+	targets.Targets = map[OsType][]Target{
 		Android: {
 			{
 				Os:   Android,
@@ -123,16 +128,16 @@ func modifyTestConfigToSupportArchMutator(testConfig Config) {
 	}
 
 	// Make the CommonOS OsType available for all products.
-	config.Targets[CommonOS] = []Target{commonTargetMap[CommonOS.Name]}
+	targets.Targets[CommonOS] = []Target{commonTargetMap[CommonOS.Name]}
 
 	if runtime.GOOS == "darwin" {
-		config.Targets[config.BuildOS] = config.Targets[config.BuildOS][:1]
+		targets.Targets[config.BuildOS] = targets.Targets[config.BuildOS][:1]
 	}
 
-	config.BuildOSTarget = config.Targets[config.BuildOS][0]
-	config.BuildOSCommonTarget = getCommonTargets(config.Targets[config.BuildOS])[0]
-	config.AndroidCommonTarget = getCommonTargets(config.Targets[Android])[0]
-	config.AndroidFirstDeviceTarget = FirstTarget(config.Targets[Android], "lib64", "lib32")[0]
+	targets.BuildOSTarget = targets.Targets[config.BuildOS][0]
+	targets.BuildOSCommonTarget = getCommonTargets(targets.Targets[config.BuildOS])[0]
+	targets.AndroidCommonTarget = getCommonTargets(targets.Targets[Android])[0]
+	targets.AndroidFirstDeviceTarget = FirstTarget(targets.Targets[Android], "lib64", "lib32")[0]
 	config.TestProductVariables.DeviceArch = proptools.StringPtr("arm64")
 	config.TestProductVariables.DeviceArchVariant = proptools.StringPtr("armv8-a")
 	config.TestProductVariables.DeviceSecondaryArch = proptools.StringPtr("arm")
@@ -141,10 +146,11 @@ func modifyTestConfigToSupportArchMutator(testConfig Config) {
 
 // ModifyTestConfigForMusl takes a Config returned by TestConfig and changes the host targets from glibc to musl.
 func ModifyTestConfigForMusl(config Config) {
-	delete(config.Targets, config.BuildOS)
+	targets := config.CompileTargets()
+	delete(targets.Targets, config.BuildOS)
 	config.productVariables.HostMusl = boolPtr(true)
-	determineBuildOS(config.config)
-	config.Targets[config.BuildOS] = []Target{
+	config.BuildOS = determineBuildOS(config)
+	targets.Targets[config.BuildOS] = []Target{
 		{
 			Os:   config.BuildOS,
 			Arch: Arch{ArchType: X86_64},
@@ -155,12 +161,13 @@ func ModifyTestConfigForMusl(config Config) {
 		},
 	}
 
-	config.BuildOSTarget = config.Targets[config.BuildOS][0]
-	config.BuildOSCommonTarget = getCommonTargets(config.Targets[config.BuildOS])[0]
+	targets.BuildOSTarget = targets.Targets[config.BuildOS][0]
+	targets.BuildOSCommonTarget = getCommonTargets(targets.Targets[config.BuildOS])[0]
 }
 
 func modifyTestConfigForMuslArm64HostCross(config Config) {
-	config.Targets[LinuxMusl] = append(config.Targets[LinuxMusl],
+	targets := config.CompileTargets()
+	targets.Targets[LinuxMusl] = append(targets.Targets[LinuxMusl],
 		Target{
 			Os:        config.BuildOS,
 			Arch:      Arch{ArchType: Arm64},

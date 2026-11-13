@@ -291,10 +291,10 @@ func executeTemplate(templ *template.Template, buffer *bytes.Buffer, data any) s
 }
 
 func (m *CmakeSnapshot) DepsMutator(ctx android.BottomUpMutatorContext) {
-	deviceVariations := ctx.Config().AndroidFirstDeviceTarget.Variations()
+	deviceVariations := ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations()
 	deviceSystemVariations := append(deviceVariations, blueprint.Variation{"image", ""})
 	deviceVendorVariations := append(deviceVariations, blueprint.Variation{"image", "vendor"})
-	hostVariations := ctx.Config().BuildOSTarget.Variations()
+	hostVariations := ctx.Config().CompileTargets().BuildOSTarget.Variations()
 
 	ctx.AddVariationDependencies(hostVariations, cmakeSnapshotModuleTag, m.Properties.Modules_host...)
 	ctx.AddVariationDependencies(deviceSystemVariations, cmakeSnapshotModuleTag, m.Properties.Modules_system...)

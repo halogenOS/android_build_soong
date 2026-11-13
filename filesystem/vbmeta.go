@@ -186,8 +186,8 @@ func (v *vbmeta) disablesHashtree(ctx android.BaseModuleContext) bool {
 func (v *vbmeta) DepsMutator(ctx android.BottomUpMutatorContext) {
 	// Reading the value before the output folder is named puts Eng in the folder name.
 	_ = v.disablesHashtree(ctx)
-	ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), vbmetaPartitionDep, v.properties.Partitions.GetOrDefault(ctx, nil)...)
-	ctx.AddVariationDependencies(ctx.Config().AndroidFirstDeviceTarget.Variations(), vbmetaChainedPartitionDep, v.properties.Chained_partitions...)
+	ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), vbmetaPartitionDep, v.properties.Partitions.GetOrDefault(ctx, nil)...)
+	ctx.AddVariationDependencies(ctx.Config().CompileTargets().AndroidFirstDeviceTarget.Variations(), vbmetaChainedPartitionDep, v.properties.Chained_partitions...)
 }
 
 func (v *vbmeta) installFileName() string {

@@ -35,7 +35,7 @@ var ccTestFs = android.MockFS{
 
 // Adds a native bridge target to the configured list of targets.
 var prepareForTestWithNativeBridgeTarget = android.FixtureModifyConfig(func(config android.Config) {
-	config.Targets[android.Android] = append(config.Targets[android.Android], android.Target{
+	config.CompileTargets().Targets[android.Android] = append(config.CompileTargets().Targets[android.Android], android.Target{
 		Os: android.Android,
 		Arch: android.Arch{
 			ArchType:     android.Arm64,
@@ -621,7 +621,7 @@ func TestSnapshotWithSingleHostOsType(t *testing.T) {
 		ccTestFs.AddToFixture(),
 		cc.PrepareForTestOnLinuxBionic,
 		android.FixtureModifyConfig(func(config android.Config) {
-			config.Targets[android.LinuxBionic] = []android.Target{
+			config.CompileTargets().Targets[android.LinuxBionic] = []android.Target{
 				{
 					Os:           android.LinuxBionic,
 					Arch:         android.Arch{ArchType: android.X86_64},

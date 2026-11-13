@@ -46,7 +46,7 @@ func TestGolang(t *testing.T) {
 		}),
 	).RunTestWithBp(t, bp)
 
-	bin := result.ModuleForTests(t, "gobin", result.Config.BuildOSTarget.String())
+	bin := result.ModuleForTests(t, "gobin", result.Config.CompileTargets().BuildOSTarget.String())
 
 	expected := "^out/host/" + result.Config.PrebuiltOS() + "/bin/go/gobin/?[^/]*/pkg/gobin$"
 	actual := android.PathsRelativeToTop(bin.OutputFiles(result.TestContext, t, ""))

@@ -65,7 +65,7 @@ func (r *recoveryBuildPropModule) appendRecoveryUIProperties(ctx ModuleContext, 
 	rule.Command().Text("echo '# RECOVERY UI BUILD PROPERTIES' >>").Output(r.outputFilePath)
 	rule.Command().Text("echo '#' >>").Output(r.outputFilePath)
 
-	for propName, val := range ctx.Config().ProductVariables().PartitionVarsForSoongMigrationOnlyDoNotUse.PrivateRecoveryUiProperties {
+	for propName, val := range readProductVariable(ctx.Config(), &ctx.Config().productVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.PrivateRecoveryUiProperties) {
 		if len(val) > 0 {
 			rule.Command().
 				Textf("echo ro.recovery.ui.%s=%s >>", propName, val).

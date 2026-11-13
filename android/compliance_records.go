@@ -293,7 +293,7 @@ func WriteProductComplianceRecords(ctx ModuleContext, files *ComplianceFilesInfo
 // main device.
 func productInstalledFileRows(ctx PathContext, files *ComplianceFilesInfo) []productInstalledFileRow {
 	allFiles := slices.Clone(files.filesContained)
-	deviceName := String(ctx.Config().productVariables.DeviceName)
+	deviceName := String(readProductVariable(ctx.Config(), &ctx.Config().productVariables.DeviceName))
 	prebuiltCopies := make(map[string]CompliancePrebuiltCopy, len(files.prebuiltFilesCopied))
 	for _, copied := range files.prebuiltFilesCopied {
 		dest := PathForArbitraryOutput(ctx, "target", "product", deviceName, copied.Dest)

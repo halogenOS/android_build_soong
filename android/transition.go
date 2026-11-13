@@ -415,11 +415,11 @@ func (c *incomingTransitionContextImpl) DepTag() blueprint.DependencyTag {
 }
 
 func (c *incomingTransitionContextImpl) Config() Config {
-	return c.bp.Config().(Config)
+	return c.bp.Config().(Config).recordingReadsInto(c.Module().base().configReads)
 }
 
 func (c *incomingTransitionContextImpl) DeviceConfig() DeviceConfig {
-	return DeviceConfig{c.bp.Config().(Config).deviceConfig}
+	return c.Config().DeviceConfig()
 }
 
 func (c *incomingTransitionContextImpl) IsAddingDependency() bool {
@@ -466,11 +466,11 @@ func (c *outgoingTransitionContextImpl) DepTag() blueprint.DependencyTag {
 }
 
 func (c *outgoingTransitionContextImpl) Config() Config {
-	return c.bp.Config().(Config)
+	return c.bp.Config().(Config).recordingReadsInto(c.Module().base().configReads)
 }
 
 func (c *outgoingTransitionContextImpl) DeviceConfig() DeviceConfig {
-	return DeviceConfig{c.bp.Config().(Config).deviceConfig}
+	return c.Config().DeviceConfig()
 }
 
 func (c *outgoingTransitionContextImpl) provider(provider blueprint.AnyProviderKey) (any, bool) {

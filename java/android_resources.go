@@ -70,7 +70,7 @@ type globbedResourceDir struct {
 func overlayResourceGlob(ctx android.ModuleContext, a *aapt, dir android.Path) (res []globbedResourceDir,
 	rroDirs []rroDir) {
 
-	overlayData := ctx.Config().Once(overlayDataKey, func() interface{} {
+	overlayData := android.OnceFromConfig(ctx.Config(), overlayDataKey, func(config android.Config) []overlayGlobResult {
 		var overlayData []overlayGlobResult
 
 		appendOverlayData := func(overlayDirs []string, t overlayType) {
@@ -98,10 +98,10 @@ func overlayResourceGlob(ctx android.ModuleContext, a *aapt, dir android.Path) (
 			}
 		}
 
-		appendOverlayData(ctx.Config().DeviceResourceOverlays(), device)
-		appendOverlayData(ctx.Config().ProductResourceOverlays(), product)
+		appendOverlayData(config.DeviceResourceOverlays(), device)
+		appendOverlayData(config.ProductResourceOverlays(), product)
 		return overlayData
-	}).([]overlayGlobResult)
+	})
 
 	// Runtime resource overlays (RRO) may be turned on by the product config for some modules
 	rroEnabled := a.IsRROEnforced(ctx)

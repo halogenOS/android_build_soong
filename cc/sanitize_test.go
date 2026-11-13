@@ -210,7 +210,7 @@ func TestAsan(t *testing.T) {
 		prepareForCcTest,
 		prepareForAsanTest,
 	)
-	buildOS := preparer.RunTestWithBp(t, bp).Config.BuildOSTarget.String()
+	buildOS := preparer.RunTestWithBp(t, bp).Config.CompileTargets().BuildOSTarget.String()
 
 	check := func(t *testing.T, variant string, runtimeLinkage expectedRuntimeLinkage, preparer android.FixturePreparer) {
 		result := preparer.RunTestWithBp(t, bp)
@@ -376,7 +376,7 @@ func TestTsan(t *testing.T) {
 		prepareForCcTest,
 		prepareForTsanTest,
 	)
-	buildOS := preparer.RunTestWithBp(t, bp).Config.BuildOSTarget.String()
+	buildOS := preparer.RunTestWithBp(t, bp).Config.CompileTargets().BuildOSTarget.String()
 
 	check := func(t *testing.T, variant string, preparer android.FixturePreparer) {
 		result := preparer.RunTestWithBp(t, bp)
@@ -471,7 +471,7 @@ func TestMiscUndefined(t *testing.T) {
 	preparer := android.GroupFixturePreparers(
 		prepareForCcTest,
 	)
-	buildOS := preparer.RunTestWithBp(t, bp).Config.BuildOSTarget.String()
+	buildOS := preparer.RunTestWithBp(t, bp).Config.CompileTargets().BuildOSTarget.String()
 
 	check := func(t *testing.T, variant string, preparer android.FixturePreparer) {
 		result := preparer.RunTestWithBp(t, bp)
@@ -774,7 +774,7 @@ func TestUbsan(t *testing.T) {
 	preparer := android.GroupFixturePreparers(
 		prepareForCcTest,
 	)
-	buildOS := preparer.RunTestWithBp(t, bp).Config.BuildOSTarget.String()
+	buildOS := preparer.RunTestWithBp(t, bp).Config.CompileTargets().BuildOSTarget.String()
 
 	check := func(t *testing.T, variant string, preparer android.FixturePreparer) {
 		result := preparer.RunTestWithBp(t, bp)
@@ -1355,7 +1355,7 @@ func TestHwasan(t *testing.T) {
 		{
 			buildOs: androidX86,
 			extraPreparer: android.FixtureModifyConfig(func(config android.Config) {
-				config.Targets[android.Android] = []android.Target{
+				config.CompileTargets().Targets[android.Android] = []android.Target{
 					{
 						Os:   android.Android,
 						Arch: android.Arch{ArchType: android.X86, ArchVariant: "silvermont", Abi: []string{"armeabi-v7a"}},

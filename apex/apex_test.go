@@ -4289,8 +4289,8 @@ func TestVndkApexWithBinder32(t *testing.T) {
 				NativeBridgeHostArchName: "",
 				NativeBridgeRelativePath: "",
 			}
-			config.Targets[android.Android] = []android.Target{target}
-			config.AndroidFirstDeviceTarget = target
+			config.CompileTargets().Targets[android.Android] = []android.Target{target}
+			config.CompileTargets().AndroidFirstDeviceTarget = target
 		}),
 	)
 
@@ -8983,7 +8983,7 @@ func TestApexSet(t *testing.T) {
 			variables.Platform_sdk_version = intPtr(30)
 		}),
 		android.FixtureModifyConfig(func(config android.Config) {
-			config.Targets[android.Android] = []android.Target{
+			config.CompileTargets().Targets[android.Android] = []android.Target{
 				{Os: android.Android, Arch: android.Arch{ArchType: android.Arm, ArchVariant: "armv7-a-neon", Abi: []string{"armeabi-v7a"}}},
 				{Os: android.Android, Arch: android.Arch{ArchType: android.Arm64, ArchVariant: "armv8-a", Abi: []string{"arm64-v8a"}}},
 			}
@@ -9025,7 +9025,7 @@ func TestApexSet_NativeBridge(t *testing.T) {
 		}
 	`,
 		android.FixtureModifyConfig(func(config android.Config) {
-			config.Targets[android.Android] = []android.Target{
+			config.CompileTargets().Targets[android.Android] = []android.Target{
 				{Os: android.Android, Arch: android.Arch{ArchType: android.X86_64, ArchVariant: "", Abi: []string{"x86_64"}}},
 				{Os: android.Android, Arch: android.Arch{ArchType: android.Arm64, ArchVariant: "armv8-a", Abi: []string{"arm64-v8a"}}, NativeBridge: android.NativeBridgeEnabled},
 			}

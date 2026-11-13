@@ -26,8 +26,6 @@ import (
 
 	"github.com/google/blueprint"
 	"github.com/google/blueprint/syncmap"
-
-	"github.com/google/blueprint/proptools"
 )
 
 // WriteFileRule creates a ninja rule to write contents to a file by immediately writing the
@@ -74,7 +72,7 @@ func writeFileRule(ctx BuilderContext, outputFile WritablePath, content string, 
 	// created by previous runs of soong_build for other products, as the build.ninja files for those products
 	// may still exist and still reference those files.  The raw files from different products are kept
 	// separate by appending the Make_suffix to the directory name.
-	rawPath := PathForOutput(ctx, "raw"+proptools.String(ctx.Config().productVariables.Make_suffix), relPath)
+	rawPath := PathForOutput(ctx, "raw"+ctx.Config().MakeSuffix(), relPath)
 
 	rawFileInfo := rawFileInfo{
 		relPath: relPath,
@@ -199,7 +197,7 @@ func (rawFilesSingleton) GenerateBuildActions(ctx SingletonContext) {
 		return
 	}
 	rawFileSet := getRawFileSet(ctx.Config())
-	rawFilesDir := PathForOutput(ctx, "raw"+proptools.String(ctx.Config().productVariables.Make_suffix)).String()
+	rawFilesDir := PathForOutput(ctx, "raw"+ctx.Config().MakeSuffix()).String()
 	absRawFilesDir := absolutePath(rawFilesDir)
 	err := filepath.WalkDir(absRawFilesDir, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {

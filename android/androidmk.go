@@ -375,7 +375,7 @@ func MakeVariablePrefix(config Config, module MakeVariablePrefixTarget) string {
 		prefix = "TARGET_"
 	}
 
-	if module.Arch().ArchType != config.Targets[module.Os()][0].Arch.ArchType {
+	if module.Arch().ArchType != config.CompileTargets().Targets[module.Os()][0].Arch.ArchType {
 		prefix = "2ND_" + prefix
 	}
 	return prefix
@@ -605,13 +605,13 @@ func (c *androidMkSingleton) GenerateBuildActions(ctx SingletonContext) {
 		return
 	}
 
-	transMk := PathForOutput(ctx, "Android"+String(ctx.Config().productVariables.Make_suffix)+".mk")
-	exportsMk := PathForOutput(ctx, shared.SoongExportsMkName(String(ctx.Config().productVariables.Make_suffix)))
+	transMk := PathForOutput(ctx, "Android"+ctx.Config().MakeSuffix()+".mk")
+	exportsMk := PathForOutput(ctx, shared.SoongExportsMkName(ctx.Config().MakeSuffix()))
 	if ctx.Failed() {
 		return
 	}
 
-	moduleInfoJSON := PathForOutput(ctx, "module-info"+String(ctx.Config().productVariables.Make_suffix)+".json")
+	moduleInfoJSON := PathForOutput(ctx, "module-info"+ctx.Config().MakeSuffix()+".json")
 
 	err := translateAndroidMk(ctx, absolutePath(transMk.String()), absolutePath(exportsMk.String()), moduleInfoJSON,
 		allModulesSorted(ctx))

@@ -933,8 +933,6 @@ func VariableMutator(mctx BottomUpMutatorContext) {
 
 	variableValues := reflect.ValueOf(a.variableProperties).Elem().FieldByName("Product_variables")
 
-	productVariables := reflect.ValueOf(&mctx.Config().productVariables).Elem()
-
 	for i := 0; i < variableValues.NumField(); i++ {
 		variableValue := variableValues.Field(i)
 		name := variableValues.Type().Field(i).Name
@@ -942,14 +940,19 @@ func VariableMutator(mctx BottomUpMutatorContext) {
 		property := "product_variables." + propertyName
 
 		if buildTypeValue, ok := parseBuildTypeValue(propertyName); ok {
-			if !variableValue.IsZero() && a.readBuildTypeValue(mctx.Config().config, buildTypeValue) {
+			if !variableValue.IsZero() && a.readBuildTypeValue(mctx.Config(), buildTypeValue) {
 				a.setVariableProperties(mctx, property, variableValue, true)
 			}
 			continue
 		}
 
+		// Check if any properties were set for the module
+		if variableValue.IsZero() {
+			continue
+		}
+
 		// Check that the variable was set for the product
-		val := productVariables.FieldByName(name)
+		val := readProductVariableNamed(mctx.Config(), name)
 		if !val.IsValid() || val.Kind() != reflect.Ptr || val.IsNil() {
 			continue
 		}
@@ -961,10 +964,6 @@ func VariableMutator(mctx BottomUpMutatorContext) {
 			continue
 		}
 
-		// Check if any properties were set for the module
-		if variableValue.IsZero() {
-			continue
-		}
 		a.setVariableProperties(mctx, property, variableValue, val.Interface())
 	}
 }

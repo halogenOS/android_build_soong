@@ -173,6 +173,8 @@ type singletonAdaptor struct {
 	// singleton. It takes precedence over IncrementalSupported of the singleton.
 	readByMake bool
 
+	configReads ConfigReads
+
 	buildParams []BuildParams
 	ruleParams  map[blueprint.Rule]blueprint.RuleParams
 }
@@ -197,6 +199,7 @@ func (s *singletonAdaptor) IncrementalSupported() bool {
 func (s *singletonAdaptor) GenerateBuildActions(ctx blueprint.SingletonContext) {
 	sctx := &singletonContextAdaptor{
 		SingletonContext: ctx,
+		configReads:      &s.configReads,
 		phonies:          make(phonyMap),
 	}
 	if sctx.Config().captureBuild {
@@ -234,6 +237,8 @@ type Singleton interface {
 type singletonContextAdaptor struct {
 	blueprint.SingletonContext
 
+	configReads *ConfigReads
+
 	buildParams []BuildParams
 	ruleParams  map[blueprint.Rule]blueprint.RuleParams
 	dists       []dist
@@ -245,11 +250,11 @@ func (s *singletonContextAdaptor) blueprintSingletonContext() blueprint.Singleto
 }
 
 func (s *singletonContextAdaptor) Config() Config {
-	return s.SingletonContext.Config().(Config)
+	return s.SingletonContext.Config().(Config).recordingReadsInto(s.configReads)
 }
 
 func (s *singletonContextAdaptor) DeviceConfig() DeviceConfig {
-	return DeviceConfig{s.Config().deviceConfig}
+	return s.Config().DeviceConfig()
 }
 
 func (s *singletonContextAdaptor) Variable(pctx PackageContext, name, value string) {

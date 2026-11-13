@@ -1930,7 +1930,7 @@ type sanitizerLibraryDependencyTag struct {
 var _ android.AllowDisabledModuleDependency = (*sanitizerLibraryDependencyTag)(nil)
 
 func (txt *sanitizerLibrariesTxtModule) DepsMutator(actx android.BottomUpMutatorContext) {
-	targets := actx.Config().Targets[android.Android]
+	targets := actx.Config().CompileTargets().Targets[android.Android]
 	depTag := sanitizerLibraryDependencyTag{}
 
 	for _, target := range targets {
@@ -1966,7 +1966,7 @@ func (txt *sanitizerLibrariesTxtModule) getSanitizerLibs(ctx android.ModuleConte
 			return
 		}
 
-		targets := ctx.Config().Targets[android.Android]
+		targets := ctx.Config().CompileTargets().Targets[android.Android]
 
 		var targetMatches bool
 		for _, target := range targets {
