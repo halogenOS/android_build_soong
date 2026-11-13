@@ -36,7 +36,6 @@ import (
 	"github.com/google/blueprint/deptools"
 	"github.com/google/blueprint/metrics"
 	"github.com/google/blueprint/pathtools"
-	"github.com/google/blueprint/proptools"
 )
 
 var (
@@ -53,15 +52,12 @@ var (
 const configCacheFile = "config.cache"
 
 type ConfigCache struct {
-	EnvDepsHash proptools.Hash
-	// ProductVariablesHash and DexpreoptConfigHash are the hashes of the
-	// contents of the files that Kati writes for Soong during the product
-	// configuration. They are hashed from the bytes that the analysis decodes,
-	// so the key follows the contents that the analysis used, whatever the
-	// times of the files are.
-	ProductVariablesHash    proptools.Hash
-	DexpreoptConfigHash     proptools.Hash
 	SoongBuildFileTimestamp int64
+	// BuildOS, BuildFromSourceStub and RunGoTests are configuration values that modules read
+	// directly from config fields, which records no read for the cache to compare.
+	BuildOS             string
+	BuildFromSourceStub bool
+	RunGoTests          bool
 	// KatiEnabled, KatiSuffix and SplitAllVariants are the build mode. An
 	// analysis for one mode leaves out what another mode needs, such as the
 	// Make data of modules and the variants that Make may depend on.
@@ -202,37 +198,19 @@ func writeDepFile(outputFile string, eventHandler *metrics.EventHandler, ninjaDe
 	maybeQuit(err, "error writing depfile '%s'", depFile)
 }
 
-// Check if there are changes to the environment file, the files written by Kati
-// for Soong, the build mode and the soong_build binary, in which case the
-// analysis runs in full. For env variables we check the used env file, which
-// will be removed in soong ui if there is any changes to the env variables used
-// last time, in which case the check below will fail and a full build will be
-// attempted. If any new env variables are added in the new run, soong ui won't
-// be able to detect it, the used env file check below will pass. But unless
-// there is a soong build code change, in which case the soong build binary
-// check will fail, otherwise the new env variables shouldn't have any affect.
+// Check if the soong_build binary, the build mode or a config field read directly by modules
+// changed, in which case the analysis runs in full. A change of any other configuration value
+// makes only the modules and singletons that read it run again, as the cache compares the
+// configuration values read by each of them.
 func incrementalValid(config android.Config, splitAllVariants bool, configCacheFile string) (*ConfigCache, bool) {
 	var newConfigCache ConfigCache
-	data, err := os.ReadFile(shared.JoinPath(topDir, usedEnvFile))
-	if err != nil {
-		// Clean build
-		if os.IsNotExist(err) {
-			data = []byte{}
-		} else {
-			maybeQuit(err, "")
-		}
-	}
-
-	newConfigCache.EnvDepsHash, err = proptools.CalculateHashReflection(data)
-	maybeQuit(err, "")
-	newConfigCache.ProductVariablesHash = config.ProductVariablesHash()
-	if hash, ok := config.DexpreoptGlobalConfigHash(); ok {
-		newConfigCache.DexpreoptConfigHash = hash
-	}
 	newConfigCache.SoongBuildFileTimestamp = getFileTimestamp(shared.JoinPath(topDir, config.HostToolDir(), "soong_build"))
 	newConfigCache.KatiEnabled = cmdlineArgs.KatiEnabled
 	newConfigCache.KatiSuffix = cmdlineArgs.KatiSuffix
 	newConfigCache.SplitAllVariants = splitAllVariants
+	newConfigCache.BuildOS = config.BuildOS.Name
+	newConfigCache.BuildFromSourceStub = cmdlineArgs.BuildFromSourceStub
+	newConfigCache.RunGoTests = cmdlineArgs.RunGoTests
 
 	file, err := os.Open(configCacheFile)
 	if err != nil && os.IsNotExist(err) {
@@ -409,10 +387,6 @@ func main() {
 	writeDepFile(finalOutputFile, ctx.EventHandler, ninjaDeps)
 
 	if ctx.GetIncrementalEnabled() {
-		data, err := shared.EnvFileContents(configuration.EnvDeps())
-		maybeQuit(err, "")
-		configCache.EnvDepsHash, err = proptools.CalculateHashReflection(data)
-		maybeQuit(err, "")
 		writeConfigCache(configCache, configFile)
 	}
 

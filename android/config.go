@@ -408,8 +408,6 @@ type config struct {
 	TestProductVariables *ProductVariables
 
 	ProductVariablesFileName string
-	// productVariablesHash is the hash of the contents of the product variables file.
-	productVariablesHash proptools.Hash
 
 	// dexpreoptGlobalConfig is the contents of the dexpreopt.config file that the product variables
 	// name, and dexpreoptGlobalConfigHash its hash. Both are unset where the product variables name
@@ -671,12 +669,9 @@ func (c Config) parsePartialCompileFlags(isEngBuild bool) (partialCompileFlags, 
 }
 
 func loadConfig(config *config) error {
-	data, err := loadFromConfigFile(&config.productVariables, absolutePath(config.ProductVariablesFileName))
+	err := loadFromConfigFile(&config.productVariables, absolutePath(config.ProductVariablesFileName))
 	if err != nil {
 		return err
-	}
-	if config.productVariablesHash, err = hashFileContents(data); err != nil {
-		return fmt.Errorf("could not hash the product variables file %s: %w", config.ProductVariablesFileName, err)
 	}
 
 	name := config.productVariables.DexpreoptGlobalConfig
@@ -710,8 +705,8 @@ func isGoIdentifier(ident string) bool {
 }
 
 // loadFromConfigFile loads and decodes configuration options from a JSON file
-// in the current working directory. It returns the contents of the file.
-func loadFromConfigFile(configurable *ProductVariables, filename string) ([]byte, error) {
+// in the current working directory.
+func loadFromConfigFile(configurable *ProductVariables, filename string) error {
 	data, err := os.ReadFile(filename)
 	if os.IsNotExist(err) {
 		// Need to create a file, so that blueprint & ninja don't get in
@@ -721,26 +716,22 @@ func loadFromConfigFile(configurable *ProductVariables, filename string) ([]byte
 		configurable.SetDefaultConfig()
 		err = saveToConfigFile(configurable, filename)
 		if err != nil {
-			return nil, err
-		}
-		data, err = os.ReadFile(filename)
-		if err != nil {
-			return nil, fmt.Errorf("config file: could not read the default config %s: %w", filename, err)
+			return err
 		}
 	} else if err != nil {
-		return nil, fmt.Errorf("config file: could not open %s: %s", filename, err.Error())
+		return fmt.Errorf("config file: could not open %s: %s", filename, err.Error())
 	} else {
 		// Make a decoder for it
 		jsonDecoder := json.NewDecoder(bytes.NewReader(data))
 		jsonDecoder.DisallowUnknownFields()
 		err = jsonDecoder.Decode(configurable)
 		if err != nil {
-			return nil, fmt.Errorf("config file: %s did not parse correctly: %s", filename, err.Error())
+			return fmt.Errorf("config file: %s did not parse correctly: %s", filename, err.Error())
 		}
 	}
 
 	if Bool(configurable.GcovCoverage) && Bool(configurable.ClangCoverage) {
-		return nil, fmt.Errorf("GcovCoverage and ClangCoverage cannot both be set")
+		return fmt.Errorf("GcovCoverage and ClangCoverage cannot both be set")
 	}
 
 	configurable.Native_coverage = proptools.BoolPtr(
@@ -752,11 +743,11 @@ func loadFromConfigFile(configurable *ProductVariables, filename string) ([]byte
 	// will allow the same identifiers as are valid in bp files.
 	for namespace := range configurable.VendorVars {
 		if !isGoIdentifier(namespace) {
-			return nil, fmt.Errorf("soong config namespaces must be valid identifiers: %q", namespace)
+			return fmt.Errorf("soong config namespaces must be valid identifiers: %q", namespace)
 		}
 		for variable := range configurable.VendorVars[namespace] {
 			if !isGoIdentifier(variable) {
-				return nil, fmt.Errorf("soong config variables must be valid identifiers: %q", variable)
+				return fmt.Errorf("soong config variables must be valid identifiers: %q", variable)
 			}
 		}
 	}
@@ -768,14 +759,14 @@ func loadFromConfigFile(configurable *ProductVariables, filename string) ([]byte
 			configurable.Platform_sdk_version_or_codename =
 				proptools.StringPtr(strconv.Itoa(*(configurable.Platform_sdk_version)))
 		} else {
-			return nil, fmt.Errorf("Platform_sdk_version cannot be pointed by a NULL pointer")
+			return fmt.Errorf("Platform_sdk_version cannot be pointed by a NULL pointer")
 		}
 	} else {
 		configurable.Platform_sdk_version_or_codename =
 			proptools.StringPtr(String(configurable.Platform_sdk_codename))
 	}
 
-	return data, nil
+	return nil
 }
 
 // atomically writes the config file in case two copies of soong_build are running simultaneously
@@ -1155,7 +1146,7 @@ func (c *config) CpPreserveSymlinksFlags() string {
 
 func (c Config) Getenv(key string) string {
 	val := c.config.getenv(key)
-	c.reads.record(ConfigVariable{EnvironmentVariableKind, key}, val)
+	c.readRecorder().record(ConfigVariable{Kind: EnvironmentVariableKind, Name: key}, val)
 	return val
 }
 
@@ -1949,19 +1940,6 @@ func (c Config) DexpreoptGlobalConfigPath(ctx PathContext) OptionalPath {
 		pathForBuildToolDep(ctx, *readProductVariable(c, &c.productVariables.DexpreoptGlobalConfig)))
 }
 
-// ProductVariablesHash returns the hash of the contents of the product variables file that Kati
-// writes during the product configuration phase.
-func (c *config) ProductVariablesHash() proptools.Hash {
-	return c.productVariablesHash
-}
-
-// DexpreoptGlobalConfigHash returns the hash of the contents of the dexpreopt.config file that Kati
-// writes during the product configuration phase, or false where the product configuration leaves
-// the file name unset.
-func (c Config) DexpreoptGlobalConfigHash() (proptools.Hash, bool) {
-	return c.dexpreoptGlobalConfigHash, readProductVariable(c, &c.productVariables.DexpreoptGlobalConfig) != nil
-}
-
 // DexpreoptGlobalConfig returns the raw byte contents of the dexpreopt global
 // configuration. Since the configuration file was created by Kati during
 // product configuration (externally of soong_build), it's not tracked, so we
@@ -1974,7 +1952,14 @@ func (c Config) DexpreoptGlobalConfig(ctx PathContext) []byte {
 		return nil
 	}
 	ctx.AddNinjaFileDeps(path.String())
+	c.recordDexpreoptGlobalConfigRead()
 	return c.dexpreoptGlobalConfig
+}
+
+// recordDexpreoptGlobalConfigRead records a read of the contents of the dexpreopt global config by
+// their hash.
+func (c Config) recordDexpreoptGlobalConfigRead() {
+	c.readRecorder().record(ConfigVariable{Kind: DexpreoptGlobalConfigKind}, c.dexpreoptGlobalConfigHash)
 }
 
 func (c DeviceConfig) WithDexpreopt() bool {
@@ -2367,26 +2352,26 @@ func (c Config) XOMDisabledForPath(path string) bool {
 }
 
 func (c Config) VendorConfig(name string) VendorConfig {
-	variables, _ := readMapEntry(c.reads, ConfigVariable{VendorNamespaceKind, name}, c.productVariables.VendorVars, name)
+	variables, _ := readMapEntry(c.readRecorder(), ConfigVariable{Kind: VendorNamespaceKind, Name: name}, c.productVariables.VendorVars, name)
 	return soongconfig.Config(variables)
 }
 
 // VendorVariable returns the vendor variable name of namespace and records its read.
 func (c Config) VendorVariable(namespace, name string) (string, bool) {
-	return readMapEntry(c.reads, vendorVariable(VendorVariableKind, namespace, name),
+	return readMapEntry(c.readRecorder(), vendorVariable(VendorVariableKind, namespace, name),
 		c.productVariables.VendorVars[namespace], name)
 }
 
 // VendorVariableType returns the type of the vendor variable name of namespace and records its
 // read. A variable without a type is a string.
 func (c Config) VendorVariableType(namespace, name string) string {
-	variableType, _ := readMapEntry(c.reads, vendorVariable(VendorVariableTypeKind, namespace, name),
+	variableType, _ := readMapEntry(c.readRecorder(), vendorVariable(VendorVariableTypeKind, namespace, name),
 		c.productVariables.VendorVarTypes[namespace], name)
 	return variableType
 }
 
 func vendorVariable(kind ConfigVariableKind, namespace, name string) ConfigVariable {
-	return ConfigVariable{kind, namespace + "." + name}
+	return ConfigVariable{Kind: kind, Namespace: namespace, Name: name}
 }
 
 func (c Config) NdkAbis() bool {
@@ -2705,12 +2690,12 @@ func (c DeviceConfig) CheckVendorSeappViolations() bool {
 }
 
 func (c Config) GetBuildFlag(name string) (string, bool) {
-	return readMapEntry(c.reads, ConfigVariable{BuildFlagKind, name}, c.productVariables.BuildFlags, name)
+	return readMapEntry(c.readRecorder(), ConfigVariable{Kind: BuildFlagKind, Name: name}, c.productVariables.BuildFlags, name)
 }
 
 // GetBuildFlagType returns the type of the build flag name and records its read.
 func (c Config) GetBuildFlagType(name string) (string, bool) {
-	return readMapEntry(c.reads, ConfigVariable{BuildFlagTypeKind, name}, c.productVariables.BuildFlagTypes, name)
+	return readMapEntry(c.readRecorder(), ConfigVariable{Kind: BuildFlagTypeKind, Name: name}, c.productVariables.BuildFlagTypes, name)
 }
 
 func (c Config) GetBuildFlagBool(name string) bool {

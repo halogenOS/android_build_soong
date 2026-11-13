@@ -1292,6 +1292,12 @@ func (m *ModuleBase) base() *ModuleBase {
 	return m
 }
 
+var _ blueprint.ConfigValueReader = (*ModuleBase)(nil)
+
+func (m *ModuleBase) ConfigValuesRead() ([]blueprint.ConfigValueRead, error) {
+	return m.configReads.configValuesRead()
+}
+
 var _ blueprint.ModuleWithClonedState = (*ModuleBase)(nil)
 
 // CopyStateToClone copies the configuration reads recorded so far into clone, a new variant or a

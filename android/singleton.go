@@ -186,6 +186,12 @@ type incrementalSingleton interface {
 	IncrementalSupported() bool
 }
 
+var _ blueprint.ConfigValueReader = (*singletonAdaptor)(nil)
+
+func (s *singletonAdaptor) ConfigValuesRead() ([]blueprint.ConfigValueRead, error) {
+	return s.configReads.configValuesRead()
+}
+
 func (s *singletonAdaptor) IncrementalSupported() bool {
 	if s.readByMake {
 		return false
