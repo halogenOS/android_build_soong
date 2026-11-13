@@ -15,6 +15,7 @@
 package fsgen
 
 import (
+	"strconv"
 	"strings"
 	"testing"
 
@@ -168,33 +169,41 @@ func createProductPackagesSet(pkgs []string) map[string]android.ProductPackagesV
 	return productPackagesSet
 }
 
+// prepareForTestWithExt4SystemImageCreator sets up the filesystem creator foo with an ext4 system
+// image. Each test sets the product packages.
+var prepareForTestWithExt4SystemImageCreator = android.GroupFixturePreparers(
+	android.PrepareForIntegrationTestWithAndroid,
+	android.PrepareForTestWithAndroidBuildComponents,
+	android.PrepareForTestWithAllowMissingDependencies,
+	filesystem.PrepareForTestWithFilesystemBuildComponents,
+	prepareForTestWithFsgenBuildComponents,
+	java.PrepareForTestWithJavaBuildComponents,
+	java.PrepareForTestWithJavaDefaultModules,
+	android.FixtureModifyConfig(func(config android.Config) {
+		config.TestProductVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.PartitionQualifiedVariables =
+			map[string]android.PartitionQualifiedVariablesType{
+				"system": {
+					BoardFileSystemType: "ext4",
+					BuildingImage:       true,
+				},
+			}
+	}),
+	prepareMockRamdiksNodeList,
+	android.FixtureMergeMockFs(android.MockFS{
+		"external/avb/test/data/testkey_rsa4096.pem": nil,
+		"build/soong/fsgen/Android.bp": []byte(`
+		soong_filesystem_creator {
+			name: "foo",
+		}
+		`),
+	}),
+)
+
 func TestFileSystemCreatorSetPartitionDeps(t *testing.T) {
 	result := android.GroupFixturePreparers(
-		android.PrepareForIntegrationTestWithAndroid,
-		android.PrepareForTestWithAndroidBuildComponents,
-		android.PrepareForTestWithAllowMissingDependencies,
-		filesystem.PrepareForTestWithFilesystemBuildComponents,
-		prepareForTestWithFsgenBuildComponents,
-		java.PrepareForTestWithJavaBuildComponents,
-		java.PrepareForTestWithJavaDefaultModules,
+		prepareForTestWithExt4SystemImageCreator,
 		android.FixtureModifyConfig(func(config android.Config) {
 			config.TestProductVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.ProductPackagesSet = createProductPackagesSet([]string{"bar", "baz"})
-			config.TestProductVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.PartitionQualifiedVariables =
-				map[string]android.PartitionQualifiedVariablesType{
-					"system": {
-						BoardFileSystemType: "ext4",
-						BuildingImage:       true,
-					},
-				}
-		}),
-		prepareMockRamdiksNodeList,
-		android.FixtureMergeMockFs(android.MockFS{
-			"external/avb/test/data/testkey_rsa4096.pem": nil,
-			"build/soong/fsgen/Android.bp": []byte(`
-			soong_filesystem_creator {
-				name: "foo",
-			}
-			`),
 		}),
 	).RunTestWithBp(t, `
 	java_library {
@@ -220,6 +229,53 @@ func TestFileSystemCreatorSetPartitionDeps(t *testing.T) {
 		false,
 		java.CheckModuleHasDependency(t, result.TestContext, "test_product_generated_system_image", "android_common", "baz"),
 	)
+}
+
+// mutatorsOnlyTestRunner runs the mutators of a test and leaves out the build actions.
+type mutatorsOnlyTestRunner struct{}
+
+func (mutatorsOnlyTestRunner) FinalPreparer(result *android.TestResult) android.CustomTestResult {
+	result.TestContext.Register()
+	return result
+}
+
+func (mutatorsOnlyTestRunner) PostParseProcessor(customResult android.CustomTestResult) {
+	result := customResult.(*android.TestResult)
+	ninjaDeps, errs := result.TestContext.ResolveDependencies(result.Config)
+	result.NinjaDeps = append(result.NinjaDeps, ninjaDeps...)
+	result.CollateErrs(errs)
+}
+
+// Mutators running on the modules added as partition deps read configuration that the creator
+// never reads. Incremental analysis restores the creator unless its properties or reads change, so
+// the Android.bp text it writes must be a property that changes with that configuration. Restore
+// compares the properties hash before build actions run, so the test runs only the mutators.
+func TestFileSystemCreatorProductConfigBpFollowsDepConfig(t *testing.T) {
+	productConfigBpBeforeBuildActions := func(includeBar bool) string {
+		result := android.GroupFixturePreparers(
+			prepareForTestWithExt4SystemImageCreator,
+			android.FixtureModifyConfig(func(config android.Config) {
+				config.TestProductVariables.PartitionVarsForSoongMigrationOnlyDoNotUse.ProductPackagesSet = createProductPackagesSet([]string{"bar"})
+				config.TestProductVariables.VendorVars = map[string]map[string]string{
+					"fsgen_test": {"include_bar": strconv.FormatBool(includeBar)},
+				}
+			}),
+			android.FixtureSetTestRunner(mutatorsOnlyTestRunner{}),
+		).RunTestWithBp(t, `
+		java_library {
+			name: "bar",
+			srcs: ["A.java"],
+			enabled: select(soong_config_variable("fsgen_test", "include_bar"), {
+				"true": true,
+				default: false,
+			}),
+		}
+		`)
+		return result.ModuleForTests(t, "foo", "android_common").Module().(*filesystemCreator).properties.Product_config_bp
+	}
+
+	android.AssertStringDoesContain(t, "Android.bp text with bar enabled", productConfigBpBeforeBuildActions(true), `"bar"`)
+	android.AssertStringDoesNotContain(t, "Android.bp text with bar disabled", productConfigBpBeforeBuildActions(false), `"bar"`)
 }
 
 func TestFileSystemCreatorDepsWithNamespace(t *testing.T) {
@@ -335,7 +391,7 @@ java_import {
 	overrides: ["prebuiltA"], // overrides prebuiltA
 }
 	`)
-	resolvedSystemDeps := result.TestContext.Config().Get(fsGenStateOnceKey).(*FsGenState).fsDeps["system"]
+	resolvedSystemDeps := readFsGenState(result.TestContext.Config()).fsDeps["system"]
 	_, libFooInDeps := (*resolvedSystemDeps)["libfoo"]
 	android.AssertBoolEquals(t, "libfoo should not appear in deps because it has been overridden by libbaz. The latter is a required dep of libbar, which is listed in PRODUCT_PACKAGES", false, libFooInDeps)
 	_, prebuiltAInDeps := (*resolvedSystemDeps)["prebuiltA"]
@@ -791,7 +847,7 @@ override_android_app {
 	base: "//mynamespace:system_ext_app_in_namespace",
 }
 `)
-	resolvedDeps := result.TestContext.Config().Get(fsGenStateOnceKey).(*FsGenState).fsDeps["system_ext"]
+	resolvedDeps := readFsGenState(result.TestContext.Config()).fsDeps["system_ext"]
 	_, overrideAppInSystemExt := (*resolvedDeps)["system_ext_override_app"]
 	android.AssertBoolEquals(t, "Override app should be added to the same partition as the `base`", true, overrideAppInSystemExt)
 	_, overrideAppInSystemExt = (*resolvedDeps)["system_ext_override_app_in_namespace"]
@@ -978,7 +1034,7 @@ cc_library_shared {
 	name: "system_lib",
 }
 `)
-	resolvedDeps := result.TestContext.Config().Get(fsGenStateOnceKey).(*FsGenState).fsDeps["system"]
+	resolvedDeps := readFsGenState(result.TestContext.Config()).fsDeps["system"]
 	xPartitionSharedLib := (*resolvedDeps)["system_lib"]
 	android.AssertIntEquals(
 		t,
@@ -1038,7 +1094,7 @@ func TestRemoveOverriddenTransitiveDeps(t *testing.T) {
 		srcs: ["A.java"],
 	}
 		`)
-		resolvedProductDeps := result.TestContext.Config().Get(fsGenStateOnceKey).(*FsGenState).fsDeps["product"]
+		resolvedProductDeps := readFsGenState(result.TestContext.Config()).fsDeps["product"]
 		_, fooInDeps := (*resolvedProductDeps)["foo"]
 		android.AssertBoolEquals(t, "foo should not be in deps", false, fooInDeps)
 	})
@@ -1086,7 +1142,7 @@ func TestRemoveOverriddenTransitiveDeps(t *testing.T) {
 		srcs: ["A.java"],
 	}
 		`)
-		resolvedProductDeps := result.TestContext.Config().Get(fsGenStateOnceKey).(*FsGenState).fsDeps["product"]
+		resolvedProductDeps := readFsGenState(result.TestContext.Config()).fsDeps["product"]
 		_, fooInDeps := (*resolvedProductDeps)["foo"]
 		android.AssertBoolEquals(t, "foo should be in deps", true, fooInDeps)
 	})
@@ -1289,7 +1345,7 @@ cc_binary {
 	system_ext_specific: true,
 }
 `)
-	resolvedDeps := result.TestContext.Config().Get(fsGenStateOnceKey).(*FsGenState).fsDeps["system_ext"]
+	resolvedDeps := readFsGenState(result.TestContext.Config()).fsDeps["system_ext"]
 	_, exists := (*resolvedDeps)["system_ext_bin"]
 	android.AssertBoolEquals(
 		t,

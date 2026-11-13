@@ -1217,7 +1217,10 @@ func (c *config) KatiEnabled() bool {
 	return c.katiEnabled
 }
 
-func (c *config) ProductVariables() ProductVariables {
+// ProductVariables returns a copy of every product variable and records a read of all of them, so
+// a caller is run again when any product variable changes. Prefer the accessor of one variable.
+func (c Config) ProductVariables() ProductVariables {
+	c.readRecorder().record(ConfigVariable{Kind: ProductVariablesKind}, c.productVariables)
 	return c.productVariables
 }
 

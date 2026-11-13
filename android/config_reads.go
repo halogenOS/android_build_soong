@@ -33,6 +33,8 @@ var (
 	VendorNamespaceKind = ConfigVariableKind{"vendor variable namespace"}
 	// The dexpreopt global config is read whole, by the hash of its contents, without a name.
 	DexpreoptGlobalConfigKind = ConfigVariableKind{"dexpreopt global config"}
+	// The product variables are read whole, without a name.
+	ProductVariablesKind = ConfigVariableKind{"product variables"}
 )
 
 // configVariableReaders contains, for each kind, the accessor that reads and records the current
@@ -48,6 +50,7 @@ var configVariableReaders = map[ConfigVariableKind]func(c Config, variable Confi
 	DexpreoptGlobalConfigKind: func(c Config, _ ConfigVariable) {
 		c.recordDexpreoptGlobalConfigRead()
 	},
+	ProductVariablesKind: func(c Config, _ ConfigVariable) { c.ProductVariables() },
 }
 
 var _ encoding.TextMarshaler = ConfigVariableKind{}
@@ -254,6 +257,12 @@ func OnceFromConfig[T any](c Config, key OnceKey, compute func(Config) T) T {
 	}).(configComputedValue[T]).readBy(c)
 }
 
+// ReadOnceFromConfig returns the value of key computed by an earlier call of OnceFromConfig, and
+// records the configuration reads of its computation into c.
+func ReadOnceFromConfig[T any](c Config, key OnceKey) T {
+	return c.Get(key).(configComputedValue[T]).readBy(c)
+}
+
 // readMapEntry returns the entry of key in entries and records its read as variable, with null
 // as the value of a missing entry.
 func readMapEntry[V any](reads configReadRecorder, variable ConfigVariable, entries map[string]V, key string) (V, bool) {
@@ -385,5 +394,28 @@ func (ctx moduleContextRecordingReads) DeviceConfig() DeviceConfig {
 func OnceFromModuleContext[T any](ctx ModuleContext, key OnceKey, compute func(ModuleContext) T) T {
 	return OnceFromConfig(ctx.Config(), key, func(c Config) T {
 		return compute(moduleContextRecordingReads{ctx, c})
+	})
+}
+
+// loadHookContextRecordingReads is ctx with a configuration that records the reads of one
+// computation.
+type loadHookContextRecordingReads struct {
+	LoadHookContext
+	config Config
+}
+
+func (ctx loadHookContextRecordingReads) Config() Config {
+	return ctx.config
+}
+
+func (ctx loadHookContextRecordingReads) DeviceConfig() DeviceConfig {
+	return ctx.config.DeviceConfig()
+}
+
+// OnceFromLoadHookContext is OnceFromConfig for a value computed from a LoadHookContext. compute
+// gets ctx with a configuration that records the reads of the computation.
+func OnceFromLoadHookContext[T any](ctx LoadHookContext, key OnceKey, compute func(LoadHookContext) T) T {
+	return OnceFromConfig(ctx.Config(), key, func(c Config) T {
+		return compute(loadHookContextRecordingReads{ctx, c})
 	})
 }

@@ -149,7 +149,7 @@ func setRecoveryFstabSrcs(ctx android.BottomUpMutatorContext) {
 	if !shouldEnableFilesystemCreator(ctx) {
 		return
 	}
-	recoveryFstabModuleName := ctx.Config().Get(fsGenStateOnceKey).(*FsGenState).recoveryFstabModuleName
+	recoveryFstabModuleName := readFsGenState(ctx.Config()).recoveryFstabModuleName
 	if len(recoveryFstabModuleName) > 0 && ctx.ModuleName() == recoveryFstabModuleName {
 		recoveryFstabSrc := getRecoveryFsTabSrc(ctx.Config())
 		resolvedRecoveryFstabSrcName := recoveryFstabSrc

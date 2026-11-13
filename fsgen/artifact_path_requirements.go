@@ -126,7 +126,7 @@ func (s *artifactPathRequirementsVerifierSingleton) GenerateBuildActions(ctx and
 		ctx.Errorf("PRODUCT_ENFORCE_ARTIFACT_PATH_REQUIREMENTS must be one of [true, false, relaxed, strict], found: %s", enforcement)
 	}
 
-	allInstalledModules := productInstalledModules(ctx, "all")
+	allInstalledModules := productInstalledModules(ctx.Config(), "all")
 	allInstalledFiles := make(map[string]bool)
 	allOffendingFiles := make(map[string]bool)
 	installedModulesOfMakefile := make(map[string][]string)
@@ -138,7 +138,7 @@ func (s *artifactPathRequirementsVerifierSingleton) GenerateBuildActions(ctx and
 	internalUnusedAllowedList := make(map[string][]string)
 	externalUnusedAllowedList := make(map[string][]string)
 	for _, makefile := range partitionVars.ArtifactPathRequirementProducts {
-		installedModulesOfMakefile[makefile] = productInstalledModules(ctx, makefile)
+		installedModulesOfMakefile[makefile] = productInstalledModules(ctx.Config(), makefile)
 		installedFilesOfMakefile[makefile] = make(map[string]bool)
 	}
 

@@ -34,6 +34,9 @@ func RegisterCollectFileSystemDepsMutators(ctx android.RegisterMutatorsContext) 
 	ctx.BottomUp("fs_remove_deps", removeDepsMutator).MutatesGlobalState()
 	ctx.BottomUp("fs_cross_partition_required_deps", crossPartitionRequiredMutator).MutatesGlobalState()
 	ctx.BottomUp("fs_set_deps", setDepsMutator)
+	// Runs after every mutator above, since those mutators fill the partition deps written into the
+	// text.
+	ctx.BottomUp("fs_product_config_bp", setProductConfigBpMutator)
 }
 
 var fsGenStateOnceKey = android.NewOnceKey("FsGenState")
@@ -176,46 +179,47 @@ func defaultDepCandidateProps(config android.Config) *depCandidateProps {
 	}
 }
 
-type DeviceConfigContext interface {
-	Config() android.Config
-	DeviceConfig() android.DeviceConfig
-}
-
-func productInstalledModules(ctx DeviceConfigContext, makefile string) []string {
-	productPkg := ctx.Config().PartitionVariables().ProductPackagesSet[makefile]
+func productInstalledModules(config android.Config, makefile string) []string {
+	productPkg := config.PartitionVariables().ProductPackagesSet[makefile]
 	allInstalledModules := productPkg.ProductPackages
-	if ctx.Config().Debuggable() {
+	if config.Debuggable() {
 		allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesDebug...)
-		if ctx.Config().Eng() {
+		if config.Eng() {
 			allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesEng...)
 		}
-		if android.InList("address", ctx.Config().SanitizeDevice()) {
+		if android.InList("address", config.SanitizeDevice()) {
 			allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesDebugAsan...)
 		}
-		if ctx.Config().IsEnvTrue("EMMA_INSTRUMENT") {
+		if config.IsEnvTrue("EMMA_INSTRUMENT") {
 			allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesDebugJavaCoverage...)
 		}
 	}
-	if android.InList("arm64", []string{ctx.DeviceConfig().DeviceArch(), ctx.DeviceConfig().DeviceSecondaryArch()}) {
+	if android.InList("arm64", []string{config.DeviceConfig().DeviceArch(), config.DeviceConfig().DeviceSecondaryArch()}) {
 		allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesArm64...)
 	}
-	if android.UncheckedFinalApiLevel(29).GreaterThanOrEqualTo(ctx.DeviceConfig().ShippingApiLevel()) {
+	if android.UncheckedFinalApiLevel(29).GreaterThanOrEqualTo(config.DeviceConfig().ShippingApiLevel()) {
 		allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesShippingApiLevel29...)
 	}
-	if android.UncheckedFinalApiLevel(33).GreaterThanOrEqualTo(ctx.DeviceConfig().ShippingApiLevel()) {
+	if android.UncheckedFinalApiLevel(33).GreaterThanOrEqualTo(config.DeviceConfig().ShippingApiLevel()) {
 		allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesShippingApiLevel33...)
 	}
-	if android.UncheckedFinalApiLevel(34).GreaterThanOrEqualTo(ctx.DeviceConfig().ShippingApiLevel()) {
+	if android.UncheckedFinalApiLevel(34).GreaterThanOrEqualTo(config.DeviceConfig().ShippingApiLevel()) {
 		allInstalledModules = append(allInstalledModules, productPkg.ProductPackagesShippingApiLevel34...)
 	}
 
 	return allInstalledModules
 }
 
+// readFsGenState returns the state made by createFsGenState and records the configuration reads
+// of its creation into config.
+func readFsGenState(config android.Config) *FsGenState {
+	return android.ReadOnceFromConfig[*FsGenState](config, fsGenStateOnceKey)
+}
+
 func createFsGenState(ctx android.LoadHookContext, generatedPrebuiltEtcModuleNames []string, avbpubkeyGenerated bool) *FsGenState {
-	return ctx.Config().Once(fsGenStateOnceKey, func() interface{} {
+	return android.OnceFromLoadHookContext(ctx, fsGenStateOnceKey, func(ctx android.LoadHookContext) *FsGenState {
 		allInstalledModules := slices.Concat(
-			productInstalledModules(ctx, "all"),
+			productInstalledModules(ctx.Config(), "all"),
 			generatedPrebuiltEtcModuleNames,
 		)
 		candidatesMap := map[string]bool{}
@@ -372,7 +376,7 @@ func createFsGenState(ctx android.LoadHookContext, generatedPrebuiltEtcModuleNam
 		}
 
 		return &fsGenState
-	}).(*FsGenState)
+	})
 }
 
 func checkDepModuleInMultipleNamespaces(mctx android.BottomUpMutatorContext, foundDeps multilibDeps, module string, partitionName string) {
@@ -431,7 +435,7 @@ func collectDepsMutator(mctx android.BottomUpMutatorContext) {
 	if m.Target().Os.Class != android.Device {
 		return
 	}
-	fsGenState := mctx.Config().Get(fsGenStateOnceKey).(*FsGenState)
+	fsGenState := readFsGenState(mctx.Config())
 
 	fsGenState.fsDepsMutex.Lock()
 	defer fsGenState.fsDepsMutex.Unlock()
@@ -567,7 +571,7 @@ func removeDepsMutator(mctx android.BottomUpMutatorContext) {
 	if !shouldEnableFilesystemCreator(mctx) {
 		return
 	}
-	fsGenState := mctx.Config().Get(fsGenStateOnceKey).(*FsGenState)
+	fsGenState := readFsGenState(mctx.Config())
 	fsGenState.fsDepsMutex.Lock()
 	defer fsGenState.fsDepsMutex.Unlock()
 	updatePartitionsOfOverrideModules(mctx)
@@ -577,7 +581,7 @@ func crossPartitionRequiredMutator(mctx android.BottomUpMutatorContext) {
 	if !shouldEnableFilesystemCreator(mctx) {
 		return
 	}
-	fsGenState := mctx.Config().Get(fsGenStateOnceKey).(*FsGenState)
+	fsGenState := readFsGenState(mctx.Config())
 	fsGenState.fsDepsMutex.Lock()
 	defer fsGenState.fsDepsMutex.Unlock()
 	additionalCrossPartitionRequiredDeps := correctCrossPartitionRequiredDeps(mctx.Config())
@@ -595,8 +599,8 @@ func setDepsMutator(mctx android.BottomUpMutatorContext) {
 	if !shouldEnableFilesystemCreator(mctx) {
 		return
 	}
-	removeOverriddenDeps(mctx)
-	fsGenState := mctx.Config().Get(fsGenStateOnceKey).(*FsGenState)
+	removeOverriddenDeps(mctx.Config())
+	fsGenState := readFsGenState(mctx.Config())
 	fsDeps := fsGenState.fsDeps
 	m := mctx.Module()
 	if partition := fsGenState.soongGeneratedPartitions.typeForName(m.Name()); partition != "" {
@@ -626,10 +630,18 @@ func setDepsMutator(mctx android.BottomUpMutatorContext) {
 	}
 }
 
+// setProductConfigBpMutator sets the Android.bp text describing the generated partitions on the
+// filesystem creator.
+func setProductConfigBpMutator(mctx android.BottomUpMutatorContext) {
+	if creator, ok := mctx.Module().(*filesystemCreator); ok && shouldEnableFilesystemCreator(mctx) {
+		creator.properties.Product_config_bp = generateProductConfigBp(mctx)
+	}
+}
+
 // Adds override apps (override_android_app, override_apex, ...) to the partition of their `base` apps.
 func updatePartitionsOfOverrideModules(mctx android.BottomUpMutatorContext) {
 	if override, ok := mctx.Module().(android.OverrideModule); ok {
-		fsGenState := mctx.Config().Get(fsGenStateOnceKey).(*FsGenState)
+		fsGenState := readFsGenState(mctx.Config())
 		fsDeps := fsGenState.fsDeps
 		overridePartition := mctx.Module().PartitionTag(mctx.DeviceConfig())
 		if _, ok := (*fsDeps[overridePartition])[mctx.Module().Name()]; !ok {
@@ -694,10 +706,11 @@ func (q *queue) Len() int {
 // removeOverriddenDeps collects PRODUCT_PACKAGES and (transitive) required deps.
 // it then removes any modules which appear in `overrides` of the above list.
 // Returns the list of names of the overridden modules. These are passed as `Overridden_modules`
-// when generating the filesystem modules.
-func removeOverriddenDeps(mctx android.BottomUpMutatorContext) {
-	mctx.Config().Once(fsGenRemoveOverridesOnceKey, func() interface{} {
-		fsGenState := mctx.Config().Get(fsGenStateOnceKey).(*FsGenState)
+// when generating the filesystem modules. Every call records the configuration reads of that
+// removal into config.
+func removeOverriddenDeps(config android.Config) {
+	android.OnceFromConfig(config, fsGenRemoveOverridesOnceKey, func(config android.Config) struct{} {
+		fsGenState := readFsGenState(config)
 		fsDeps := fsGenState.fsDeps
 		overridden := map[string]bool{}
 		allDeps := []string{}
@@ -718,7 +731,7 @@ func removeOverriddenDeps(mctx android.BottomUpMutatorContext) {
 		// Record all modules' required rdeps (i.e. modules that set the module as a required
 		// dependency) and whether if the module is installed as a top level module.
 		moduleToRequiredRdepsMap := map[string][]string{}
-		for _, productPackagesEntry := range productInstalledModules(mctx, "all") {
+		for _, productPackagesEntry := range productInstalledModules(config, "all") {
 			if moduleName, _, ok := fsGenState.moduleToInstallationProps.GetFromModuleName(productPackagesEntry); ok {
 				moduleToRequiredRdepsMap[moduleName] = append(moduleToRequiredRdepsMap[moduleName], "PRODUCT_PACKAGES")
 			}
@@ -825,7 +838,7 @@ func removeOverriddenDeps(mctx android.BottomUpMutatorContext) {
 		}
 
 		fsGenState.overriddenModuleNames = filteredOverriddenDepsMap
-		return nil
+		return struct{}{}
 	})
 }
 
@@ -853,9 +866,10 @@ type crossPartitionRequiredDep struct {
 // install partition differs from that of the parent module if the module is not installed
 // for the target product.
 // The return value is a mapping of fully qualified module name to their install partition and arch types.
+// Every call records the configuration reads of that computation into config.
 func correctCrossPartitionRequiredDeps(config android.Config) map[string]crossPartitionRequiredDep {
-	return config.Once(fsGenCrossPartitionRequiredDepsOnceKey, func() interface{} {
-		fsGenState := config.Get(fsGenStateOnceKey).(*FsGenState)
+	return android.OnceFromConfig(config, fsGenCrossPartitionRequiredDepsOnceKey, func(config android.Config) map[string]crossPartitionRequiredDep {
+		fsGenState := readFsGenState(config)
 		fsDeps := fsGenState.fsDeps
 		moduleToInstallationProps := fsGenState.moduleToInstallationProps
 
@@ -951,7 +965,7 @@ func correctCrossPartitionRequiredDeps(config android.Config) map[string]crossPa
 			}
 		}
 		return ret
-	}).(map[string]crossPartitionRequiredDep)
+	})
 }
 
 var HighPriorityDeps = []string{}
