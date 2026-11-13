@@ -41,6 +41,12 @@ func compDBGeneratorSingleton() android.Singleton {
 
 type compdbGeneratorSingleton struct{}
 
+func (c *compdbGeneratorSingleton) IncrementalSupported() bool {
+	// The generated files contain package variables evaluated from the configuration, which the
+	// configuration reads of the singleton do not cover.
+	return false
+}
+
 const (
 	compdbFilename                = "compile_commands.json"
 	compdbOutputProjectsDirectory = "development/ide/compdb"

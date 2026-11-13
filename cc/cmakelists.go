@@ -38,6 +38,12 @@ func cMakeListsGeneratorSingleton() android.Singleton {
 
 type cmakelistsGeneratorSingleton struct{}
 
+func (c *cmakelistsGeneratorSingleton) IncrementalSupported() bool {
+	// The generated files contain package variables evaluated from the configuration, which the
+	// configuration reads of the singleton do not cover.
+	return false
+}
+
 const (
 	cMakeListsFilename              = "CMakeLists.txt"
 	cLionAggregateProjectsDirectory = "development" + string(os.PathSeparator) + "ide" + string(os.PathSeparator) + "clion"
