@@ -1,0 +1,18 @@
+// SPDX-FileCopyrightText: The halogenOS Project
+// SPDX-License-Identifier: Apache-2.0
+
+package {
+    default_applicable_licenses: ["Android-Apache-2.0"],
+}
+
+bootstrap_go_package {
+    name: "soong-compliance-filedigest",
+    pkgPath: "android/soong/compliance/filedigest",
+    srcs: [
+        "filedigest.go",
+    ],
+    visibility: [
+        "//build/make/tools/compliance",
+        "//build/soong/compliance/build_license_metadata",
+    ],
+}

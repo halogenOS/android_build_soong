@@ -481,6 +481,7 @@ func (p *PrebuiltEtc) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 		// Build compliance metadata
 		ctx.ComplianceMetadataInfo().SetPrebuiltSrc(ctx, src)
+		ctx.AddInstalledPrebuiltFile(p.sourceFilePaths[0], p.outputFilePaths[0])
 
 	} else if len(srcsProperty) > 0 {
 		p.usedSrcsProperty = true
@@ -523,6 +524,7 @@ func (p *PrebuiltEtc) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 				installDirPath: installDirPath,
 			}
 			p.outputFilePaths = append(p.outputFilePaths, output)
+			ctx.AddInstalledPrebuiltFile(src, output)
 			installs = append(installs, ip)
 			p.installDirPaths = append(p.installDirPaths, installDirPath)
 		}
@@ -682,18 +684,21 @@ func InitPrebuiltEtcModule(p *PrebuiltEtc, dirBase string) {
 	p.AddProperties(&p.subdirProperties)
 	p.AddProperties(&p.rootProperties)
 	p.AddProperties(&p.dstsProperties)
+	android.InitPublicSourceProperty(p)
 }
 
 func InitPrebuiltRootModule(p *PrebuiltEtc) {
 	p.installDirBase = "."
 	p.AddProperties(&p.properties)
 	p.AddProperties(&p.rootProperties)
+	android.InitPublicSourceProperty(p)
 }
 
 func InitPrebuiltAvbModule(p *PrebuiltEtc) {
 	p.installDirBase = "avb"
 	p.AddProperties(&p.properties)
 	p.AddProperties(&p.dstsProperties)
+	android.InitPublicSourceProperty(p)
 	p.rootProperties.Install_in_root = proptools.BoolPtr(true)
 }
 

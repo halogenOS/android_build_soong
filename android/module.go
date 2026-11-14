@@ -948,6 +948,9 @@ type ModuleBase struct {
 	// The primary licenses property, may be nil, records license metadata for the module.
 	primaryLicensesProperty *applicableLicensesProperty
 
+	// The public_source property of a prebuilt module, nil for other modules.
+	publicSourceProperties *PublicSourceProperties
+
 	noAddressSanitizer bool
 
 	hooks hooks
@@ -1068,6 +1071,10 @@ func (m *ModuleBase) DepsMutator(BottomUpMutatorContext) {}
 func (m *ModuleBase) baseDepsMutator(ctx BottomUpMutatorContext) {
 	if m.Team() != "" {
 		ctx.AddDependency(ctx.Module(), teamDepTag, m.Team())
+	}
+
+	if m.publicSourceProperties != nil {
+		addPublicSourceDependency(ctx, m.publicSourceProperties)
 	}
 
 	// TODO(jiyong): remove below case. This is to work around build errors happening

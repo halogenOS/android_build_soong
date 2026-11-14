@@ -58,8 +58,64 @@ message LicenseMetadata {
   // deps lists the license metadata files depended on.
   repeated AnnotatedDependency deps = 13;
 
-  // next id: 15
+  // public_source names the public copy that the prebuilt files of the target come from.
+  optional PublicSource public_source = 15;
 
+  // next id: 16
+
+}
+
+// PublicSource messages describe a public copy of prebuilt files, from which they can be fetched
+// in place of shipping them.
+message PublicSource {
+  // The name of the public_source module.
+  optional string name = 1;
+
+  oneof location {
+    GitRepository git = 2;
+    Archive archive = 3;
+  }
+
+  // The prebuilt files of the target found in the public source.
+  repeated PublicSourceFile files = 4;
+}
+
+// GitRepository messages describe a git repository at one commit.
+message GitRepository {
+  optional string url = 1;
+  optional string commit = 2;
+}
+
+// Archive messages describe an archive file.
+message Archive {
+  optional string url = 1;
+  optional string sha256 = 2;
+
+  // The length of the archive in bytes.
+  optional int64 size = 3;
+}
+
+// PublicSourceFile messages describe one prebuilt file found in a public source.
+message PublicSourceFile {
+  // The path of the file in the source tree.
+  optional string file = 1;
+
+  // The path of the file inside the public source.
+  optional string path = 2;
+
+  // The SHA-256 that the declaration names for the file in the public source, if any.
+  optional string sha256 = 3;
+
+  // The SHA-256 of the file in the source tree.
+  optional string file_sha256 = 4;
+
+  // The path of the file that the build installs from the file in the source tree. It differs
+  // from the file in the source tree when the build changes the file on the way, as it does when
+  // it signs an APK again.
+  optional string installed = 5;
+
+  // The SHA-256 of the installed file.
+  optional string installed_sha256 = 6;
 }
 
 // InstallMap messages describe the mapping from an input filesystem file to the path to the file

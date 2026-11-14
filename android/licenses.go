@@ -85,9 +85,11 @@ func setPrimaryLicensesProperty(module Module, name string, licensesProperty *[]
 	module.base().primaryLicensesProperty = newApplicableLicensesProperty(name, licensesProperty)
 }
 
-// Storage blob for a package's default_applicable_licenses mapped by package directory.
+// Storage blob for a package's default_applicable_licenses and default_public_source mapped by
+// package directory.
 type licensesContainer struct {
-	licenses []string
+	licenses            []string
+	defaultPublicSource *string
 }
 
 func (r licensesContainer) getLicenses() []string {
@@ -127,16 +129,16 @@ func licensesPackageMapper(ctx BottomUpMutatorContext) {
 	licenses := getLicenses(ctx, p)
 
 	dir := ctx.ModuleDir()
-	c := makeLicensesContainer(licenses)
+	c := makeLicensesContainer(licenses, p.publicSourceProperties.Default_public_source)
 	moduleToPackageDefaultLicensesMap(ctx.Config()).Store(dir, c)
 }
 
 // Copies the default_applicable_licenses property values for mapping by package directory.
-func makeLicensesContainer(propVals []string) licensesContainer {
+func makeLicensesContainer(propVals []string, defaultPublicSource *string) licensesContainer {
 	licenses := make([]string, 0, len(propVals))
 	licenses = append(licenses, propVals...)
 
-	return licensesContainer{licenses}
+	return licensesContainer{licenses, defaultPublicSource}
 }
 
 // Gathers the applicable licenses into dependency references after defaults expansion.
@@ -180,18 +182,11 @@ func licensesPropertyFlattener(ctx ModuleContext) *LicensesInfo {
 	}
 
 	var licenses []string
-	var texts NamedPaths
-	var conditions []string
-	var kinds []string
+	var infos []LicenseInfo
 	for _, module := range ctx.GetDirectDepsProxyWithTag(licensesTag) {
 		if l, ok := OtherModuleProvider(ctx, module, LicenseInfoProvider); ok {
 			licenses = append(licenses, ctx.OtherModuleName(module))
-			if m.base().commonProperties.Effective_package_name == nil && l.PackageName != nil {
-				m.base().commonProperties.Effective_package_name = l.PackageName
-			}
-			texts = append(texts, l.EffectiveLicenseText...)
-			kinds = append(kinds, l.EffectiveLicenseKinds...)
-			conditions = append(conditions, l.EffectiveLicenseConditions...)
+			infos = append(infos, l)
 		} else {
 			propertyName := "licenses"
 			primaryProperty := m.base().primaryLicensesProperty
@@ -202,14 +197,36 @@ func licensesPropertyFlattener(ctx ModuleContext) *LicensesInfo {
 		}
 	}
 
-	m.base().commonProperties.Effective_license_text = SortedUniqueNamedPaths(texts)
-	m.base().commonProperties.Effective_license_kinds = SortedUniqueStrings(kinds)
-	m.base().commonProperties.Effective_license_conditions = SortedUniqueStrings(conditions)
+	merged := mergeLicenseInfos(infos)
+	if m.base().commonProperties.Effective_package_name == nil {
+		m.base().commonProperties.Effective_package_name = merged.PackageName
+	}
+	m.base().commonProperties.Effective_license_text = merged.EffectiveLicenseText
+	m.base().commonProperties.Effective_license_kinds = merged.EffectiveLicenseKinds
+	m.base().commonProperties.Effective_license_conditions = merged.EffectiveLicenseConditions
 
 	// Make the license information available for other modules.
 	return &LicensesInfo{
 		Licenses: licenses,
 	}
+}
+
+// mergeLicenseInfos returns the union of the licenses in infos, with the first package name among
+// them.
+func mergeLicenseInfos(infos []LicenseInfo) LicenseInfo {
+	var merged LicenseInfo
+	for _, l := range infos {
+		if merged.PackageName == nil {
+			merged.PackageName = l.PackageName
+		}
+		merged.EffectiveLicenseText = append(merged.EffectiveLicenseText, l.EffectiveLicenseText...)
+		merged.EffectiveLicenseKinds = append(merged.EffectiveLicenseKinds, l.EffectiveLicenseKinds...)
+		merged.EffectiveLicenseConditions = append(merged.EffectiveLicenseConditions, l.EffectiveLicenseConditions...)
+	}
+	merged.EffectiveLicenseText = SortedUniqueNamedPaths(merged.EffectiveLicenseText)
+	merged.EffectiveLicenseKinds = SortedUniqueStrings(merged.EffectiveLicenseKinds)
+	merged.EffectiveLicenseConditions = SortedUniqueStrings(merged.EffectiveLicenseConditions)
+	return merged
 }
 
 // Update a property NamedPath array with a distinct union of its values and a list of new values.
@@ -270,6 +287,8 @@ func exemptFromRequiredApplicableLicensesProperty(module ModuleOrProxy) bool {
 	switch reflect.TypeOf(module).String() {
 	case "*android.licenseModule": // is a license, doesn't need one
 	case "*android.licenseKindModule": // is a license, doesn't need one
+	case "*android.publicSourceModule": // names where files come from, has none itself
+	case "*android.publicSourceFileModule": // names where a file comes from, has none itself
 	case "*android.genNoticeModule": // contains license texts as data
 	case "*android.NamespaceModule": // just partitions things, doesn't add anything
 	case "*android.soongConfigModuleTypeModule": // creates aliases for modules with licenses
@@ -305,4 +324,5 @@ func licensesMakeVarsProvider(ctx MakeVarsContext) {
 	ctx.Strict("COMPLIANCENOTICE_SHIPPEDLIBS", ctx.Config().HostToolPath(ctx, "compliancenotice_shippedlibs").String())
 	ctx.Strict("COMPLIANCE_LISTSHARE", ctx.Config().HostToolPath(ctx, "compliance_listshare").String())
 	ctx.Strict("COMPLIANCE_CHECKSHARE", ctx.Config().HostToolPath(ctx, "compliance_checkshare").String())
+	ctx.Strict("COMPLIANCE_UNFREEFILES", ctx.Config().HostToolPath(ctx, "compliance_unfreefiles").String())
 }

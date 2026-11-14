@@ -25,6 +25,7 @@ import (
 	"google.golang.org/protobuf/encoding/prototext"
 	"google.golang.org/protobuf/proto"
 
+	"android/soong/compliance/filedigest"
 	"android/soong/compliance/license_metadata_proto"
 	"android/soong/response"
 )
@@ -78,6 +79,11 @@ func main() {
 	roots := newMultiString(flags, "r", "root directory of project")
 	installedMap := newMultiString(flags, "m", "map dependent targets to their installed names")
 	isContainer := flags.Bool("is_container", false, "preserved dependent target name when given")
+	publicSource := flags.String("public_source", "", "file with the binary PublicSource message of the prebuilt files")
+	publicSourceFile := flags.String("public_source_file", "", "prebuilt file found in the public source, besides the files in the message")
+	publicSourcePath := flags.String("public_source_path", "", "path of the public_source_file inside the public source")
+	publicSourceInstalled := flags.String("public_source_installed", "", "file installed from the public_source_file")
+	publicSourceSha256 := flags.String("public_source_sha256", "", "SHA-256 of the public_source_file in the public source, when it is declared")
 	outFile := flags.String("o", "", "output file")
 
 	flags.Parse(expandedArgs)
@@ -98,11 +104,37 @@ func main() {
 	metadata.Sources = *sources
 	metadata.Deps = convertDependencies(*deps)
 
+	if *publicSource != "" {
+		var files []*license_metadata_proto.PublicSourceFile
+		if *publicSourceFile != "" {
+			files = append(files, &license_metadata_proto.PublicSourceFile{
+				File:      proto.String(*publicSourceFile),
+				Path:      proto.String(*publicSourcePath),
+				Installed: proto.String(*publicSourceInstalled),
+				Sha256:    nonEmpty(*publicSourceSha256),
+			})
+		}
+		var err error
+		metadata.PublicSource, err = readPublicSource(*publicSource, files)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
+			os.Exit(2)
+		}
+	}
+
 	err := writeMetadata(*outFile, &metadata)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
 		os.Exit(2)
 	}
+}
+
+// nonEmpty returns a pointer to s, nil when s is empty.
+func nonEmpty(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 func findGitRoots(dirs []string) []string {
@@ -177,6 +209,35 @@ func convertDependencies(deps []string) []*license_metadata_proto.AnnotatedDepen
 	}
 
 	return ret
+}
+
+// readPublicSource reads the PublicSource message in file, adds files to it, and adds to each
+// prebuilt file in it the SHA-256 of the file in the source tree and of the installed file.
+func readPublicSource(file string, files []*license_metadata_proto.PublicSourceFile) (*license_metadata_proto.PublicSource, error) {
+	data, err := os.ReadFile(file)
+	if err != nil {
+		return nil, fmt.Errorf("could not read the public source %q: %w", file, err)
+	}
+	source := &license_metadata_proto.PublicSource{}
+	if err := proto.Unmarshal(data, source); err != nil {
+		return nil, fmt.Errorf("could not parse the public source %q: %w", file, err)
+	}
+	source.Files = append(source.Files, files...)
+
+	for _, prebuilt := range source.Files {
+		fileSha256, err := filedigest.SHA256(prebuilt.GetFile())
+		if err != nil {
+			return nil, err
+		}
+		installedSha256, err := filedigest.SHA256(prebuilt.GetInstalled())
+		if err != nil {
+			return nil, err
+		}
+		prebuilt.FileSha256 = proto.String(fileSha256)
+		prebuilt.InstalledSha256 = proto.String(installedSha256)
+	}
+
+	return source, nil
 }
 
 func writeMetadata(file string, metadata *license_metadata_proto.LicenseMetadata) error {

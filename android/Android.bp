@@ -30,6 +30,7 @@ bootstrap_go_package {
 
         "golang-protobuf-proto",
         "golang-protobuf-encoding-prototext",
+        "license_metadata_proto",
 
         // Only used for tests.
         "androidmk-parser",
@@ -62,6 +63,7 @@ bootstrap_go_package {
         "configurable_evaluation.go",
         "configurable_properties.go",
         "configured_jars.go",
+        "copied_files.go",
         "csuite_config.go",
         "deapexer.go",
         "defaults.go",
@@ -115,6 +117,7 @@ bootstrap_go_package {
         "proto.go",
         "provider.go",
         "provider_keys.go",
+        "public_source.go",
         "raw_files.go",
         "recovery_build_prop.go",
         "register.go",

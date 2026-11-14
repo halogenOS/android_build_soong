@@ -1313,3 +1313,8 @@ license_kind {
         "proprietary",
     ],
 }
+
+license_kind {
+    name: "unfree",
+    conditions: ["proprietary"],
+}

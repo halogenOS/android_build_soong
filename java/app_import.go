@@ -555,6 +555,7 @@ func (a *AndroidAppImport) generateAndroidBuildActions(ctx android.ModuleContext
 
 	if apexInfo.IsForPlatform() {
 		a.installPath = ctx.InstallFile(installDir, apkFilename, a.outputFile)
+		ctx.AddInstalledPrebuiltFile(srcApk, a.outputFile)
 		artifactPath := android.PathForModuleSrc(ctx, a.properties.Apk.GetOrDefault(ctx, ""))
 		provenance.GenerateArtifactProvenanceMetaData(ctx, artifactPath, a.installPath)
 	}

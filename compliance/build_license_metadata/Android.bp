@@ -23,6 +23,7 @@ blueprint_go_binary {
     ],
     deps: [
         "license_metadata_proto",
+        "soong-compliance-filedigest",
         "golang-protobuf-proto",
         "golang-protobuf-encoding-prototext",
         "soong-response",

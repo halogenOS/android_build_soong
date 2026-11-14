@@ -3807,6 +3807,7 @@ func (j *DexImport) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 	if apexInfo.IsForPlatform() {
 		ctx.InstallFile(android.PathForModuleInstall(ctx, "framework"),
 			j.Stem()+".jar", dexOutputFile)
+		ctx.AddInstalledPrebuiltFile(inputJar, dexOutputFile)
 	}
 
 	javaInfo := &JavaInfo{}

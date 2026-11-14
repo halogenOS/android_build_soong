@@ -335,6 +335,7 @@ func (s *ShBinary) generateAndroidBuildActions(ctx android.ModuleContext) {
 		Output: s.outputFilePath,
 		Input:  s.sourceFilePath,
 	})
+	ctx.AddInstalledPrebuiltFile(s.sourceFilePath, s.outputFilePath)
 
 	s.properties.SubName = s.GetSubname(ctx)
 
@@ -643,6 +644,7 @@ func (s *ShTest) AndroidMkEntries() []android.AndroidMkEntries {
 
 func initShBinaryModule(s *ShBinary) {
 	s.AddProperties(&s.properties)
+	android.InitPublicSourceProperty(s)
 }
 
 // sh_binary is for a shell script or batch file to be installed as an

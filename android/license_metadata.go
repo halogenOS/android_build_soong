@@ -174,9 +174,18 @@ func buildLicenseMetadata(ctx *moduleContext, licenseMetadataFile WritablePath, 
 		args = append(args, "--is_container")
 	}
 
+	// The tool hashes the prebuilt files and the files installed from them.
+	var publicSourceInputs Paths
+	if source, files := modulePublicSourceFiles(ctx); len(files) > 0 {
+		message := PathForModuleOut(ctx, "public_source.pb")
+		publicSourceInputs = writePublicSourceMessage(ctx, message, source, files)
+		args = append(args, "-public_source "+proptools.NinjaAndShellEscapeIncludingSpaces(message.String()))
+	}
+
 	ctx.Build(pctx, BuildParams{
 		Rule:        licenseMetadataRule,
 		Output:      licenseMetadataFile,
+		Implicits:   publicSourceInputs,
 		OrderOnly:   orderOnlyDeps,
 		Description: "license metadata",
 		Args: map[string]string{

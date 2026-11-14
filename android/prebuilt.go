@@ -235,6 +235,7 @@ type PrebuiltSrcsSupplier func(ctx BaseModuleContext, prebuilt Module) []string
 func initPrebuiltModuleCommon(module PrebuiltInterface) *Prebuilt {
 	p := module.Prebuilt()
 	module.AddProperties(&p.properties)
+	InitPublicSourceProperty(module)
 	return p
 }
 

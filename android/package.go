@@ -48,10 +48,17 @@ type PackageInfo struct {
 	PrimaryLicenses []string
 }
 
+type packagePublicSourceProperties struct {
+	// Specifies the public source of the prebuilt files in this package, and in the directories
+	// below it that have no package of their own, that do not name one themselves.
+	Default_public_source *string
+}
+
 type packageModule struct {
 	ModuleBase
 
-	properties packageProperties
+	properties             packageProperties
+	publicSourceProperties packagePublicSourceProperties
 }
 
 func (p *packageModule) GenerateAndroidBuildActions(ModuleContext) {
@@ -62,6 +69,9 @@ func (p *packageModule) DepsMutator(ctx BottomUpMutatorContext) {
 	// Add the dependency to do a validity check
 	if p.properties.Default_team != nil {
 		ctx.AddDependency(ctx.Module(), nil, *p.properties.Default_team)
+	}
+	if source := p.publicSourceProperties.Default_public_source; source != nil {
+		ctx.AddDependency(ctx.Module(), publicSourceTag, *source)
 	}
 }
 
@@ -74,8 +84,32 @@ func (p *packageModule) GenerateBuildActions(ctx blueprint.ModuleContext) {
 			PrimaryLicenses: primaryLicenses,
 		},
 	})
+	ctx.SetProvider(PackageFilesInfoProvider, packageFilesInfo(ctx))
 	writePackageComplianceRecord(ctx, primaryLicenses)
 	ctx.FreeModuleAfterGenerateBuildActions()
+}
+
+// packageFilesInfo returns the licenses and the public source that the package declares for its
+// files.
+func packageFilesInfo(ctx blueprint.ModuleContext) PackageFilesInfo {
+	var info PackageFilesInfo
+	var licenses []LicenseInfo
+	ctx.VisitDirectDepsProxy(func(dep blueprint.ModuleProxy) {
+		if ctx.OtherModuleDependencyTag(dep) != licensesTag {
+			return
+		}
+		if license, ok := blueprint.OtherModuleProvider(ctx, dep, LicenseInfoProvider); ok {
+			licenses = append(licenses, license)
+		}
+	})
+	info.License = mergeLicenseInfos(licenses)
+	if source, ok := publicSourceDependency(ctx, "default_public_source"); ok {
+		info.DefaultPublicSource = &source
+		if len(info.License.EffectiveLicenseKinds) == 0 {
+			ctx.PropertyErrorf("default_public_source", "needs default_applicable_licenses for the files it covers")
+		}
+	}
+	return info
 }
 
 func (p *packageModule) qualifiedModuleId(ctx BaseModuleContext) qualifiedModuleName {
@@ -86,7 +120,7 @@ func (p *packageModule) qualifiedModuleId(ctx BaseModuleContext) qualifiedModule
 func PackageFactory() Module {
 	module := &packageModule{}
 
-	module.AddProperties(&module.properties)
+	module.AddProperties(&module.properties, &module.publicSourceProperties)
 
 	// The name is the relative path from build root to the directory containing this
 	// module. Set that name at the earliest possible moment that information is available

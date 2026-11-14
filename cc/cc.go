@@ -2976,6 +2976,9 @@ func buildComplianceMetadataInfo(ctx ModuleContext, c *Module, deps PathDeps) {
 	if p, ok := c.linker.(*prebuiltLibraryLinker); ok && len(p.SingleSource(ctx)) > 0 {
 		complianceMetadataInfo.SetPrebuiltSrc(ctx, p.SingleSource(ctx))
 	}
+	if p := c.Prebuilt(); p != nil && len(p.SingleSource(ctx)) > 0 && c.outputFile.Valid() {
+		ctx.AddInstalledPrebuiltFile(p.SingleSourcePath(ctx), c.outputFile.Path())
+	}
 }
 
 func (c *Module) maybeUnhideFromMake() {

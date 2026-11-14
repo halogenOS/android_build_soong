@@ -256,6 +256,11 @@ type ModuleContext interface {
 	// apex container for use when generation the license metadata file.
 	SetLicenseInstallMap(installMap []string)
 
+	// AddInstalledPrebuiltFile records that the module installs the prebuilt file src of the source
+	// tree as installed. The license metadata of the module names the public source of each such
+	// file.
+	AddInstalledPrebuiltFile(src Path, installed Path)
+
 	// ComplianceMetadataInfo returns a ComplianceMetadataInfo instance for different module types to dump metadata,
 	// which usually happens in GenerateAndroidBuildActions() of a module type.
 	// See android.ModuleBase.complianceMetadataInfo
@@ -338,6 +343,9 @@ type moduleContext struct {
 	// set of dependency module:location mappings used to populate the license metadata for
 	// apex containers.
 	licenseInstallMap []string
+
+	// The prebuilt files of the source tree that the module installs, for the license metadata.
+	installedPrebuiltFiles []installedPrebuiltFile
 
 	// The path to the generated license metadata file for the module.
 	licenseMetadataFile WritablePath
@@ -1066,6 +1074,10 @@ func (m *moduleContext) GetOutputFiles() OutputFilesInfo {
 
 func (m *moduleContext) SetLicenseInstallMap(installMap []string) {
 	m.licenseInstallMap = append(m.licenseInstallMap, installMap...)
+}
+
+func (m *moduleContext) AddInstalledPrebuiltFile(src Path, installed Path) {
+	m.installedPrebuiltFiles = append(m.installedPrebuiltFiles, installedPrebuiltFile{src: src, installed: installed})
 }
 
 func (m *moduleContext) ComplianceMetadataInfo() *ComplianceMetadataInfo {

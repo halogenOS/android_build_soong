@@ -4137,6 +4137,84 @@ func (r ContainersInfo) GetTypeId() int16 {
 
 // end of container.go
 
+// begin of copied_files.go
+func init() {
+	PackageFilesInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PackageFilesInfo) })
+}
+
+func (r PackageFilesInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = r.License.Encode(ctx, buf); err != nil {
+		return err
+	}
+
+	val1 := r.DefaultPublicSource == nil
+	if err = gobtools.EncodeBool(buf, val1); err != nil {
+		return err
+	}
+	if !val1 {
+		if err = (*r.DefaultPublicSource).Encode(ctx, buf); err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func (r PackageFilesInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.PackageFilesInfo")
+	hasher.WriteInt(2)
+	if err := r.License.CustomHash(hasher); err != nil {
+		return err
+	}
+	hasher.WriteString(":.*PublicSourceInfo")
+	val1 := r.DefaultPublicSource == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		val2 := func(hasher *proptools.Hasher) error {
+			if err := (*r.DefaultPublicSource).CustomHash(hasher); err != nil {
+				return err
+			}
+			return nil
+		}
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.DefaultPublicSource)), val2); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *PackageFilesInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if err = r.License.Decode(ctx, buf); err != nil {
+		return err
+	}
+
+	var val3 bool
+	if err = gobtools.DecodeBool(buf, &val3); err != nil {
+		return err
+	}
+	if !val3 {
+		var val2 PublicSourceInfo
+		if err = val2.Decode(ctx, buf); err != nil {
+			return err
+		}
+		r.DefaultPublicSource = &val2
+	}
+
+	return err
+}
+
+var PackageFilesInfoGobRegId int16
+
+func (r PackageFilesInfo) GetTypeId() int16 {
+	return PackageFilesInfoGobRegId
+}
+
+// end of copied_files.go
+
 // begin of deapexer.go
 func init() {
 	RequiredFilesFromPrebuiltApexInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(RequiredFilesFromPrebuiltApexInfo) })
@@ -14732,6 +14810,338 @@ func (r PrebuiltKernelModulesComplianceMetadata) GetTypeId() int16 {
 }
 
 // end of provider_keys.go
+
+// begin of public_source.go
+func init() {
+	PublicSourceInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceInfo) })
+	PublicGitRepositoryGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicGitRepository) })
+	PublicSourceArchiveGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceArchive) })
+	PublicSourceFileGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFile) })
+	PublicSourceFileInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFileInfo) })
+}
+
+func (r PublicSourceInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Name); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Location); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r PublicSourceInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.PublicSourceInfo")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Name)
+	hasher.WriteString(":android.PublicSourceLocation")
+	val1 := r.Location == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Location); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.Location == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.Location.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Location.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	return nil
+}
+
+func (r *PublicSourceInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Name)
+	if err != nil {
+		return err
+	}
+
+	if val3, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val3 == nil {
+		r.Location = nil
+	} else {
+		r.Location = val3.(PublicSourceLocation)
+	}
+
+	return err
+}
+
+var PublicSourceInfoGobRegId int16
+
+func (r PublicSourceInfo) GetTypeId() int16 {
+	return PublicSourceInfoGobRegId
+}
+
+func (r PublicGitRepository) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Url); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Commit); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r PublicGitRepository) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.PublicGitRepository")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Url)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Commit)
+	return nil
+}
+
+func (r *PublicGitRepository) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Url)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.Commit)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var PublicGitRepositoryGobRegId int16
+
+func (r PublicGitRepository) GetTypeId() int16 {
+	return PublicGitRepositoryGobRegId
+}
+
+func (r PublicSourceArchive) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Url); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Sha256); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInt64(buf, r.Size); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r PublicSourceArchive) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.PublicSourceArchive")
+	hasher.WriteInt(3)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Url)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Sha256)
+	hasher.WriteString(":.int64")
+	hasher.WriteUint64(uint64(r.Size))
+	return nil
+}
+
+func (r *PublicSourceArchive) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Url)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.Sha256)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeInt64(buf, &r.Size)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var PublicSourceArchiveGobRegId int16
+
+func (r PublicSourceArchive) GetTypeId() int16 {
+	return PublicSourceArchiveGobRegId
+}
+
+func (r PublicSourceFile) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.File); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Path); err != nil {
+		return err
+	}
+
+	val1 := r.Sha256 == nil
+	if err = gobtools.EncodeBool(buf, val1); err != nil {
+		return err
+	}
+	if !val1 {
+		if err = gobtools.EncodeString(buf, (*r.Sha256)); err != nil {
+			return err
+		}
+	}
+	return err
+}
+
+func (r PublicSourceFile) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.PublicSourceFile")
+	hasher.WriteInt(3)
+	hasher.WriteString(":android.Path")
+	val1 := r.File == nil
+	if val1 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.File); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val2 := r.File == nil
+				if val2 {
+					hasher.WriteByte(0)
+				} else {
+					val3 := func(hasher *proptools.Hasher) error { return r.File.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val3); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.File.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Path)
+	hasher.WriteString(":.*string")
+	val4 := r.Sha256 == nil
+	if val4 {
+		hasher.WriteByte(0)
+	} else {
+		val5 := func(hasher *proptools.Hasher) error {
+			hasher.WriteString(":.string")
+			hasher.WriteString((*r.Sha256))
+			return nil
+		}
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.Sha256)), val5); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *PublicSourceFile) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if val2, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val2 == nil {
+		r.File = nil
+	} else {
+		r.File = val2.(Path)
+	}
+
+	err = gobtools.DecodeString(buf, &r.Path)
+	if err != nil {
+		return err
+	}
+
+	var val5 bool
+	if err = gobtools.DecodeBool(buf, &val5); err != nil {
+		return err
+	}
+	if !val5 {
+		var val4 string
+		err = gobtools.DecodeString(buf, &val4)
+		if err != nil {
+			return err
+		}
+		r.Sha256 = &val4
+	}
+
+	return err
+}
+
+var PublicSourceFileGobRegId int16
+
+func (r PublicSourceFile) GetTypeId() int16 {
+	return PublicSourceFileGobRegId
+}
+
+func (r PublicSourceFileInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = r.Source.Encode(ctx, buf); err != nil {
+		return err
+	}
+
+	if err = r.File.Encode(ctx, buf); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r PublicSourceFileInfo) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.PublicSourceFileInfo")
+	hasher.WriteInt(2)
+	if err := r.Source.CustomHash(hasher); err != nil {
+		return err
+	}
+	if err := r.File.CustomHash(hasher); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *PublicSourceFileInfo) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	if err = r.Source.Decode(ctx, buf); err != nil {
+		return err
+	}
+
+	if err = r.File.Decode(ctx, buf); err != nil {
+		return err
+	}
+
+	return err
+}
+
+var PublicSourceFileInfoGobRegId int16
+
+func (r PublicSourceFileInfo) GetTypeId() int16 {
+	return PublicSourceFileInfoGobRegId
+}
+
+// end of public_source.go
 
 // begin of rule_builder.go
 func init() {
