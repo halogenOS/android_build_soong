@@ -3211,6 +3211,22 @@ func (e configurationEvalutor) evaluateModuleVariantBool(property, variable stri
 	return proptools.ConfigurableValueBool(valueFor(e.m))
 }
 
+// evaluateBoardKernelBuildModule returns the module reference that BOARD_KERNEL_BUILD_MODULE gives
+// to a device variant of the primary arch, and no value to every other variant. The kernel built
+// from source has the primary arch, so its user-space headers, with the asm folder of that arch,
+// do not fit the variants of another arch.
+func (e configurationEvalutor) evaluateBoardKernelBuildModule(property, variable string) proptools.ConfigurableValue {
+	if !e.m.base().ArchReady() {
+		e.ctx.OtherModulePropertyErrorf(e.m, property, "A select on product_variable(%q) was attempted before the arch mutator ran", variable)
+		return proptools.ConfigurableValueUndefined()
+	}
+	ref := e.ctx.Config().BoardKernelBuildModule()
+	if ref == "" || e.m.base().Os().Class != Device || e.m.base().Arch().ArchType != e.ctx.Config().DevicePrimaryArchType() {
+		return proptools.ConfigurableValueUndefined()
+	}
+	return proptools.ConfigurableValueString(ref)
+}
+
 func (e configurationEvalutor) EvaluateConfiguration(condition proptools.ConfigurableCondition, property string) proptools.ConfigurableValue {
 	ctx := e.ctx
 	m := e.m
@@ -3264,6 +3280,8 @@ func (e configurationEvalutor) EvaluateConfiguration(condition proptools.Configu
 			return proptools.ConfigurableValueBool(ctx.Config().AlwaysUsePrebuiltSdks())
 		case "device_primary_arch":
 			return proptools.ConfigurableValueString(ctx.Config().DevicePrimaryArchType().String())
+		case "board_kernel_build_module":
+			return e.evaluateBoardKernelBuildModule(property, variable)
 		default:
 			// TODO(b/323382414): Might add these on a case-by-case basis
 			ctx.OtherModulePropertyErrorf(m, property, fmt.Sprintf("TODO(b/323382414): Product variable %q is not yet supported in selects", variable))

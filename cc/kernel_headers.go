@@ -22,20 +22,24 @@ type kernelHeadersDecorator struct {
 	*libraryDecorator
 }
 
+// link exports every directory as a system directory, the device's own kernel header directories
+// first, so that kernel headers raise no warnings in the modules that use them and a directory of
+// the device comes before one re-exported from header_libs.
 func (stub *kernelHeadersDecorator) link(ctx ModuleContext, flags Flags, deps PathDeps, objs Objects) android.Path {
 	if ctx.Device() {
-		f := &stub.libraryDecorator.flagExporter
-		f.reexportSystemDirs(android.PathsForSource(ctx, ctx.DeviceConfig().DeviceKernelHeaderDirs())...)
-		f.setProvider(ctx)
+		stub.reexportSystemDirs(android.PathsForSource(ctx, ctx.DeviceConfig().DeviceKernelHeaderDirs())...)
 	}
-	return stub.libraryDecorator.linkStatic(ctx, flags, deps, objs)
+	stub.reexportSystemDirs(deps.ReexportedDirs...)
+	depsWithoutDirs := deps
+	depsWithoutDirs.ReexportedDirs = nil
+	return stub.libraryDecorator.link(ctx, flags, depsWithoutDirs, objs)
 }
 
 // kernel_headers retrieves the list of kernel headers directories from
 // TARGET_BOARD_KERNEL_HEADERS and TARGET_PRODUCT_KERNEL_HEADERS variables in
 // a makefile for compilation. See
 // https://android.googlesource.com/platform/build/+/main/core/config.mk
-// for more details on them.
+// for more details on them, and re-exports the headers of its header_libs.
 func kernelHeadersFactory() android.Module {
 	module, library := NewLibrary(android.HostAndDeviceSupported)
 	library.HeaderOnly()

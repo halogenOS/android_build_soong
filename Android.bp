@@ -53,11 +53,20 @@ cc_defaults {
 // C static libraries extracted from the gcc toolchain
 //
 
+// The headers of the kernel that the board builds from source, for the variants of the kernel's
+// arch.
+board_kernel_header_libs = select(product_variable("board_kernel_build_module"), {
+    any: ["generated_kernel_headers"],
+    default: [],
+})
+
 kernel_headers {
     name: "device_kernel_headers",
     vendor: true,
     recovery_available: true,
     min_sdk_version: "apex_inherit",
+    header_libs: board_kernel_header_libs,
+    export_header_lib_headers: board_kernel_header_libs,
     visibility: ["//visibility:public"],
 }
 
