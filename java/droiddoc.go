@@ -226,7 +226,9 @@ type Javadoc struct {
 	srcJars     android.Paths
 	srcFiles    android.Paths
 	sourcepaths android.Paths
-	implicits   android.Paths
+
+	// The Java files of srcs before filter_packages applies.
+	unfilteredJavaFiles android.Paths
 
 	docZip      android.WritablePath
 	stubsSrcJar android.WritablePath
@@ -433,7 +435,7 @@ func (j *Javadoc) collectDeps(ctx android.ModuleContext) deps {
 	// do not pass exclude_srcs directly when expanding srcFiles since exclude_srcs
 	// may contain filegroup or genrule.
 	srcFiles := android.PathsForModuleSrcExcludes(ctx, j.properties.Srcs.GetOrDefault(ctx, nil), j.properties.Exclude_srcs)
-	j.implicits = append(j.implicits, srcFiles...)
+	j.unfilteredJavaFiles = srcFiles.FilterByExt(".java")
 
 	// Module can depend on a java_aconfig_library module using the ":module_name{.tag}" syntax.
 	// Find the corresponding aconfig_declarations module name for such case.

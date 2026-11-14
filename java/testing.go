@@ -47,7 +47,7 @@ var PrepareForTestWithJavaBuildComponents = android.GroupFixturePreparers(
 	// Make java build components available to the test.
 	android.FixtureRegisterWithContext(registerRequiredBuildComponentsForTest),
 	android.FixtureRegisterWithContext(registerJavaPluginBuildComponents),
-	android.PrepareForTestWithHostTools("cp_if_changed", "rm", "touch", "grep"),
+	android.PrepareForTestWithHostTools("cp_if_changed", "rm", "touch", "grep", "strip-method-bodies"),
 	// Additional files needed in tests that disallow non-existent source files.
 	// This includes files that are needed by all, or at least most, instances of a java module type.
 	android.MockFS{

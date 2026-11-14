@@ -212,7 +212,9 @@ func TestDroidstubsSandbox(t *testing.T) {
 
 	m := ctx.ModuleForTests(t, "bar-stubs", "android_common")
 	metalava := m.Rule("metalava")
-	if g, w := metalava.Inputs.Strings(), []string{"bar-doc/a.java"}; !reflect.DeepEqual(w, g) {
+	strip := m.Rule("strip_method_bodies")
+	android.AssertStringListContains(t, "stripped sources", strip.Implicits.Strings(), "bar-doc/a.java")
+	if g, w := metalava.Inputs.Strings(), []string{strip.Output.String()}; !reflect.DeepEqual(w, g) {
 		t.Errorf("Expected inputs %q, got %q", w, g)
 	}
 

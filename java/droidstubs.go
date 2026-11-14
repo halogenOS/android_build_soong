@@ -294,6 +294,7 @@ type stubsCommandParams struct {
 type stubsCommandConfigParams struct {
 	stubsType             StubsType
 	javaVersion           javaVersion
+	metalavaSources       metalavaSources
 	deps                  deps
 	aconfigCacheFiles     android.Paths
 	checkApi              bool
@@ -451,6 +452,7 @@ var metalavaCurrentApiTimestampTag = dependencyTag{name: "metalava-current-api-t
 
 func (d *Droidstubs) DepsMutator(ctx android.BottomUpMutatorContext) {
 	d.Javadoc.addDeps(ctx)
+	ctx.AddHostToolDependencies("strip-method-bodies")
 
 	if len(d.properties.Merge_annotations_dirs) != 0 {
 		for _, mergeAnnotationsDir := range d.properties.Merge_annotations_dirs {
@@ -825,7 +827,7 @@ func metalavaUseRewrapper(ctx android.ModuleContext) bool {
 	return ctx.Config().UseREWrapper() && ctx.Config().IsEnvTrue("RBE_METALAVA")
 }
 
-func metalavaCmd(ctx android.ModuleContext, rule *android.RuleBuilder, srcs android.Paths,
+func metalavaCmd(ctx android.ModuleContext, rule *android.RuleBuilder,
 	srcJarList android.Path, homeDir android.WritablePath, params stubsCommandConfigParams,
 	configFiles android.Paths, apiSurface *string) *android.RuleBuilderCommand {
 	rule.Command().Text("rm -rf").Flag(homeDir.String())
@@ -860,7 +862,8 @@ func metalavaCmd(ctx android.ModuleContext, rule *android.RuleBuilder, srcs andr
 		Flag(config.MetalavaVmFlags).
 		Flag(config.MetalavaAddOpens).
 		FlagWithArg("--java-source ", params.javaVersion.String()).
-		FlagWithRspFileInputList("@", android.PathForModuleOut(ctx, fmt.Sprintf("%s.metalava.rsp", params.stubsType.String())), srcs).
+		FlagWithRspFileInputList("@", android.PathForModuleOut(ctx, fmt.Sprintf("%s.metalava.rsp", params.stubsType.String())), params.metalavaSources.listed).
+		Implicits(params.metalavaSources.all).
 		FlagWithInput("@", srcJarList)
 
 	// If this is for the host then pass the --jdk-home option to Metalava and
@@ -981,6 +984,65 @@ func generateMetalavaFlagConfigArgs(ctx android.ModuleContext, cmd *android.Rule
 	cmd.FlagWithInput("--config-file ", metalavaFlagsConfigFile)
 }
 
+// metalavaSources are the sources read by metalava.
+type metalavaSources struct {
+	// listed are the sources named on the metalava command line.
+	listed android.Paths
+	// all are the listed sources and the Java files left out by filter_packages, found by metalava in
+	// the directories of the listed sources.
+	all android.Paths
+}
+
+// stripMethodBodies returns the copies of the sources read by metalava, written by
+// strip-method-bodies. The Java files left out by filter_packages are copied too, since metalava
+// resolves classes from the directories of the sources given to metalava.
+func (d *Droidstubs) stripMethodBodies(ctx android.ModuleContext) metalavaSources {
+	listed := android.FirstUniquePaths(d.Javadoc.srcFiles)
+	srcs := android.FirstUniquePaths(slices.Concat(listed, d.Javadoc.unfilteredJavaFiles))
+	// The tool does not read Kotlin. It cannot find typedefs declared in Kotlin sources. A rule needs
+	// outputs. A module with all its sources in srcjars has nothing to copy. Metalava reads the
+	// original sources of both.
+	if len(srcs) == 0 || len(srcs.FilterByExt(".kt")) > 0 {
+		return metalavaSources{listed: listed, all: srcs}
+	}
+	dir := android.PathForModuleOut(ctx, "stripped-sources")
+	copies := strippedSourceCopies(ctx, dir, srcs)
+	copyList := make([]string, 0, 2*len(srcs))
+	for i, src := range srcs {
+		copyList = append(copyList, src.String(), copies[i].String())
+	}
+	copyListFile := android.PathForModuleOut(ctx, "stripped-sources.list")
+	android.WriteFileRuleVerbatim(ctx, copyListFile, strings.Join(copyList, "\n"))
+
+	rule := android.NewRuleBuilder(pctx, ctx)
+	rule.Command().
+		BuiltTool("strip-method-bodies").
+		Text(dir.String()).
+		Input(copyListFile).
+		Inputs(d.Javadoc.srcJars).
+		Implicits(srcs).
+		ImplicitOutputs(copies)
+	rule.Restat()
+	rule.Build("strip_method_bodies", "strip method bodies")
+	// FirstUniquePaths does not change the order. The listed sources come first in srcs.
+	return metalavaSources{listed: copies[:len(listed)].Paths(), all: copies.Paths()}
+}
+
+// strippedSourceCopies returns the paths in dir for the copies of srcs. A copy is placed at the path
+// of the source copied, below the top of the tree, or below "out" for a generated file. That puts
+// every file in the directory of its package, where metalava looks for it.
+func strippedSourceCopies(ctx android.ModuleContext, dir android.ModuleOutPath, srcs android.Paths) android.WritablePaths {
+	copies := make(android.WritablePaths, len(srcs))
+	for i, src := range srcs {
+		if rel, isGenerated := android.MaybeRel(ctx, ctx.Config().OutDir(), src.String()); isGenerated {
+			copies[i] = dir.Join(ctx, "out", rel)
+		} else {
+			copies[i] = dir.Join(ctx, src.String())
+		}
+	}
+	return copies
+}
+
 func (d *Droidstubs) commonMetalavaStubCmd(ctx android.ModuleContext, rule *android.RuleBuilder,
 	params stubsCommandParams) *android.RuleBuilderCommand {
 	if BoolDefault(d.properties.High_mem, false) {
@@ -999,9 +1061,8 @@ func (d *Droidstubs) commonMetalavaStubCmd(ctx android.ModuleContext, rule *andr
 
 	configFiles := android.PathsForModuleSrc(ctx, d.properties.ConfigFiles)
 
-	cmd := metalavaCmd(ctx, rule, d.Javadoc.srcFiles, srcJarList, homeDir, params.stubConfig,
-		configFiles, d.properties.Api_surface)
-	cmd.Implicits(d.Javadoc.implicits)
+	cmd := metalavaCmd(ctx, rule, srcJarList, homeDir, params.stubConfig, configFiles,
+		d.properties.Api_surface)
 
 	d.stubsFlags(ctx, cmd, params.stubsDir, params.stubConfig.stubsType, params.stubConfig.checkApi)
 
@@ -1407,6 +1468,7 @@ func (d *Droidstubs) GenerateAndroidBuildActions(ctx android.ModuleContext) {
 
 	stubCmdParams := stubsCommandConfigParams{
 		javaVersion:           javaVersion,
+		metalavaSources:       d.stripMethodBodies(ctx),
 		deps:                  deps,
 		aconfigCacheFiles:     aconfigCacheFiles.ToList(),
 		checkApi:              checkApi,
