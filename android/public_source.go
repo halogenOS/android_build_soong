@@ -202,7 +202,9 @@ type PublicSourceFileProperties struct {
 	From *string `android:"arch_variant"`
 	// Path of the file inside the public source.
 	Path *string `android:"arch_variant"`
-	// SHA-256 of the file in the public source, compared with the file in the tree.
+	// SHA-256 of the file in the public source, which the installer checks the download against.
+	// The file in the tree can differ from it by our edits. The dist package needs it for every file
+	// of an archive.
 	Sha256 *string `android:"arch_variant"`
 }
 
