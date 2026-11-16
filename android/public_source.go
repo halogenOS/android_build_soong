@@ -44,14 +44,15 @@ type PublicSourceInfo struct {
 	Location PublicSourceLocation
 }
 
-// A PublicSourceLocation is the place a public copy is fetched from: a PublicGitRepository or a
-// PublicSourceArchive.
+// A PublicSourceLocation is the place a public copy is fetched from: a PublicGitRepository, a
+// PublicSourceArchive or a PublicImageArchive.
 type PublicSourceLocation interface {
 	setOn(message *license_metadata_proto.PublicSource)
 }
 
 var _ PublicSourceLocation = PublicGitRepository{}
 var _ PublicSourceLocation = PublicSourceArchive{}
+var _ PublicSourceLocation = PublicImageArchive{}
 
 // @auto-generate: gob
 type PublicGitRepository struct {
@@ -82,6 +83,36 @@ func (a PublicSourceArchive) setOn(message *license_metadata_proto.PublicSource)
 	}}
 }
 
+// PublicImageArchive is a 7z archive of partition images, each named <partition>.img, split into
+// parts, such as a firmware release of a phone. The path of a file in it starts with the partition
+// whose image contains the file.
+// @auto-generate: gob
+type PublicImageArchive struct {
+	Parts []ArchivePart
+}
+
+// @auto-generate: gob
+type ArchivePart struct {
+	Url    string
+	Sha256 string
+	// The length of the part in bytes.
+	Size int64
+}
+
+func (a PublicImageArchive) setOn(message *license_metadata_proto.PublicSource) {
+	parts := make([]*license_metadata_proto.ArchivePart, 0, len(a.Parts))
+	for _, part := range a.Parts {
+		parts = append(parts, &license_metadata_proto.ArchivePart{
+			Url:    proto.String(part.Url),
+			Sha256: proto.String(part.Sha256),
+			Size:   proto.Int64(part.Size),
+		})
+	}
+	message.Location = &license_metadata_proto.PublicSource_ImageArchive{
+		ImageArchive: &license_metadata_proto.ImageArchive{Parts: parts},
+	}
+}
+
 // PublicSourceFile is a prebuilt file of the tree found in a public source.
 // @auto-generate: gob
 type PublicSourceFile struct {
@@ -91,6 +122,11 @@ type PublicSourceFile struct {
 	Path string
 	// The SHA-256 named for the file in the public source, nil when the declaration names none.
 	Sha256 *string
+	// The length of the file in the public source in bytes, nil when the declaration names none.
+	Size *int64
+	// The delta file of our edit, which makes the file in the tree from the file in the public
+	// source, nil for a file that we did not edit.
+	Delta Path
 }
 
 // PublicSourceFileInfo is the public copy of one file of the source tree, declared by a
@@ -139,29 +175,63 @@ type publicSourceProperties struct {
 	Sha256 *string
 	// Length of the archive in bytes.
 	Size *int64
+	// The parts, in order, of a 7z archive of partition images split into parts.
+	Image_archive_parts []archivePartProperties
+}
+
+type archivePartProperties struct {
+	// URL of the part.
+	Url *string
+	// SHA-256 of the part.
+	Sha256 *string
+	// Length of the part in bytes.
+	Size *int64
 }
 
 // location returns the location that the properties declare, reporting the properties that do not
 // form one.
 func (p publicSourceProperties) location(ctx ModuleContext) (PublicSourceLocation, bool) {
+	imageArchive := len(p.Image_archive_parts) > 0
 	switch {
-	case p.Git != nil && p.Commit != nil && p.Archive == nil && p.Sha256 == nil && p.Size == nil:
+	case p.Git != nil && p.Commit != nil && p.Archive == nil && p.Sha256 == nil && p.Size == nil && !imageArchive:
 		checkPublicUrl(ctx, "git", *p.Git)
 		if !gitCommitPattern.MatchString(*p.Commit) {
 			ctx.PropertyErrorf("commit", "must be the 40-digit hash of a commit, not %q", *p.Commit)
 		}
 		return PublicGitRepository{Url: *p.Git, Commit: *p.Commit}, true
-	case p.Archive != nil && p.Sha256 != nil && p.Size != nil && p.Git == nil && p.Commit == nil:
+	case p.Archive != nil && p.Sha256 != nil && p.Size != nil && p.Git == nil && p.Commit == nil && !imageArchive:
 		checkPublicUrl(ctx, "archive", *p.Archive)
 		checkSha256(ctx, "sha256", *p.Sha256)
 		if *p.Size <= 0 {
 			ctx.PropertyErrorf("size", "must be the length of the archive in bytes, not %d", *p.Size)
 		}
 		return PublicSourceArchive{Url: *p.Archive, Sha256: *p.Sha256, Size: *p.Size}, true
+	case imageArchive && p.Git == nil && p.Commit == nil && p.Archive == nil && p.Sha256 == nil && p.Size == nil:
+		return PublicImageArchive{Parts: archiveParts(ctx, p.Image_archive_parts)}, true
 	default:
-		ctx.ModuleErrorf("needs either git and commit, or archive, sha256 and size")
+		ctx.ModuleErrorf("needs either git and commit, archive, sha256 and size, or image_archive_parts")
 		return nil, false
 	}
+}
+
+// archiveParts returns the parts that properties declare, reporting each part that lacks a
+// property.
+func archiveParts(ctx ModuleContext, properties []archivePartProperties) []ArchivePart {
+	parts := make([]ArchivePart, 0, len(properties))
+	for i, part := range properties {
+		property := fmt.Sprintf("image_archive_parts[%d]", i)
+		if part.Url == nil || part.Sha256 == nil || part.Size == nil {
+			ctx.PropertyErrorf(property, "needs url, sha256 and size")
+			continue
+		}
+		checkPublicUrl(ctx, property+".url", *part.Url)
+		checkSha256(ctx, property+".sha256", *part.Sha256)
+		if *part.Size <= 0 {
+			ctx.PropertyErrorf(property+".size", "must be the length of the part in bytes, not %d", *part.Size)
+		}
+		parts = append(parts, ArchivePart{Url: *part.Url, Sha256: *part.Sha256, Size: *part.Size})
+	}
+	return parts
 }
 
 func checkPublicUrl(ctx ModuleContext, property, value string) {
@@ -203,14 +273,19 @@ type PublicSourceFileProperties struct {
 	// Path of the file inside the public source.
 	Path *string `android:"arch_variant"`
 	// SHA-256 of the file in the public source, which the installer checks the download against.
-	// The file in the tree can differ from it by our edits. The dist package needs it for every file
-	// of an archive.
+	// The file in the tree can differ from it by our edit, which delta names. The dist package needs
+	// it for every file of an archive.
 	Sha256 *string `android:"arch_variant"`
+	// Length of the file in the public source in bytes.
+	Size *int64 `android:"arch_variant"`
+	// The delta file of our edit, written by fetch-public-sources write-deltas, which makes the file
+	// in the tree from the file in the public source. A file with a delta needs sha256 and size.
+	Delta *string `android:"path,arch_variant"`
 }
 
 // declared reports whether the properties name the public copy of a file.
 func (p PublicSourceFileProperties) declared() bool {
-	return p.From != nil || p.Path != nil || p.Sha256 != nil
+	return p.From != nil || p.Path != nil || p.Sha256 != nil || p.Size != nil || p.Delta != nil
 }
 
 // foundAt returns file as found at the path inside the public source that the properties name.
@@ -221,7 +296,17 @@ func (p PublicSourceFileProperties) foundAt(ctx ModuleContext, propertyPrefix st
 	if p.Sha256 != nil {
 		checkSha256(ctx, propertyPrefix+"sha256", *p.Sha256)
 	}
-	return PublicSourceFile{File: file, Path: proptools.String(p.Path), Sha256: p.Sha256}
+	if p.Size != nil && *p.Size < 0 {
+		ctx.PropertyErrorf(propertyPrefix+"size", "must be the length of the file in bytes, not %d", *p.Size)
+	}
+	found := PublicSourceFile{File: file, Path: proptools.String(p.Path), Sha256: p.Sha256, Size: p.Size}
+	if p.Delta != nil {
+		if p.Sha256 == nil || p.Size == nil {
+			ctx.PropertyErrorf(propertyPrefix+"delta", "needs sha256 and size of the file in the public source")
+		}
+		found.Delta = PathForModuleSrc(ctx, *p.Delta)
+	}
+	return found
 }
 
 // PublicSourceProperties are the properties of a prebuilt module that name the public copy of its
@@ -320,13 +405,19 @@ func writePublicSourceMessage(ctx BuilderContext, file WritablePath, source Publ
 	source.Location.setOn(message)
 	inputs := Paths{file}
 	for _, f := range files {
-		message.Files = append(message.Files, &license_metadata_proto.PublicSourceFile{
+		file := &license_metadata_proto.PublicSourceFile{
 			File:      proto.String(f.File.String()),
 			Path:      proto.String(f.Path),
 			Sha256:    f.Sha256,
+			Size:      f.Size,
 			Installed: proto.String(f.installed.String()),
-		})
+		}
 		inputs = append(inputs, f.File, f.installed)
+		if f.Delta != nil {
+			file.Delta = proto.String(f.Delta.String())
+			inputs = append(inputs, f.Delta)
+		}
+		message.Files = append(message.Files, file)
 	}
 
 	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(message)

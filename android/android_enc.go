@@ -14816,6 +14816,8 @@ func init() {
 	PublicSourceInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceInfo) })
 	PublicGitRepositoryGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicGitRepository) })
 	PublicSourceArchiveGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceArchive) })
+	PublicImageArchiveGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicImageArchive) })
+	ArchivePartGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ArchivePart) })
 	PublicSourceFileGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFile) })
 	PublicSourceFileInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFileInfo) })
 }
@@ -14990,6 +14992,121 @@ func (r PublicSourceArchive) GetTypeId() int16 {
 	return PublicSourceArchiveGobRegId
 }
 
+func (r PublicImageArchive) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if r.Parts == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r.Parts)); err != nil {
+			return err
+		}
+		for val1 := 0; val1 < len(r.Parts); val1++ {
+			if err = r.Parts[val1].Encode(ctx, buf); err != nil {
+				return err
+			}
+		}
+	}
+	return err
+}
+
+func (r PublicImageArchive) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.PublicImageArchive")
+	hasher.WriteInt(1)
+	hasher.WriteString(":.[]ArchivePart")
+	hasher.WriteInt(len(r.Parts))
+	for val1 := 0; val1 < len(r.Parts); val1++ {
+		if err := r.Parts[val1].CustomHash(hasher); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *PublicImageArchive) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	var val2 int
+	err = gobtools.DecodeInt(buf, &val2)
+	if err != nil {
+		return err
+	}
+	if val2 != -1 {
+		r.Parts = make([]ArchivePart, val2)
+		for val3 := 0; val3 < int(val2); val3++ {
+			if err = r.Parts[val3].Decode(ctx, buf); err != nil {
+				return err
+			}
+		}
+	}
+
+	return err
+}
+
+var PublicImageArchiveGobRegId int16
+
+func (r PublicImageArchive) GetTypeId() int16 {
+	return PublicImageArchiveGobRegId
+}
+
+func (r ArchivePart) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Url); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Sha256); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeInt64(buf, r.Size); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r ArchivePart) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ArchivePart")
+	hasher.WriteInt(3)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Url)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Sha256)
+	hasher.WriteString(":.int64")
+	hasher.WriteUint64(uint64(r.Size))
+	return nil
+}
+
+func (r *ArchivePart) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Url)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.Sha256)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeInt64(buf, &r.Size)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var ArchivePartGobRegId int16
+
+func (r ArchivePart) GetTypeId() int16 {
+	return ArchivePartGobRegId
+}
+
 func (r PublicSourceFile) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
 	var err error
 
@@ -15010,12 +15127,26 @@ func (r PublicSourceFile) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) err
 			return err
 		}
 	}
+
+	val2 := r.Size == nil
+	if err = gobtools.EncodeBool(buf, val2); err != nil {
+		return err
+	}
+	if !val2 {
+		if err = gobtools.EncodeInt64(buf, (*r.Size)); err != nil {
+			return err
+		}
+	}
+
+	if err = gobtools.EncodeInterface(ctx, buf, r.Delta); err != nil {
+		return err
+	}
 	return err
 }
 
 func (r PublicSourceFile) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":android.PublicSourceFile")
-	hasher.WriteInt(3)
+	hasher.WriteInt(5)
 	hasher.WriteString(":android.Path")
 	val1 := r.File == nil
 	if val1 {
@@ -15055,6 +15186,43 @@ func (r PublicSourceFile) CustomHash(hasher *proptools.Hasher) error {
 			return err
 		}
 	}
+	hasher.WriteString(":.*int64")
+	val6 := r.Size == nil
+	if val6 {
+		hasher.WriteByte(0)
+	} else {
+		val7 := func(hasher *proptools.Hasher) error {
+			hasher.WriteString(":.int64")
+			hasher.WriteUint64(uint64((*r.Size)))
+			return nil
+		}
+		if err := proptools.HashReference(hasher, uintptr(unsafe.Pointer(r.Size)), val7); err != nil {
+			return err
+		}
+	}
+	hasher.WriteString(":android.Path")
+	val8 := r.Delta == nil
+	if val8 {
+		hasher.WriteByte(0)
+	} else {
+		if v := reflect.ValueOf(r.Delta); v.Kind() == reflect.Ptr {
+			if v.IsNil() {
+				panic(fmt.Errorf("nil pointer is not supported in interface"))
+			} else {
+				val9 := r.Delta == nil
+				if val9 {
+					hasher.WriteByte(0)
+				} else {
+					val10 := func(hasher *proptools.Hasher) error { return r.Delta.(proptools.CustomHash).CustomHash(hasher) }
+					if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val10); err != nil {
+						return err
+					}
+				}
+			}
+		} else {
+			r.Delta.(proptools.CustomHash).CustomHash(hasher)
+		}
+	}
 	return nil
 }
 
@@ -15085,6 +15253,27 @@ func (r *PublicSourceFile) Decode(ctx gobtools.EncContext, buf *bytes.Reader) er
 			return err
 		}
 		r.Sha256 = &val4
+	}
+
+	var val8 bool
+	if err = gobtools.DecodeBool(buf, &val8); err != nil {
+		return err
+	}
+	if !val8 {
+		var val7 int64
+		err = gobtools.DecodeInt64(buf, &val7)
+		if err != nil {
+			return err
+		}
+		r.Size = &val7
+	}
+
+	if val11, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+		return err
+	} else if val11 == nil {
+		r.Delta = nil
+	} else {
+		r.Delta = val11.(Path)
 	}
 
 	return err

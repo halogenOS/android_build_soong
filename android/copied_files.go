@@ -5,6 +5,7 @@ package android
 
 import (
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/google/blueprint"
@@ -102,10 +103,14 @@ func (s *copiedFilesSingleton) GenerateBuildActions(ctx SingletonContext) {
 	for _, src := range SortedKeys(declaredFiles) {
 		info := declaredFiles[src]
 		message := PathForOutput(ctx, "public_source_files", src+".pb")
+		inputs := writePublicSourceMessage(ctx, message, info.Source, nil)
+		if info.File.Delta != nil {
+			inputs = append(inputs, info.File.Delta)
+		}
 		s.declaredFiles = append(s.declaredFiles, declaredPublicSourceFile{
 			src:                src,
 			publicSource:       message,
-			publicSourceInputs: writePublicSourceMessage(ctx, message, info.Source, nil),
+			publicSourceInputs: inputs,
 			publicSourceFile:   info.File,
 		})
 	}
@@ -187,6 +192,12 @@ func (s *copiedFilesSingleton) MakeVars(ctx MakeVarsContext) {
 		writePublicSourceMakeVars(ctx, prefix, file.publicSource, file.publicSourceInputs)
 		ctx.StrictRaw(prefix+"PUBLIC_SOURCE_PATH", file.publicSourceFile.Path)
 		ctx.StrictRaw(prefix+"PUBLIC_SOURCE_SHA256", proptools.String(file.publicSourceFile.Sha256))
+		if size := file.publicSourceFile.Size; size != nil {
+			ctx.StrictRaw(prefix+"PUBLIC_SOURCE_SIZE", strconv.FormatInt(*size, 10))
+		}
+		if delta := file.publicSourceFile.Delta; delta != nil {
+			ctx.StrictRaw(prefix+"PUBLIC_SOURCE_DELTA", delta.String())
+		}
 	}
 
 	dirs := make([]string, 0, len(s.packages))

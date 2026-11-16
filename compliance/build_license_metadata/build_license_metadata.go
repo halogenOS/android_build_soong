@@ -84,6 +84,8 @@ func main() {
 	publicSourcePath := flags.String("public_source_path", "", "path of the public_source_file inside the public source")
 	publicSourceInstalled := flags.String("public_source_installed", "", "file installed from the public_source_file")
 	publicSourceSha256 := flags.String("public_source_sha256", "", "SHA-256 of the public_source_file in the public source, when it is declared")
+	publicSourceSize := flags.Int64("public_source_size", -1, "length in bytes of the public_source_file in the public source, when it is declared")
+	publicSourceDelta := flags.String("public_source_delta", "", "delta file of our edit of the public_source_file, when we edited it")
 	outFile := flags.String("o", "", "output file")
 
 	flags.Parse(expandedArgs)
@@ -107,12 +109,17 @@ func main() {
 	if *publicSource != "" {
 		var files []*license_metadata_proto.PublicSourceFile
 		if *publicSourceFile != "" {
-			files = append(files, &license_metadata_proto.PublicSourceFile{
+			file := &license_metadata_proto.PublicSourceFile{
 				File:      proto.String(*publicSourceFile),
 				Path:      proto.String(*publicSourcePath),
 				Installed: proto.String(*publicSourceInstalled),
 				Sha256:    nonEmpty(*publicSourceSha256),
-			})
+				Delta:     nonEmpty(*publicSourceDelta),
+			}
+			if *publicSourceSize >= 0 {
+				file.Size = proto.Int64(*publicSourceSize)
+			}
+			files = append(files, file)
 		}
 		var err error
 		metadata.PublicSource, err = readPublicSource(*publicSource, files)

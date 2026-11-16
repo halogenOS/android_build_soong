@@ -74,6 +74,7 @@ message PublicSource {
   oneof location {
     GitRepository git = 2;
     Archive archive = 3;
+    ImageArchive image_archive = 5;
   }
 
   // The prebuilt files of the target found in the public source.
@@ -92,6 +93,23 @@ message Archive {
   optional string sha256 = 2;
 
   // The length of the archive in bytes.
+  optional int64 size = 3;
+}
+
+// ImageArchive messages describe a 7z archive of partition images, each named <partition>.img,
+// split into parts. The path of a file in it starts with the partition whose image contains the
+// file.
+message ImageArchive {
+  // The parts in the order in which they form the archive.
+  repeated ArchivePart parts = 1;
+}
+
+// ArchivePart messages describe one file of an archive split into parts.
+message ArchivePart {
+  optional string url = 1;
+  optional string sha256 = 2;
+
+  // The length of the part in bytes.
   optional int64 size = 3;
 }
 
@@ -116,6 +134,13 @@ message PublicSourceFile {
 
   // The SHA-256 of the installed file.
   optional string installed_sha256 = 6;
+
+  // The length in bytes that the declaration names for the file in the public source, if any.
+  optional int64 size = 7;
+
+  // The path of the delta file of our edit in the source tree, which makes the file in the source
+  // tree from the file in the public source, if we edited the file.
+  optional string delta = 8;
 }
 
 // InstallMap messages describe the mapping from an input filesystem file to the path to the file
