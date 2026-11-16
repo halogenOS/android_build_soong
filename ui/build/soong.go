@@ -333,14 +333,6 @@ func bootstrapBlueprint(ctx Context, config Config) {
 	if config.incrementalBuildActions {
 		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, "--incremental-build-actions")
 	}
-	if availableRAM := config.AvailableRAM(); availableRAM != 0 {
-		// Without a limit, the garbage collector lets the heap of soong_build
-		// grow to twice its live size, and with a limit it lets the heap grow
-		// up to the limit. The memory used by other processes stays theirs,
-		// and the memory of soong_build outside its heap and the rest of the
-		// machine keep the other half of what is available.
-		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, fmt.Sprintf("--memory_limit=%d", availableRAM/2))
-	}
 	if len(config.partialAnalysisTargets) > 0 {
 		mainSoongBuildExtraArgs = append(mainSoongBuildExtraArgs, fmt.Sprintf("%s=\"%s\"", "--partial-analysis-targets", config.partialAnalysisTargets))
 	}

@@ -1715,12 +1715,6 @@ func (c *configImpl) TotalRAM() uint64 {
 	return c.totalRAM
 }
 
-// AvailableRAM is the memory that the machine had available for new processes
-// without swapping when soong_ui started.
-func (c *configImpl) AvailableRAM() uint64 {
-	return c.systemMemInfo.MemAvailable
-}
-
 func (c *configImpl) canSupportRBE() bool {
 	// Only supported on linux
 	if runtime.GOOS != "linux" {

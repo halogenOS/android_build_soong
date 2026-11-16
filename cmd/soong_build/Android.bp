@@ -31,8 +31,10 @@ blueprint_go_binary {
         "soong",
         "soong-android",
         "soong-android-allowlists",
+        "soong-finder-fs",
         "soong-provenance",
         "soong-shared",
+        "soong-ui-metrics",
         "soong-ui-metrics_proto",
     ],
     srcs: [

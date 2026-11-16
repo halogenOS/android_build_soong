@@ -27,7 +27,9 @@ import (
 
 	"android/soong/android"
 	"android/soong/android/allowlists"
+	"android/soong/finder/fs"
 	"android/soong/shared"
+	uiMetrics "android/soong/ui/metrics"
 
 	androidProtobuf "google.golang.org/protobuf/android"
 
@@ -84,7 +86,7 @@ func init() {
 	flag.StringVar(&cmdlineArgs.TraceFile, "trace", "", "write trace to file")
 	flag.StringVar(&cmdlineArgs.Memprofile, "memprofile", "", "write memory profile to file")
 	flag.BoolVar(&cmdlineArgs.NoGC, "nogc", false, "turn off GC for debugging")
-	flag.Int64Var(&cmdlineArgs.MemoryLimit, "memory_limit", 0, "soft memory limit of the Go runtime in bytes, unless GOMEMLIMIT is set")
+	flag.Int64Var(&cmdlineArgs.MemoryLimit, "memory_limit", 0, "soft memory limit of the Go runtime in bytes, unless GOMEMLIMIT is set; 0 sets half of the memory available when soong_build starts")
 
 	// Flags representing various modes soong_build can run in
 	flag.StringVar(&cmdlineArgs.DocFile, "soong_docs", "", "build documentation file to output")
@@ -310,8 +312,28 @@ func parseAvailableEnv() map[string]string {
 	return result
 }
 
+// halfOfAvailableMemory returns the heap limit that leaves the other half of
+// the memory available at start to the memory of soong_build outside its heap
+// and to the rest of the machine. Without a limit, the garbage collector lets
+// the heap grow to twice its live size. soong_build reads the available memory
+// itself: a value on its command line would change the command of the analysis
+// step, and so rerun the analysis, whenever the free memory of the machine
+// changes.
+func halfOfAvailableMemory() int64 {
+	memInfo, err := uiMetrics.NewMemInfo(fs.OsFs)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "could not read the available memory, the heap has no limit: %s\n", err)
+		return 0
+	}
+	return int64(memInfo.MemAvailable / 2)
+}
+
 func main() {
 	flag.Parse()
+
+	if cmdlineArgs.MemoryLimit == 0 {
+		cmdlineArgs.MemoryLimit = halfOfAvailableMemory()
+	}
 
 	if cmdlineArgs.Memprofile == "" {
 		// Go enables memory profile collection automatically if any references
