@@ -22,7 +22,10 @@ import (
 
 // location is used to service $(location) and $(locations) entries in genrule commands.
 type location interface {
-	Paths(cmd *android.RuleBuilderCommand) []string
+	// ReferenceIn returns the paths used by cmd for the location inside the sandbox. Srcs
+	// referenced this way also become inputs of cmd, since a gensrcs shard otherwise has only
+	// the srcs in it.
+	ReferenceIn(cmd *android.RuleBuilderCommand) []string
 	String() string
 }
 
@@ -35,8 +38,8 @@ func (l inputLocation) String() string {
 	return strings.Join(l.paths.Strings(), " ")
 }
 
-func (l inputLocation) Paths(cmd *android.RuleBuilderCommand) []string {
-	return cmd.PathsForInputs(l.paths)
+func (l inputLocation) ReferenceIn(cmd *android.RuleBuilderCommand) []string {
+	return cmd.Implicits(l.paths).PathsForInputs(l.paths)
 }
 
 var _ location = inputLocation{}
@@ -50,7 +53,7 @@ func (l outputLocation) String() string {
 	return l.path.String()
 }
 
-func (l outputLocation) Paths(cmd *android.RuleBuilderCommand) []string {
+func (l outputLocation) ReferenceIn(cmd *android.RuleBuilderCommand) []string {
 	return []string{cmd.PathForOutput(l.path)}
 }
 
@@ -65,7 +68,7 @@ func (l toolLocation) String() string {
 	return strings.Join(l.paths.Strings(), " ")
 }
 
-func (l toolLocation) Paths(cmd *android.RuleBuilderCommand) []string {
+func (l toolLocation) ReferenceIn(cmd *android.RuleBuilderCommand) []string {
 	return cmd.PathsForTools(l.paths)
 }
 
@@ -81,7 +84,7 @@ func (l packagedToolLocation) String() string {
 	return l.spec.FileName()
 }
 
-func (l packagedToolLocation) Paths(cmd *android.RuleBuilderCommand) []string {
+func (l packagedToolLocation) ReferenceIn(cmd *android.RuleBuilderCommand) []string {
 	return []string{cmd.PathForPackagedTool(l.spec)}
 }
 
@@ -97,7 +100,7 @@ func (l errorLocation) String() string {
 	return l.err
 }
 
-func (l errorLocation) Paths(cmd *android.RuleBuilderCommand) []string {
+func (l errorLocation) ReferenceIn(cmd *android.RuleBuilderCommand) []string {
 	return []string{l.err}
 }
 

@@ -232,6 +232,8 @@ type Module struct {
 type taskFunc func(ctx android.ModuleContext, rawCommand string, srcFiles android.Paths) []generateTask
 
 type generateTask struct {
+	// The srcs read by the command. generateCommonBuildActions adds to them only the srcs
+	// referenced through $(location) or $(locations).
 	in          android.Paths
 	out         android.WritablePaths
 	copyTo      android.WritablePaths // For gensrcs to set on gensrcsMerge rule.
@@ -599,7 +601,7 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 					return reportError("at least one `tools` or `tool_files` is required if $(location) is used")
 				}
 				loc := locationLabels[firstLabel]
-				paths := loc.Paths(cmd)
+				paths := loc.ReferenceIn(cmd)
 				if len(paths) == 0 {
 					return reportError("default label %q has no files", firstLabel)
 				} else if len(paths) > 1 {
@@ -631,7 +633,7 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 				if strings.HasPrefix(name, "location ") {
 					label := strings.TrimSpace(strings.TrimPrefix(name, "location "))
 					if loc, ok := locationLabels[label]; ok {
-						paths := loc.Paths(cmd)
+						paths := loc.ReferenceIn(cmd)
 						if len(paths) == 0 {
 							return reportError("label %q has no files", label)
 						} else if len(paths) > 1 {
@@ -645,7 +647,7 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 				} else if strings.HasPrefix(name, "locations ") {
 					label := strings.TrimSpace(strings.TrimPrefix(name, "locations "))
 					if loc, ok := locationLabels[label]; ok {
-						paths := loc.Paths(cmd)
+						paths := loc.ReferenceIn(cmd)
 						if len(paths) == 0 {
 							return reportError("label %q has no files", label)
 						}
@@ -667,7 +669,6 @@ func (g *Module) generateCommonBuildActions(ctx android.ModuleContext) {
 		g.rawCommands = append(g.rawCommands, rawCommand)
 
 		cmd.Text(rawCommand)
-		cmd.Implicits(srcFiles) // need to be able to reference other srcs
 		cmd.Implicits(extraInputs)
 		cmd.ImplicitOutputs(task.out)
 		cmd.Implicits(task.in)
@@ -858,6 +859,7 @@ func NewGenSrcs() *Module {
 		// gensrcs rules can easily hit command line limits by repeating the command for
 		// every input file.  Shard the input files into groups.
 		shards := android.ShardPaths(srcFiles, shardSize)
+		readsOtherSrcs := proptools.BoolDefault(properties.Reads_other_srcs, true)
 		var generateTasks []generateTask
 
 		// Expands the output path pattern to form the output path for the given
@@ -957,8 +959,13 @@ func NewGenSrcs() *Module {
 			}
 			fullCommand := strings.Join(commands, " && ")
 
+			inputs := shard
+			if readsOtherSrcs {
+				inputs = srcFiles
+			}
+
 			generateTasks = append(generateTasks, generateTask{
-				in:     shard,
+				in:     inputs,
 				out:    outFiles,
 				copyTo: copyTo,
 				genDir: genDir,
@@ -1014,6 +1021,12 @@ type genSrcsProperties struct {
 
 	// maximum number of files that will be passed on a single command line.
 	Shard_size *int64
+
+	// Set to false when the command run for each source file reads no other files in srcs. The
+	// inputs of each shard are then the srcs in that shard and the srcs referenced by cmd
+	// through $(location) or $(locations). Defaults to true, for commands that read other
+	// srcs, for example the imports of a .proto file.
+	Reads_other_srcs *bool
 
 	// Additional files needed for build that are not tooling related.
 	Data []string `android:"path"`
