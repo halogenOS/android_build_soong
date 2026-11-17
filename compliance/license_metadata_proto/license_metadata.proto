@@ -139,8 +139,31 @@ message PublicSourceFile {
   optional int64 size = 7;
 
   // The path of the delta file of our edit in the source tree, which makes the file in the source
-  // tree from the file in the public source, if we edited the file.
+  // tree from the file in the public source with its fixups made, if we edited the file.
   optional string delta = 8;
+
+  // The fixups of extract-utils, made in order on the file in the public source before the delta.
+  repeated Fixup fixups = 9;
+}
+
+// Fixup messages describe one fixup that extract-utils makes on an ELF file: a method of the
+// blob_fixups of a device tree, or the FIX_SONAME argument of a file.
+message Fixup {
+  oneof edit {
+    LibraryReplacement replace_needed = 1;
+
+    // A library that the file needs too.
+    string add_needed = 2;
+
+    // The soname that the file gets.
+    string set_soname = 3;
+  }
+}
+
+// LibraryReplacement messages describe a needed library and the library that replaces it.
+message LibraryReplacement {
+  optional string from = 1;
+  optional string to = 2;
 }
 
 // InstallMap messages describe the mapping from an input filesystem file to the path to the file

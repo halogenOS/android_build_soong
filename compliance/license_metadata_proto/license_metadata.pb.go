@@ -581,8 +581,10 @@ type PublicSourceFile struct {
 	// The length in bytes that the declaration names for the file in the public source, if any.
 	Size *int64 `protobuf:"varint,7,opt,name=size" json:"size,omitempty"`
 	// The path of the delta file of our edit in the source tree, which makes the file in the source
-	// tree from the file in the public source, if we edited the file.
+	// tree from the file in the public source with its fixups made, if we edited the file.
 	Delta *string `protobuf:"bytes,8,opt,name=delta" json:"delta,omitempty"`
+	// The fixups of extract-utils, made in order on the file in the public source before the delta.
+	Fixups []*Fixup `protobuf:"bytes,9,rep,name=fixups" json:"fixups,omitempty"`
 }
 
 func (x *PublicSourceFile) Reset() {
@@ -673,6 +675,168 @@ func (x *PublicSourceFile) GetDelta() string {
 	return ""
 }
 
+func (x *PublicSourceFile) GetFixups() []*Fixup {
+	if x != nil {
+		return x.Fixups
+	}
+	return nil
+}
+
+// Fixup messages describe one fixup that extract-utils makes on an ELF file: a method of the
+// blob_fixups of a device tree, or the FIX_SONAME argument of a file.
+type Fixup struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	// Types that are assignable to Edit:
+	//
+	//	*Fixup_ReplaceNeeded
+	//	*Fixup_AddNeeded
+	//	*Fixup_SetSoname
+	Edit isFixup_Edit `protobuf_oneof:"edit"`
+}
+
+func (x *Fixup) Reset() {
+	*x = Fixup{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_license_metadata_proto_msgTypes[7]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *Fixup) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Fixup) ProtoMessage() {}
+
+func (x *Fixup) ProtoReflect() protoreflect.Message {
+	mi := &file_license_metadata_proto_msgTypes[7]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Fixup.ProtoReflect.Descriptor instead.
+func (*Fixup) Descriptor() ([]byte, []int) {
+	return file_license_metadata_proto_rawDescGZIP(), []int{7}
+}
+
+func (m *Fixup) GetEdit() isFixup_Edit {
+	if m != nil {
+		return m.Edit
+	}
+	return nil
+}
+
+func (x *Fixup) GetReplaceNeeded() *LibraryReplacement {
+	if x, ok := x.GetEdit().(*Fixup_ReplaceNeeded); ok {
+		return x.ReplaceNeeded
+	}
+	return nil
+}
+
+func (x *Fixup) GetAddNeeded() string {
+	if x, ok := x.GetEdit().(*Fixup_AddNeeded); ok {
+		return x.AddNeeded
+	}
+	return ""
+}
+
+func (x *Fixup) GetSetSoname() string {
+	if x, ok := x.GetEdit().(*Fixup_SetSoname); ok {
+		return x.SetSoname
+	}
+	return ""
+}
+
+type isFixup_Edit interface {
+	isFixup_Edit()
+}
+
+type Fixup_ReplaceNeeded struct {
+	ReplaceNeeded *LibraryReplacement `protobuf:"bytes,1,opt,name=replace_needed,json=replaceNeeded,oneof"`
+}
+
+type Fixup_AddNeeded struct {
+	// A library that the file needs too.
+	AddNeeded string `protobuf:"bytes,2,opt,name=add_needed,json=addNeeded,oneof"`
+}
+
+type Fixup_SetSoname struct {
+	// The soname that the file gets.
+	SetSoname string `protobuf:"bytes,3,opt,name=set_soname,json=setSoname,oneof"`
+}
+
+func (*Fixup_ReplaceNeeded) isFixup_Edit() {}
+
+func (*Fixup_AddNeeded) isFixup_Edit() {}
+
+func (*Fixup_SetSoname) isFixup_Edit() {}
+
+// LibraryReplacement messages describe a needed library and the library that replaces it.
+type LibraryReplacement struct {
+	state         protoimpl.MessageState
+	sizeCache     protoimpl.SizeCache
+	unknownFields protoimpl.UnknownFields
+
+	From *string `protobuf:"bytes,1,opt,name=from" json:"from,omitempty"`
+	To   *string `protobuf:"bytes,2,opt,name=to" json:"to,omitempty"`
+}
+
+func (x *LibraryReplacement) Reset() {
+	*x = LibraryReplacement{}
+	if protoimpl.UnsafeEnabled {
+		mi := &file_license_metadata_proto_msgTypes[8]
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		ms.StoreMessageInfo(mi)
+	}
+}
+
+func (x *LibraryReplacement) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LibraryReplacement) ProtoMessage() {}
+
+func (x *LibraryReplacement) ProtoReflect() protoreflect.Message {
+	mi := &file_license_metadata_proto_msgTypes[8]
+	if protoimpl.UnsafeEnabled && x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LibraryReplacement.ProtoReflect.Descriptor instead.
+func (*LibraryReplacement) Descriptor() ([]byte, []int) {
+	return file_license_metadata_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LibraryReplacement) GetFrom() string {
+	if x != nil && x.From != nil {
+		return *x.From
+	}
+	return ""
+}
+
+func (x *LibraryReplacement) GetTo() string {
+	if x != nil && x.To != nil {
+		return *x.To
+	}
+	return ""
+}
+
 // InstallMap messages describe the mapping from an input filesystem file to the path to the file
 // in a container.
 type InstallMap struct {
@@ -689,7 +853,7 @@ type InstallMap struct {
 func (x *InstallMap) Reset() {
 	*x = InstallMap{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_license_metadata_proto_msgTypes[7]
+		mi := &file_license_metadata_proto_msgTypes[9]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -702,7 +866,7 @@ func (x *InstallMap) String() string {
 func (*InstallMap) ProtoMessage() {}
 
 func (x *InstallMap) ProtoReflect() protoreflect.Message {
-	mi := &file_license_metadata_proto_msgTypes[7]
+	mi := &file_license_metadata_proto_msgTypes[9]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -715,7 +879,7 @@ func (x *InstallMap) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InstallMap.ProtoReflect.Descriptor instead.
 func (*InstallMap) Descriptor() ([]byte, []int) {
-	return file_license_metadata_proto_rawDescGZIP(), []int{7}
+	return file_license_metadata_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *InstallMap) GetFromPath() string {
@@ -747,7 +911,7 @@ type AnnotatedDependency struct {
 func (x *AnnotatedDependency) Reset() {
 	*x = AnnotatedDependency{}
 	if protoimpl.UnsafeEnabled {
-		mi := &file_license_metadata_proto_msgTypes[8]
+		mi := &file_license_metadata_proto_msgTypes[10]
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		ms.StoreMessageInfo(mi)
 	}
@@ -760,7 +924,7 @@ func (x *AnnotatedDependency) String() string {
 func (*AnnotatedDependency) ProtoMessage() {}
 
 func (x *AnnotatedDependency) ProtoReflect() protoreflect.Message {
-	mi := &file_license_metadata_proto_msgTypes[8]
+	mi := &file_license_metadata_proto_msgTypes[10]
 	if protoimpl.UnsafeEnabled && x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -773,7 +937,7 @@ func (x *AnnotatedDependency) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AnnotatedDependency.ProtoReflect.Descriptor instead.
 func (*AnnotatedDependency) Descriptor() ([]byte, []int) {
-	return file_license_metadata_proto_rawDescGZIP(), []int{8}
+	return file_license_metadata_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *AnnotatedDependency) GetFile() string {
@@ -872,7 +1036,7 @@ var file_license_metadata_proto_rawDesc = []byte{
 	0x03, 0x75, 0x72, 0x6c, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x03, 0x75, 0x72, 0x6c, 0x12,
 	0x16, 0x0a, 0x06, 0x73, 0x68, 0x61, 0x32, 0x35, 0x36, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52,
 	0x06, 0x73, 0x68, 0x61, 0x32, 0x35, 0x36, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x18,
-	0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x22, 0xe6, 0x01, 0x0a, 0x10,
+	0x03, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x22, 0x9d, 0x02, 0x0a, 0x10,
 	0x50, 0x75, 0x62, 0x6c, 0x69, 0x63, 0x53, 0x6f, 0x75, 0x72, 0x63, 0x65, 0x46, 0x69, 0x6c, 0x65,
 	0x12, 0x12, 0x0a, 0x04, 0x66, 0x69, 0x6c, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04,
 	0x66, 0x69, 0x6c, 0x65, 0x12, 0x12, 0x0a, 0x04, 0x70, 0x61, 0x74, 0x68, 0x18, 0x02, 0x20, 0x01,
@@ -887,20 +1051,37 @@ var file_license_metadata_proto_rawDesc = []byte{
 	0x6c, 0x6c, 0x65, 0x64, 0x53, 0x68, 0x61, 0x32, 0x35, 0x36, 0x12, 0x12, 0x0a, 0x04, 0x73, 0x69,
 	0x7a, 0x65, 0x18, 0x07, 0x20, 0x01, 0x28, 0x03, 0x52, 0x04, 0x73, 0x69, 0x7a, 0x65, 0x12, 0x14,
 	0x0a, 0x05, 0x64, 0x65, 0x6c, 0x74, 0x61, 0x18, 0x08, 0x20, 0x01, 0x28, 0x09, 0x52, 0x05, 0x64,
-	0x65, 0x6c, 0x74, 0x61, 0x22, 0x50, 0x0a, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6c, 0x6c, 0x4d,
-	0x61, 0x70, 0x12, 0x1b, 0x0a, 0x09, 0x66, 0x72, 0x6f, 0x6d, 0x5f, 0x70, 0x61, 0x74, 0x68, 0x18,
-	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x08, 0x66, 0x72, 0x6f, 0x6d, 0x50, 0x61, 0x74, 0x68, 0x12,
-	0x25, 0x0a, 0x0e, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x5f, 0x70, 0x61, 0x74,
-	0x68, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x0d, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e,
-	0x65, 0x72, 0x50, 0x61, 0x74, 0x68, 0x22, 0x4b, 0x0a, 0x13, 0x41, 0x6e, 0x6e, 0x6f, 0x74, 0x61,
-	0x74, 0x65, 0x64, 0x44, 0x65, 0x70, 0x65, 0x6e, 0x64, 0x65, 0x6e, 0x63, 0x79, 0x12, 0x12, 0x0a,
-	0x04, 0x66, 0x69, 0x6c, 0x65, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x66, 0x69, 0x6c,
-	0x65, 0x12, 0x20, 0x0a, 0x0b, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73,
-	0x18, 0x02, 0x20, 0x03, 0x28, 0x09, 0x52, 0x0b, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69,
-	0x6f, 0x6e, 0x73, 0x42, 0x31, 0x5a, 0x2f, 0x61, 0x6e, 0x64, 0x72, 0x6f, 0x69, 0x64, 0x2f, 0x73,
-	0x6f, 0x6f, 0x6e, 0x67, 0x2f, 0x63, 0x6f, 0x6d, 0x70, 0x6c, 0x69, 0x61, 0x6e, 0x63, 0x65, 0x2f,
-	0x6c, 0x69, 0x63, 0x65, 0x6e, 0x73, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61,
-	0x5f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
+	0x65, 0x6c, 0x74, 0x61, 0x12, 0x35, 0x0a, 0x06, 0x66, 0x69, 0x78, 0x75, 0x70, 0x73, 0x18, 0x09,
+	0x20, 0x03, 0x28, 0x0b, 0x32, 0x1d, 0x2e, 0x62, 0x75, 0x69, 0x6c, 0x64, 0x5f, 0x6c, 0x69, 0x63,
+	0x65, 0x6e, 0x73, 0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x46, 0x69,
+	0x78, 0x75, 0x70, 0x52, 0x06, 0x66, 0x69, 0x78, 0x75, 0x70, 0x73, 0x22, 0xa6, 0x01, 0x0a, 0x05,
+	0x46, 0x69, 0x78, 0x75, 0x70, 0x12, 0x53, 0x0a, 0x0e, 0x72, 0x65, 0x70, 0x6c, 0x61, 0x63, 0x65,
+	0x5f, 0x6e, 0x65, 0x65, 0x64, 0x65, 0x64, 0x18, 0x01, 0x20, 0x01, 0x28, 0x0b, 0x32, 0x2a, 0x2e,
+	0x62, 0x75, 0x69, 0x6c, 0x64, 0x5f, 0x6c, 0x69, 0x63, 0x65, 0x6e, 0x73, 0x65, 0x5f, 0x6d, 0x65,
+	0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x2e, 0x4c, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x52, 0x65,
+	0x70, 0x6c, 0x61, 0x63, 0x65, 0x6d, 0x65, 0x6e, 0x74, 0x48, 0x00, 0x52, 0x0d, 0x72, 0x65, 0x70,
+	0x6c, 0x61, 0x63, 0x65, 0x4e, 0x65, 0x65, 0x64, 0x65, 0x64, 0x12, 0x1f, 0x0a, 0x0a, 0x61, 0x64,
+	0x64, 0x5f, 0x6e, 0x65, 0x65, 0x64, 0x65, 0x64, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x48, 0x00,
+	0x52, 0x09, 0x61, 0x64, 0x64, 0x4e, 0x65, 0x65, 0x64, 0x65, 0x64, 0x12, 0x1f, 0x0a, 0x0a, 0x73,
+	0x65, 0x74, 0x5f, 0x73, 0x6f, 0x6e, 0x61, 0x6d, 0x65, 0x18, 0x03, 0x20, 0x01, 0x28, 0x09, 0x48,
+	0x00, 0x52, 0x09, 0x73, 0x65, 0x74, 0x53, 0x6f, 0x6e, 0x61, 0x6d, 0x65, 0x42, 0x06, 0x0a, 0x04,
+	0x65, 0x64, 0x69, 0x74, 0x22, 0x38, 0x0a, 0x12, 0x4c, 0x69, 0x62, 0x72, 0x61, 0x72, 0x79, 0x52,
+	0x65, 0x70, 0x6c, 0x61, 0x63, 0x65, 0x6d, 0x65, 0x6e, 0x74, 0x12, 0x12, 0x0a, 0x04, 0x66, 0x72,
+	0x6f, 0x6d, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x66, 0x72, 0x6f, 0x6d, 0x12, 0x0e,
+	0x0a, 0x02, 0x74, 0x6f, 0x18, 0x02, 0x20, 0x01, 0x28, 0x09, 0x52, 0x02, 0x74, 0x6f, 0x22, 0x50,
+	0x0a, 0x0a, 0x49, 0x6e, 0x73, 0x74, 0x61, 0x6c, 0x6c, 0x4d, 0x61, 0x70, 0x12, 0x1b, 0x0a, 0x09,
+	0x66, 0x72, 0x6f, 0x6d, 0x5f, 0x70, 0x61, 0x74, 0x68, 0x18, 0x01, 0x20, 0x01, 0x28, 0x09, 0x52,
+	0x08, 0x66, 0x72, 0x6f, 0x6d, 0x50, 0x61, 0x74, 0x68, 0x12, 0x25, 0x0a, 0x0e, 0x63, 0x6f, 0x6e,
+	0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x5f, 0x70, 0x61, 0x74, 0x68, 0x18, 0x02, 0x20, 0x01, 0x28,
+	0x09, 0x52, 0x0d, 0x63, 0x6f, 0x6e, 0x74, 0x61, 0x69, 0x6e, 0x65, 0x72, 0x50, 0x61, 0x74, 0x68,
+	0x22, 0x4b, 0x0a, 0x13, 0x41, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x65, 0x64, 0x44, 0x65, 0x70,
+	0x65, 0x6e, 0x64, 0x65, 0x6e, 0x63, 0x79, 0x12, 0x12, 0x0a, 0x04, 0x66, 0x69, 0x6c, 0x65, 0x18,
+	0x01, 0x20, 0x01, 0x28, 0x09, 0x52, 0x04, 0x66, 0x69, 0x6c, 0x65, 0x12, 0x20, 0x0a, 0x0b, 0x61,
+	0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x18, 0x02, 0x20, 0x03, 0x28, 0x09,
+	0x52, 0x0b, 0x61, 0x6e, 0x6e, 0x6f, 0x74, 0x61, 0x74, 0x69, 0x6f, 0x6e, 0x73, 0x42, 0x31, 0x5a,
+	0x2f, 0x61, 0x6e, 0x64, 0x72, 0x6f, 0x69, 0x64, 0x2f, 0x73, 0x6f, 0x6f, 0x6e, 0x67, 0x2f, 0x63,
+	0x6f, 0x6d, 0x70, 0x6c, 0x69, 0x61, 0x6e, 0x63, 0x65, 0x2f, 0x6c, 0x69, 0x63, 0x65, 0x6e, 0x73,
+	0x65, 0x5f, 0x6d, 0x65, 0x74, 0x61, 0x64, 0x61, 0x74, 0x61, 0x5f, 0x70, 0x72, 0x6f, 0x74, 0x6f,
 }
 
 var (
@@ -915,7 +1096,7 @@ func file_license_metadata_proto_rawDescGZIP() []byte {
 	return file_license_metadata_proto_rawDescData
 }
 
-var file_license_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_license_metadata_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_license_metadata_proto_goTypes = []interface{}{
 	(*LicenseMetadata)(nil),     // 0: build_license_metadata.LicenseMetadata
 	(*PublicSource)(nil),        // 1: build_license_metadata.PublicSource
@@ -924,23 +1105,27 @@ var file_license_metadata_proto_goTypes = []interface{}{
 	(*ImageArchive)(nil),        // 4: build_license_metadata.ImageArchive
 	(*ArchivePart)(nil),         // 5: build_license_metadata.ArchivePart
 	(*PublicSourceFile)(nil),    // 6: build_license_metadata.PublicSourceFile
-	(*InstallMap)(nil),          // 7: build_license_metadata.InstallMap
-	(*AnnotatedDependency)(nil), // 8: build_license_metadata.AnnotatedDependency
+	(*Fixup)(nil),               // 7: build_license_metadata.Fixup
+	(*LibraryReplacement)(nil),  // 8: build_license_metadata.LibraryReplacement
+	(*InstallMap)(nil),          // 9: build_license_metadata.InstallMap
+	(*AnnotatedDependency)(nil), // 10: build_license_metadata.AnnotatedDependency
 }
 var file_license_metadata_proto_depIdxs = []int32{
-	7, // 0: build_license_metadata.LicenseMetadata.install_map:type_name -> build_license_metadata.InstallMap
-	8, // 1: build_license_metadata.LicenseMetadata.deps:type_name -> build_license_metadata.AnnotatedDependency
-	1, // 2: build_license_metadata.LicenseMetadata.public_source:type_name -> build_license_metadata.PublicSource
-	2, // 3: build_license_metadata.PublicSource.git:type_name -> build_license_metadata.GitRepository
-	3, // 4: build_license_metadata.PublicSource.archive:type_name -> build_license_metadata.Archive
-	4, // 5: build_license_metadata.PublicSource.image_archive:type_name -> build_license_metadata.ImageArchive
-	6, // 6: build_license_metadata.PublicSource.files:type_name -> build_license_metadata.PublicSourceFile
-	5, // 7: build_license_metadata.ImageArchive.parts:type_name -> build_license_metadata.ArchivePart
-	8, // [8:8] is the sub-list for method output_type
-	8, // [8:8] is the sub-list for method input_type
-	8, // [8:8] is the sub-list for extension type_name
-	8, // [8:8] is the sub-list for extension extendee
-	0, // [0:8] is the sub-list for field type_name
+	9,  // 0: build_license_metadata.LicenseMetadata.install_map:type_name -> build_license_metadata.InstallMap
+	10, // 1: build_license_metadata.LicenseMetadata.deps:type_name -> build_license_metadata.AnnotatedDependency
+	1,  // 2: build_license_metadata.LicenseMetadata.public_source:type_name -> build_license_metadata.PublicSource
+	2,  // 3: build_license_metadata.PublicSource.git:type_name -> build_license_metadata.GitRepository
+	3,  // 4: build_license_metadata.PublicSource.archive:type_name -> build_license_metadata.Archive
+	4,  // 5: build_license_metadata.PublicSource.image_archive:type_name -> build_license_metadata.ImageArchive
+	6,  // 6: build_license_metadata.PublicSource.files:type_name -> build_license_metadata.PublicSourceFile
+	5,  // 7: build_license_metadata.ImageArchive.parts:type_name -> build_license_metadata.ArchivePart
+	7,  // 8: build_license_metadata.PublicSourceFile.fixups:type_name -> build_license_metadata.Fixup
+	8,  // 9: build_license_metadata.Fixup.replace_needed:type_name -> build_license_metadata.LibraryReplacement
+	10, // [10:10] is the sub-list for method output_type
+	10, // [10:10] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_license_metadata_proto_init() }
@@ -1034,7 +1219,7 @@ func file_license_metadata_proto_init() {
 			}
 		}
 		file_license_metadata_proto_msgTypes[7].Exporter = func(v interface{}, i int) interface{} {
-			switch v := v.(*InstallMap); i {
+			switch v := v.(*Fixup); i {
 			case 0:
 				return &v.state
 			case 1:
@@ -1046,6 +1231,30 @@ func file_license_metadata_proto_init() {
 			}
 		}
 		file_license_metadata_proto_msgTypes[8].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*LibraryReplacement); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_license_metadata_proto_msgTypes[9].Exporter = func(v interface{}, i int) interface{} {
+			switch v := v.(*InstallMap); i {
+			case 0:
+				return &v.state
+			case 1:
+				return &v.sizeCache
+			case 2:
+				return &v.unknownFields
+			default:
+				return nil
+			}
+		}
+		file_license_metadata_proto_msgTypes[10].Exporter = func(v interface{}, i int) interface{} {
 			switch v := v.(*AnnotatedDependency); i {
 			case 0:
 				return &v.state
@@ -1063,13 +1272,18 @@ func file_license_metadata_proto_init() {
 		(*PublicSource_Archive)(nil),
 		(*PublicSource_ImageArchive)(nil),
 	}
+	file_license_metadata_proto_msgTypes[7].OneofWrappers = []interface{}{
+		(*Fixup_ReplaceNeeded)(nil),
+		(*Fixup_AddNeeded)(nil),
+		(*Fixup_SetSoname)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: file_license_metadata_proto_rawDesc,
 			NumEnums:      0,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

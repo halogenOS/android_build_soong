@@ -14819,6 +14819,9 @@ func init() {
 	PublicImageArchiveGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicImageArchive) })
 	ArchivePartGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ArchivePart) })
 	PublicSourceFileGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFile) })
+	ReplaceNeededFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ReplaceNeededFixup) })
+	AddNeededFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(AddNeededFixup) })
+	SetSonameFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(SetSonameFixup) })
 	PublicSourceFileInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFileInfo) })
 }
 
@@ -15141,12 +15144,27 @@ func (r PublicSourceFile) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) err
 	if err = gobtools.EncodeInterface(ctx, buf, r.Delta); err != nil {
 		return err
 	}
+
+	if r.Fixups == nil {
+		if err = gobtools.EncodeInt(buf, -1); err != nil {
+			return err
+		}
+	} else {
+		if err = gobtools.EncodeInt(buf, len(r.Fixups)); err != nil {
+			return err
+		}
+		for val3 := 0; val3 < len(r.Fixups); val3++ {
+			if err = gobtools.EncodeInterface(ctx, buf, r.Fixups[val3]); err != nil {
+				return err
+			}
+		}
+	}
 	return err
 }
 
 func (r PublicSourceFile) CustomHash(hasher *proptools.Hasher) error {
 	hasher.WriteString(":android.PublicSourceFile")
-	hasher.WriteInt(5)
+	hasher.WriteInt(6)
 	hasher.WriteString(":android.Path")
 	val1 := r.File == nil
 	if val1 {
@@ -15223,6 +15241,33 @@ func (r PublicSourceFile) CustomHash(hasher *proptools.Hasher) error {
 			r.Delta.(proptools.CustomHash).CustomHash(hasher)
 		}
 	}
+	hasher.WriteString(":.[]PublicSourceFixup")
+	hasher.WriteInt(len(r.Fixups))
+	for val11 := 0; val11 < len(r.Fixups); val11++ {
+		hasher.WriteString(":android.PublicSourceFixup")
+		val12 := r.Fixups[val11] == nil
+		if val12 {
+			hasher.WriteByte(0)
+		} else {
+			if v := reflect.ValueOf(r.Fixups[val11]); v.Kind() == reflect.Ptr {
+				if v.IsNil() {
+					panic(fmt.Errorf("nil pointer is not supported in interface"))
+				} else {
+					val13 := r.Fixups[val11] == nil
+					if val13 {
+						hasher.WriteByte(0)
+					} else {
+						val14 := func(hasher *proptools.Hasher) error { return r.Fixups[val11].(proptools.CustomHash).CustomHash(hasher) }
+						if err := proptools.HashReference(hasher, uintptr(v.Pointer()), val14); err != nil {
+							return err
+						}
+					}
+				}
+			} else {
+				r.Fixups[val11].(proptools.CustomHash).CustomHash(hasher)
+			}
+		}
+	}
 	return nil
 }
 
@@ -15276,6 +15321,24 @@ func (r *PublicSourceFile) Decode(ctx gobtools.EncContext, buf *bytes.Reader) er
 		r.Delta = val11.(Path)
 	}
 
+	var val13 int
+	err = gobtools.DecodeInt(buf, &val13)
+	if err != nil {
+		return err
+	}
+	if val13 != -1 {
+		r.Fixups = make([]PublicSourceFixup, val13)
+		for val14 := 0; val14 < int(val13); val14++ {
+			if val16, err := gobtools.DecodeInterface(ctx, buf); err != nil {
+				return err
+			} else if val16 == nil {
+				r.Fixups[val14] = nil
+			} else {
+				r.Fixups[val14] = val16.(PublicSourceFixup)
+			}
+		}
+	}
+
 	return err
 }
 
@@ -15283,6 +15346,119 @@ var PublicSourceFileGobRegId int16
 
 func (r PublicSourceFile) GetTypeId() int16 {
 	return PublicSourceFileGobRegId
+}
+
+func (r ReplaceNeededFixup) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.From); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.To); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r ReplaceNeededFixup) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.ReplaceNeededFixup")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.From)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.To)
+	return nil
+}
+
+func (r *ReplaceNeededFixup) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.From)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.To)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var ReplaceNeededFixupGobRegId int16
+
+func (r ReplaceNeededFixup) GetTypeId() int16 {
+	return ReplaceNeededFixupGobRegId
+}
+
+func (r AddNeededFixup) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Library); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r AddNeededFixup) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.AddNeededFixup")
+	hasher.WriteInt(1)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Library)
+	return nil
+}
+
+func (r *AddNeededFixup) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Library)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var AddNeededFixupGobRegId int16
+
+func (r AddNeededFixup) GetTypeId() int16 {
+	return AddNeededFixupGobRegId
+}
+
+func (r SetSonameFixup) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Soname); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r SetSonameFixup) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.SetSonameFixup")
+	hasher.WriteInt(1)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Soname)
+	return nil
+}
+
+func (r *SetSonameFixup) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Soname)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var SetSonameFixupGobRegId int16
+
+func (r SetSonameFixup) GetTypeId() int16 {
+	return SetSonameFixupGobRegId
 }
 
 func (r PublicSourceFileInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {

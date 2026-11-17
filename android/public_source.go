@@ -125,8 +125,56 @@ type PublicSourceFile struct {
 	// The length of the file in the public source in bytes, nil when the declaration names none.
 	Size *int64
 	// The delta file of our edit, which makes the file in the tree from the file in the public
-	// source, nil for a file that we did not edit.
+	// source with its fixups made, nil for a file that we did not edit.
 	Delta Path
+	// The fixups of extract-utils, made in order on the file in the public source before the delta.
+	Fixups []PublicSourceFixup
+}
+
+// A PublicSourceFixup is a fixup that extract-utils makes on an ELF file: a ReplaceNeededFixup, an
+// AddNeededFixup or a SetSonameFixup.
+type PublicSourceFixup interface {
+	message() *license_metadata_proto.Fixup
+}
+
+var _ PublicSourceFixup = ReplaceNeededFixup{}
+var _ PublicSourceFixup = AddNeededFixup{}
+var _ PublicSourceFixup = SetSonameFixup{}
+
+// ReplaceNeededFixup is the replace_needed method of the blob_fixups of a device tree: the needed
+// library From becomes To.
+// @auto-generate: gob
+type ReplaceNeededFixup struct {
+	From string
+	To   string
+}
+
+func (f ReplaceNeededFixup) message() *license_metadata_proto.Fixup {
+	return &license_metadata_proto.Fixup{Edit: &license_metadata_proto.Fixup_ReplaceNeeded{
+		ReplaceNeeded: &license_metadata_proto.LibraryReplacement{From: proto.String(f.From), To: proto.String(f.To)},
+	}}
+}
+
+// AddNeededFixup is the add_needed method of the blob_fixups of a device tree: the file needs
+// Library too.
+// @auto-generate: gob
+type AddNeededFixup struct {
+	Library string
+}
+
+func (f AddNeededFixup) message() *license_metadata_proto.Fixup {
+	return &license_metadata_proto.Fixup{Edit: &license_metadata_proto.Fixup_AddNeeded{AddNeeded: f.Library}}
+}
+
+// SetSonameFixup is the FIX_SONAME argument of a file in the proprietary-files.txt of a device
+// tree: the soname of the file becomes Soname.
+// @auto-generate: gob
+type SetSonameFixup struct {
+	Soname string
+}
+
+func (f SetSonameFixup) message() *license_metadata_proto.Fixup {
+	return &license_metadata_proto.Fixup{Edit: &license_metadata_proto.Fixup_SetSoname{SetSoname: f.Soname}}
 }
 
 // PublicSourceFileInfo is the public copy of one file of the source tree, declared by a
@@ -279,13 +327,47 @@ type PublicSourceFileProperties struct {
 	// Length of the file in the public source in bytes.
 	Size *int64 `android:"arch_variant"`
 	// The delta file of our edit, written by fetch-public-sources write-deltas, which makes the file
-	// in the tree from the file in the public source. A file with a delta needs sha256 and size.
+	// in the tree from the file in the public source with its fixups made. A file with a delta needs
+	// sha256 and size.
 	Delta *string `android:"path,arch_variant"`
+	// The fixups of extract-utils, made in order on the file in the public source before the delta.
+	// A file with fixups needs sha256 and size. Only the public_source of a prebuilt module lists
+	// fixups.
+	Fixups []publicSourceFixupProperties `android:"arch_variant"`
+}
+
+// publicSourceFixupProperties name one fixup of extract-utils with exactly one of their properties.
+type publicSourceFixupProperties struct {
+	// The needed library to replace and the library that replaces it, as the replace_needed method
+	// of the blob_fixups of a device tree.
+	Replace_needed []string
+	// A library that the file needs too, as the add_needed method of the blob_fixups of a device
+	// tree.
+	Add_needed *string
+	// The soname that the file gets, as the FIX_SONAME argument of a file in the
+	// proprietary-files.txt of a device tree.
+	Set_soname *string
+}
+
+// fixup returns the fixup that the properties name, reporting properties that name none or more
+// than one.
+func (p publicSourceFixupProperties) fixup(ctx ModuleContext, property string) (PublicSourceFixup, bool) {
+	switch {
+	case len(p.Replace_needed) == 2 && p.Add_needed == nil && p.Set_soname == nil:
+		return ReplaceNeededFixup{From: p.Replace_needed[0], To: p.Replace_needed[1]}, true
+	case p.Replace_needed == nil && p.Add_needed != nil && p.Set_soname == nil:
+		return AddNeededFixup{Library: *p.Add_needed}, true
+	case p.Replace_needed == nil && p.Add_needed == nil && p.Set_soname != nil:
+		return SetSonameFixup{Soname: *p.Set_soname}, true
+	default:
+		ctx.PropertyErrorf(property, "needs either replace_needed with two library names, add_needed or set_soname")
+		return nil, false
+	}
 }
 
 // declared reports whether the properties name the public copy of a file.
 func (p PublicSourceFileProperties) declared() bool {
-	return p.From != nil || p.Path != nil || p.Sha256 != nil || p.Size != nil || p.Delta != nil
+	return p.From != nil || p.Path != nil || p.Sha256 != nil || p.Size != nil || p.Delta != nil || len(p.Fixups) > 0
 }
 
 // foundAt returns file as found at the path inside the public source that the properties name.
@@ -300,11 +382,16 @@ func (p PublicSourceFileProperties) foundAt(ctx ModuleContext, propertyPrefix st
 		ctx.PropertyErrorf(propertyPrefix+"size", "must be the length of the file in bytes, not %d", *p.Size)
 	}
 	found := PublicSourceFile{File: file, Path: proptools.String(p.Path), Sha256: p.Sha256, Size: p.Size}
+	if (p.Delta != nil || len(p.Fixups) > 0) && (p.Sha256 == nil || p.Size == nil) {
+		ctx.PropertyErrorf(propertyPrefix+"sha256", "is required together with size for a file with a delta or fixups")
+	}
 	if p.Delta != nil {
-		if p.Sha256 == nil || p.Size == nil {
-			ctx.PropertyErrorf(propertyPrefix+"delta", "needs sha256 and size of the file in the public source")
-		}
 		found.Delta = PathForModuleSrc(ctx, *p.Delta)
+	}
+	for i, properties := range p.Fixups {
+		if fixup, ok := properties.fixup(ctx, fmt.Sprintf("%sfixups[%d]", propertyPrefix, i)); ok {
+			found.Fixups = append(found.Fixups, fixup)
+		}
 	}
 	return found
 }
@@ -422,6 +509,9 @@ func writePublicSourceMessage(ctx BuilderContext, file WritablePath, source Publ
 			file.Delta = proto.String(f.Delta.String())
 			inputs = append(inputs, f.Delta)
 		}
+		for _, fixup := range f.Fixups {
+			file.Fixups = append(file.Fixups, fixup.message())
+		}
 		message.Files = append(message.Files, file)
 	}
 
@@ -490,6 +580,11 @@ func (m *publicSourceFileModule) GenerateAndroidBuildActions(ctx ModuleContext) 
 	// NamespaceExportedToMake in its variants.
 	if !ctx.Namespace().exportToKati {
 		return
+	}
+	// Make writes the license metadata of a file that PRODUCT_COPY_FILES copies, from variables that
+	// list no fixups.
+	if len(m.fileProperties.Fixups) > 0 {
+		ctx.PropertyErrorf("fixups", "are listed only by the public_source of a prebuilt module")
 	}
 	source, ok := publicSourceDependency(ctx.blueprintBaseModuleContext(), "from")
 	if !ok {
