@@ -357,20 +357,47 @@ func productVariableName[T any](variables *ProductVariables, field *T) string {
 }
 
 // pathContextRecordingReads is ctx with a configuration that records the reads of one computation.
+// Errorf reports path errors found by the computation to ctx.
 type pathContextRecordingReads struct {
 	PathContext
 	config Config
 }
 
+var _ errorfContext = pathContextRecordingReads{}
+
 func (ctx pathContextRecordingReads) Config() Config {
 	return ctx.config
+}
+
+func (ctx pathContextRecordingReads) Errorf(format string, args ...interface{}) {
+	ReportPathErrorf(ctx.PathContext, format, args...)
+}
+
+// pathContextRecordingReadsWithMissingDependencies is pathContextRecordingReads with
+// AddMissingDependencies of ctx.
+type pathContextRecordingReadsWithMissingDependencies struct {
+	pathContextRecordingReads
+	AddMissingDependenciesContext
+}
+
+var _ AddMissingDependenciesContext = pathContextRecordingReadsWithMissingDependencies{}
+
+// newPathContextRecordingReads returns ctx with config, which records the reads made by one
+// computation. The result has AddMissingDependencies only when ctx has it, because callers check
+// for that method by type.
+func newPathContextRecordingReads(ctx PathContext, config Config) PathContext {
+	recording := pathContextRecordingReads{ctx, config}
+	if missing, ok := ctx.(AddMissingDependenciesContext); ok {
+		return pathContextRecordingReadsWithMissingDependencies{recording, missing}
+	}
+	return recording
 }
 
 // OnceFromPathContext is OnceFromConfig for a value computed from a PathContext. compute gets ctx
 // with a configuration that records the reads of the computation.
 func OnceFromPathContext[T any](ctx PathContext, key OnceKey, compute func(PathContext) T) T {
 	return OnceFromConfig(ctx.Config(), key, func(c Config) T {
-		return compute(pathContextRecordingReads{ctx, c})
+		return compute(newPathContextRecordingReads(ctx, c))
 	})
 }
 
