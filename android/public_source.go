@@ -85,7 +85,8 @@ func (a PublicSourceArchive) setOn(message *license_metadata_proto.PublicSource)
 
 // PublicImageArchive is a 7z archive of partition images, each named <partition>.img, split into
 // parts, such as a firmware release of a phone. The path of a file in it starts with the partition
-// whose image contains the file.
+// whose image contains the file. A path of a partition name alone names the whole image of the
+// partition.
 // @auto-generate: gob
 type PublicImageArchive struct {
 	Parts []ArchivePart
@@ -131,8 +132,8 @@ type PublicSourceFile struct {
 	Fixups []PublicSourceFixup
 }
 
-// A PublicSourceFixup is a fixup that extract-utils makes on an ELF file: a ReplaceNeededFixup, an
-// AddNeededFixup or a SetSonameFixup.
+// A PublicSourceFixup is a fixup that extract-utils makes on a stock file: a ReplaceNeededFixup, an
+// AddNeededFixup, a SetSonameFixup or a BinaryRegexReplaceFixup.
 type PublicSourceFixup interface {
 	message() *license_metadata_proto.Fixup
 }
@@ -140,6 +141,7 @@ type PublicSourceFixup interface {
 var _ PublicSourceFixup = ReplaceNeededFixup{}
 var _ PublicSourceFixup = AddNeededFixup{}
 var _ PublicSourceFixup = SetSonameFixup{}
+var _ PublicSourceFixup = BinaryRegexReplaceFixup{}
 
 // ReplaceNeededFixup is the replace_needed method of the blob_fixups of a device tree: the needed
 // library From becomes To.
@@ -175,6 +177,24 @@ type SetSonameFixup struct {
 
 func (f SetSonameFixup) message() *license_metadata_proto.Fixup {
 	return &license_metadata_proto.Fixup{Edit: &license_metadata_proto.Fixup_SetSoname{SetSoname: f.Soname}}
+}
+
+// BinaryRegexReplaceFixup is the binary_regex_replace method of the blob_fixups of a device tree:
+// every match of the Python regular expression Pattern in the bytes of the file becomes
+// Replacement.
+// @auto-generate: gob
+type BinaryRegexReplaceFixup struct {
+	Pattern     string
+	Replacement string
+}
+
+func (f BinaryRegexReplaceFixup) message() *license_metadata_proto.Fixup {
+	return &license_metadata_proto.Fixup{Edit: &license_metadata_proto.Fixup_BinaryRegexReplace{
+		BinaryRegexReplace: &license_metadata_proto.RegexReplacement{
+			Pattern:     proto.String(f.Pattern),
+			Replacement: proto.String(f.Replacement),
+		},
+	}}
 }
 
 // PublicSourceFileInfo is the public copy of one file of the source tree, declared by a
@@ -347,22 +367,35 @@ type publicSourceFixupProperties struct {
 	// The soname that the file gets, as the FIX_SONAME argument of a file in the
 	// proprietary-files.txt of a device tree.
 	Set_soname *string
+	// The Python regular expression of the bytes to replace and the bytes that replace each match,
+	// as the binary_regex_replace method of the blob_fixups of a device tree.
+	Binary_regex_replace []string
 }
 
 // fixup returns the fixup that the properties name, reporting properties that name none or more
 // than one.
 func (p publicSourceFixupProperties) fixup(ctx ModuleContext, property string) (PublicSourceFixup, bool) {
-	switch {
-	case len(p.Replace_needed) == 2 && p.Add_needed == nil && p.Set_soname == nil:
-		return ReplaceNeededFixup{From: p.Replace_needed[0], To: p.Replace_needed[1]}, true
-	case p.Replace_needed == nil && p.Add_needed != nil && p.Set_soname == nil:
-		return AddNeededFixup{Library: *p.Add_needed}, true
-	case p.Replace_needed == nil && p.Add_needed == nil && p.Set_soname != nil:
-		return SetSonameFixup{Soname: *p.Set_soname}, true
-	default:
-		ctx.PropertyErrorf(property, "needs either replace_needed with two library names, add_needed or set_soname")
-		return nil, false
+	edits := 0
+	for _, set := range []bool{p.Replace_needed != nil, p.Add_needed != nil, p.Set_soname != nil, p.Binary_regex_replace != nil} {
+		if set {
+			edits++
+		}
 	}
+	if edits == 1 {
+		switch {
+		case len(p.Replace_needed) == 2:
+			return ReplaceNeededFixup{From: p.Replace_needed[0], To: p.Replace_needed[1]}, true
+		case p.Add_needed != nil:
+			return AddNeededFixup{Library: *p.Add_needed}, true
+		case p.Set_soname != nil:
+			return SetSonameFixup{Soname: *p.Set_soname}, true
+		case len(p.Binary_regex_replace) == 2:
+			return BinaryRegexReplaceFixup{Pattern: p.Binary_regex_replace[0], Replacement: p.Binary_regex_replace[1]}, true
+		}
+	}
+	ctx.PropertyErrorf(property, "needs either replace_needed with two library names, add_needed, set_soname or "+
+		"binary_regex_replace with a pattern and a replacement")
+	return nil, false
 }
 
 // declared reports whether the properties name the public copy of a file.

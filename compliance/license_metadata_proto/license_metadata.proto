@@ -98,7 +98,7 @@ message Archive {
 
 // ImageArchive messages describe a 7z archive of partition images, each named <partition>.img,
 // split into parts. The path of a file in it starts with the partition whose image contains the
-// file.
+// file. A path of a partition name alone names the whole image of the partition.
 message ImageArchive {
   // The parts in the order in which they form the archive.
   repeated ArchivePart parts = 1;
@@ -146,7 +146,7 @@ message PublicSourceFile {
   repeated Fixup fixups = 9;
 }
 
-// Fixup messages describe one fixup that extract-utils makes on an ELF file: a method of the
+// Fixup messages describe one fixup that extract-utils makes on a stock file: a method of the
 // blob_fixups of a device tree, or the FIX_SONAME argument of a file.
 message Fixup {
   oneof edit {
@@ -157,6 +157,8 @@ message Fixup {
 
     // The soname that the file gets.
     string set_soname = 3;
+
+    RegexReplacement binary_regex_replace = 4;
   }
 }
 
@@ -164,6 +166,13 @@ message Fixup {
 message LibraryReplacement {
   optional string from = 1;
   optional string to = 2;
+}
+
+// RegexReplacement messages describe a Python regular expression of the bytes of a file and the
+// bytes that replace each of its matches.
+message RegexReplacement {
+  optional string pattern = 1;
+  optional string replacement = 2;
 }
 
 // InstallMap messages describe the mapping from an input filesystem file to the path to the file

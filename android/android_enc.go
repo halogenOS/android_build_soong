@@ -14822,6 +14822,7 @@ func init() {
 	ReplaceNeededFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(ReplaceNeededFixup) })
 	AddNeededFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(AddNeededFixup) })
 	SetSonameFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(SetSonameFixup) })
+	BinaryRegexReplaceFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(BinaryRegexReplaceFixup) })
 	PublicSourceFileInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFileInfo) })
 }
 
@@ -15459,6 +15460,51 @@ var SetSonameFixupGobRegId int16
 
 func (r SetSonameFixup) GetTypeId() int16 {
 	return SetSonameFixupGobRegId
+}
+
+func (r BinaryRegexReplaceFixup) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Pattern); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Replacement); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r BinaryRegexReplaceFixup) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.BinaryRegexReplaceFixup")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Pattern)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Replacement)
+	return nil
+}
+
+func (r *BinaryRegexReplaceFixup) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Pattern)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.Replacement)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var BinaryRegexReplaceFixupGobRegId int16
+
+func (r BinaryRegexReplaceFixup) GetTypeId() int16 {
+	return BinaryRegexReplaceFixupGobRegId
 }
 
 func (r PublicSourceFileInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
