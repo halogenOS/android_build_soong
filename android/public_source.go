@@ -366,6 +366,11 @@ func modulePublicSourceFiles(ctx *moduleContext) (PublicSourceInfo, []installedP
 	if properties == nil {
 		return PublicSourceInfo{}, nil
 	}
+	// A variant that does not use the prebuilt, such as the static variant of a prebuilt shared
+	// library, installs none of its files.
+	if prebuilt := GetEmbeddedPrebuilt(ctx.Module()); prebuilt != nil && !prebuilt.UsePrebuilt() {
+		return PublicSourceInfo{}, nil
+	}
 	source, ok := publicSourceDependency(ctx.blueprintBaseModuleContext(), "public_source.from")
 	if !ok {
 		return PublicSourceInfo{}, nil
