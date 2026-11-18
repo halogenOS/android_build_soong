@@ -49,6 +49,12 @@ const sboxOutDir = sboxSandboxBaseDir + "/" + sboxOutSubDir
 // in the command.
 const pathFilesVariable = "path_files"
 
+// pathRootsVariable is the Ninja variable of a build statement that lists, separated by spaces,
+// words that a build path may follow in the files listed in pathFilesVariable, such as the
+// placeholder for the sbox sandbox. An executor that rewrites the build paths in those files also
+// rewrites a build path that follows one of these words and a slash.
+const pathRootsVariable = "path_roots"
+
 const nsjailToolsSubDir = "tools"
 const nsjailOutDir = "out"
 
@@ -958,10 +964,14 @@ func (r *RuleBuilder) Build(name string, desc string) {
 	commandString = ninjaEscapeExcept(commandString, externalVariableRefs)
 
 	args := r.args
-	if len(pathFiles) > 0 {
-		args = make(map[string]string, len(r.args)+1)
+	if r.sbox {
+		args = make(map[string]string, len(r.args)+2)
 		maps.Copy(args, r.args)
 		args[pathFilesVariable] = strings.Join(proptools.NinjaEscapeList(pathFiles.Strings()), " ")
+		// sbox copies an input from the out directory to out/<path below the out directory> in
+		// the sandbox. With the out directory "out", the manifest then contains the same text as
+		// the build path to the input behind the placeholder for the sandbox.
+		args[pathRootsVariable] = sboxSandboxBaseDir
 	}
 	args_vars := make([]string, len(args))
 	i := 0
