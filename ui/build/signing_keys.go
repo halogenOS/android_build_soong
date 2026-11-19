@@ -6,7 +6,9 @@ package build
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,23 +27,13 @@ const (
 // --signing-keys-dir, the signing run links signing-keys-<digest> in the
 // signed directory to the directory given with that option, and the value is
 // that link. Otherwise, the value is the directory of links to the test keys
-// that Soong writes in the regular build. It removes every earlier link to
-// signing keys in the directory that the build writes into, so a build without
-// --signing-keys-dir leaves no link to release keys there. The digest covers
-// the names and contents of the files in the directory, so a key replaced under
-// the same name changes the command of every step that reads a key.
+// that Soong writes in the regular build. It first removes the links that an
+// earlier build left, such as a build that was killed before its end. The
+// digest covers the names and contents of the files in the directory, so a key
+// replaced under the same name changes the command of every step that reads a
+// key.
 func linkSigningKeys(ctx Context, config Config) string {
-	entries, err := os.ReadDir(config.WriteDir())
-	if err != nil {
-		ctx.Fatalf("Could not list the output directory: %v", err)
-	}
-	for _, entry := range entries {
-		if strings.HasPrefix(entry.Name(), signingKeysLinkPrefix) && entry.Type()&os.ModeSymlink != 0 {
-			if err := os.Remove(filepath.Join(config.WriteDir(), entry.Name())); err != nil {
-				ctx.Fatalf("Could not remove an earlier link to signing keys: %v", err)
-			}
-		}
-	}
+	removeSigningKeysLinks(ctx, config)
 
 	if !config.SigningRun() || config.signing.keysDir == nil {
 		return filepath.Join(config.SoongOutDir(), shared.TestKeysDir)
@@ -57,6 +49,28 @@ func linkSigningKeys(ctx Context, config Config) string {
 		ctx.Fatalf("Could not link the signing keys: %v", err)
 	}
 	return link
+}
+
+// removeSigningKeysLinks removes every link to signing keys in the signed
+// directory. Every build calls it at its start, and the signing run again at
+// its end, so the release keys are reachable from the output directory only
+// while a signing run runs.
+func removeSigningKeysLinks(ctx Context, config Config) {
+	signedDir := config.signedOutDir()
+	entries, err := os.ReadDir(signedDir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return
+	}
+	if err != nil {
+		ctx.Fatalf("Could not list the signed directory: %v", err)
+	}
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), signingKeysLinkPrefix) && entry.Type()&os.ModeSymlink != 0 {
+			if err := os.Remove(filepath.Join(signedDir, entry.Name())); err != nil {
+				ctx.Fatalf("Could not remove a link to signing keys: %v", err)
+			}
+		}
+	}
 }
 
 // signingKeysDigest returns the start of a sha256 over the names and contents

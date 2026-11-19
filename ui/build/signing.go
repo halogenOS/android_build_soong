@@ -55,6 +55,7 @@ func BuildSigningRun(ctx Context, config Config) {
 
 	SetupTempDir(ctx, config)
 	variables := signingVariables(ctx, config)
+	defer removeSigningKeysLinks(ctx, config)
 	SetupPath(ctx, config)
 	runMakeProductConfig(ctx, config)
 	loadRegularKatiSuffix(ctx, config)
