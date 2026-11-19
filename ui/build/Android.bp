@@ -64,6 +64,7 @@ bootstrap_go_package {
         "environment.go",
         "exec.go",
         "finder.go",
+        "install_zip_lists.go",
         "kati.go",
         "ninja.go",
         "path.go",
