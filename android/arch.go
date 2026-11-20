@@ -570,15 +570,11 @@ func productInstalledModules(ctx BaseModuleContext, makefile string) *map[string
 }
 
 func (o *osTransitionMutator) splitAll(ctx BaseModuleContext) bool {
-	if splitAllOsArchCommon(ctx) {
-		return true
-	}
-	// Soong benchmark builds
-	if ctx.Config().IsEnvTrue("SOONG_SPLIT_OPT_IN_VARIANTS_ON_DEMAND") {
-		return false
-	}
-	// Otherwise use build flags
-	return !ctx.Config().GetBuildFlagBool("RELEASE_SOONG_OS_VARIANT_ON_DEMAND")
+	// Soong benchmark builds and the build flag create variants on demand. Without either, every
+	// module splits upfront and the product package list read by splitAllOsArchCommon cannot matter.
+	onDemand := ctx.Config().IsEnvTrue("SOONG_SPLIT_OPT_IN_VARIANTS_ON_DEMAND") ||
+		ctx.Config().GetBuildFlagBool("RELEASE_SOONG_OS_VARIANT_ON_DEMAND")
+	return !onDemand || splitAllOsArchCommon(ctx)
 }
 
 func (o *osTransitionMutator) Split(ctx BaseModuleContext) []string {
@@ -832,15 +828,11 @@ func (a *archTransitionMutator) split(ctx BaseModuleContext) ([]string, *allArch
 }
 
 func (a *archTransitionMutator) splitAll(ctx BaseModuleContext) bool {
-	if splitAllOsArchCommon(ctx) {
-		return true
-	}
-	// Soong benchmark builds
-	if ctx.Config().IsEnvTrue("SOONG_SPLIT_OPT_IN_VARIANTS_ON_DEMAND") {
-		return false
-	}
-	// Otherwise use build flags
-	return !ctx.Config().GetBuildFlagBool("RELEASE_SOONG_ARCH_VARIANT_ON_DEMAND")
+	// Soong benchmark builds and the build flag create variants on demand. Without either, every
+	// module splits upfront and the product package list read by splitAllOsArchCommon cannot matter.
+	onDemand := ctx.Config().IsEnvTrue("SOONG_SPLIT_OPT_IN_VARIANTS_ON_DEMAND") ||
+		ctx.Config().GetBuildFlagBool("RELEASE_SOONG_ARCH_VARIANT_ON_DEMAND")
+	return !onDemand || splitAllOsArchCommon(ctx)
 }
 
 func (a *archTransitionMutator) Split(ctx BaseModuleContext) []string {

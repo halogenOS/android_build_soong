@@ -15,6 +15,8 @@
 package android
 
 import (
+	"fmt"
+
 	"github.com/google/blueprint"
 	"github.com/google/blueprint/pool"
 )
@@ -73,7 +75,7 @@ type registerMutatorsContext struct {
 }
 
 type RegisterMutatorsContext interface {
-	BottomUp(name string, m BottomUpMutator) MutatorHandle
+	BottomUp(name string, m BottomUpMutator) BottomUpMutatorHandle
 	BottomUpBlueprint(name string, m blueprint.BottomUpMutator) MutatorHandle
 	Transition(name string, m VariationTransitionMutator) TransitionMutatorHandle
 	InfoBasedTransition(name string, m androidTransitionMutator) TransitionMutatorHandle
@@ -325,6 +327,8 @@ type bottomUpMutatorContext struct {
 	baseModuleContext
 	finalPhase        bool
 	addedHostToolDeps map[string]struct{}
+	// Set for a mutator marked ConfigReadsNotRecorded
+	configReadsNotRecorded bool
 }
 
 // callers must immediately follow the call to this function with defer bottomUpMutatorContextPool.Put(mctx).
@@ -341,21 +345,45 @@ func bottomUpMutatorContextFactory(ctx blueprint.BottomUpMutatorContext, a Modul
 	return mctx
 }
 
-func (x *registerMutatorsContext) BottomUp(name string, m BottomUpMutator) MutatorHandle {
+func (x *registerMutatorsContext) BottomUp(name string, m BottomUpMutator) BottomUpMutatorHandle {
 	finalPhase := x.finalPhase
-	f := func(ctx blueprint.BottomUpMutatorContext) {
+	mutator := &bottomUpMutator{mutator: &mutator{name: x.mutatorName(name)}}
+	mutator.bottomUpMutator = func(ctx blueprint.BottomUpMutatorContext) {
 		if a, ok := ctx.Module().(Module); ok {
 			mctx := bottomUpMutatorContextFactory(ctx, a, finalPhase)
 			defer bottomUpMutatorContextPool.Put(mctx)
+			if mutator.configReadsNotRecorded {
+				mctx.config = mctx.config.recordingReadsInto(nil)
+				mctx.configReadsNotRecorded = true
+			}
 			if mctx.config.captureBuild && ctx.CaptureModuleForTests() {
 				mctx.config.modulesForTests.Insert(mctx.ModuleName(), mctx.Module())
 			}
 			m(mctx)
 		}
 	}
-	mutator := &mutator{name: x.mutatorName(name), bottomUpMutator: f}
 	x.mutators = append(x.mutators, mutator)
 	return mutator
+}
+
+// bottomUpMutator is a mutator registered with BottomUp, which runs with an android context.
+type bottomUpMutator struct {
+	*mutator
+	configReadsNotRecorded bool
+}
+
+var _ BottomUpMutatorHandle = &bottomUpMutator{}
+
+func (mutator *bottomUpMutator) ConfigReadsNotRecorded() MutatorHandle {
+	mutator.configReadsNotRecorded = true
+	return mutator
+}
+
+func (mutator *bottomUpMutator) register(ctx *Context) {
+	if mutator.configReadsNotRecorded && (mutator.usesRename || mutator.usesReverseDependencies || mutator.usesReplaceDependencies) {
+		panic(fmt.Errorf("mutator %q is marked ConfigReadsNotRecorded and must not rename modules or reverse or replace dependencies", mutator.name))
+	}
+	mutator.mutator.register(ctx)
 }
 
 func (x *registerMutatorsContext) BottomUpBlueprint(name string, m blueprint.BottomUpMutator) MutatorHandle {
@@ -471,6 +499,20 @@ type MutatorHandle interface {
 	PrePartial() MutatorHandle
 }
 
+type BottomUpMutatorHandle interface {
+	MutatorHandle
+
+	// ConfigReadsNotRecorded keeps the configuration reads of the mutator out of the modules it
+	// visits. The cache restores a module whose properties and recorded reads are unchanged, so a
+	// mutator may use it only when what it computes from the configuration reaches build actions
+	// through module properties alone: it must not add dependencies, set providers or set fields
+	// outside the properties, and state it shares with other modules must reach build actions only
+	// through properties that later mutators set from it. Adding dependencies or setting a provider
+	// from the mutator panics, and so does registering it with UsesRename, UsesReverseDependencies
+	// or UsesReplaceDependencies.
+	ConfigReadsNotRecorded() MutatorHandle
+}
+
 type TransitionMutatorHandle interface {
 	// NeverFar causes the variations created by this mutator to never be ignored when adding
 	// far variation dependencies. Normally, far variation dependencies ignore all the variants
@@ -567,6 +609,13 @@ func (b *bottomUpMutatorContext) Rename(name string) {
 	b.Module().base().commonProperties.DebugName = name
 }
 
+func (b *bottomUpMutatorContext) setProvider(provider blueprint.AnyProviderKey, value any) {
+	if b.configReadsNotRecorded {
+		panic("Setting providers not allowed in a mutator marked ConfigReadsNotRecorded")
+	}
+	b.baseModuleContext.setProvider(provider, value)
+}
+
 func (b *bottomUpMutatorContext) createModule(factory blueprint.ModuleFactory, name string, props ...interface{}) Module {
 	return bpModuleToModule(b.bp.CreateModule(factory, name, props...))
 }
@@ -579,40 +628,40 @@ func (b *bottomUpMutatorContext) CreateModule(factory ModuleFactory, props ...in
 	return createModule(b, factory, "_bottomUpMutatorModule", doesNotSpecifyDirectory(), props...)
 }
 
-func (b *bottomUpMutatorContext) AddDependency(module blueprint.Module, tag blueprint.DependencyTag, name ...string) []ModuleProxy {
+// checkDependenciesMayChange panics when the mutator must not add or replace dependencies.
+func (b *bottomUpMutatorContext) checkDependenciesMayChange() {
 	if b.baseModuleContext.checkedMissingDeps() {
 		panic("Adding deps not allowed after checking for missing deps")
 	}
+	if b.configReadsNotRecorded {
+		panic("Adding deps not allowed in a mutator marked ConfigReadsNotRecorded")
+	}
+}
+
+func (b *bottomUpMutatorContext) AddDependency(module blueprint.Module, tag blueprint.DependencyTag, name ...string) []ModuleProxy {
+	b.checkDependenciesMayChange()
 	return bpModuleProxiesToModuleProxies(b.bp.AddDependency(module, tag, name...))
 }
 
 func (b *bottomUpMutatorContext) AddReverseDependency(module blueprint.Module, tag blueprint.DependencyTag, name string) {
-	if b.baseModuleContext.checkedMissingDeps() {
-		panic("Adding deps not allowed after checking for missing deps")
-	}
+	b.checkDependenciesMayChange()
 	b.bp.AddReverseDependency(module, tag, name)
 }
 
 func (b *bottomUpMutatorContext) AddReverseVariationDependency(variations []blueprint.Variation, tag blueprint.DependencyTag, name string) {
-	if b.baseModuleContext.checkedMissingDeps() {
-		panic("Adding deps not allowed after checking for missing deps")
-	}
+	b.checkDependenciesMayChange()
 	b.bp.AddReverseVariationDependency(variations, tag, name)
 }
 
 func (b *bottomUpMutatorContext) AddVariationDependencies(variations []blueprint.Variation, tag blueprint.DependencyTag,
 	names ...string) []ModuleProxy {
-	if b.baseModuleContext.checkedMissingDeps() {
-		panic("Adding deps not allowed after checking for missing deps")
-	}
+	b.checkDependenciesMayChange()
 	return bpModuleProxiesToModuleProxies(b.bp.AddVariationDependencies(variations, tag, names...))
 }
 
 func (b *bottomUpMutatorContext) AddFarVariationDependencies(variations []blueprint.Variation,
 	tag blueprint.DependencyTag, names ...string) []ModuleProxy {
-	if b.baseModuleContext.checkedMissingDeps() {
-		panic("Adding deps not allowed after checking for missing deps")
-	}
+	b.checkDependenciesMayChange()
 
 	return bpModuleProxiesToModuleProxies(b.bp.AddFarVariationDependencies(variations, tag, names...))
 }
@@ -631,16 +680,12 @@ func (b *bottomUpMutatorContext) AddHostToolDependencies(tools ...string) {
 }
 
 func (b *bottomUpMutatorContext) ReplaceDependencies(name string) {
-	if b.baseModuleContext.checkedMissingDeps() {
-		panic("Adding deps not allowed after checking for missing deps")
-	}
+	b.checkDependenciesMayChange()
 	b.bp.ReplaceDependencies(name)
 }
 
 func (b *bottomUpMutatorContext) ReplaceDependenciesIf(name string, predicate blueprint.ReplaceDependencyPredicate) {
-	if b.baseModuleContext.checkedMissingDeps() {
-		panic("Adding deps not allowed after checking for missing deps")
-	}
+	b.checkDependenciesMayChange()
 	b.bp.ReplaceDependenciesIf(name, predicate)
 }
 
