@@ -158,7 +158,14 @@ message Fixup {
     // The soname that the file gets.
     string set_soname = 3;
 
+    // A replacement in the bytes of the file.
     RegexReplacement binary_regex_replace = 4;
+
+    // A replacement in the text of the file.
+    RegexReplacement regex_replace = 5;
+
+    // A line that the file gets at the end of its text unless it has the line already.
+    string add_line_if_missing = 6;
   }
 }
 
@@ -168,8 +175,8 @@ message LibraryReplacement {
   optional string to = 2;
 }
 
-// RegexReplacement messages describe a Python regular expression of the bytes of a file and the
-// bytes that replace each of its matches.
+// RegexReplacement messages describe a Python regular expression of the bytes or the text of a file
+// and what replaces each of its matches.
 message RegexReplacement {
   optional string pattern = 1;
   optional string replacement = 2;

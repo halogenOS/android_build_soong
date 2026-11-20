@@ -14823,6 +14823,8 @@ func init() {
 	AddNeededFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(AddNeededFixup) })
 	SetSonameFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(SetSonameFixup) })
 	BinaryRegexReplaceFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(BinaryRegexReplaceFixup) })
+	RegexReplaceFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(RegexReplaceFixup) })
+	AddLineIfMissingFixupGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(AddLineIfMissingFixup) })
 	PublicSourceFileInfoGobRegId = gobtools.RegisterType(func() gobtools.CustomDec { return new(PublicSourceFileInfo) })
 }
 
@@ -15505,6 +15507,85 @@ var BinaryRegexReplaceFixupGobRegId int16
 
 func (r BinaryRegexReplaceFixup) GetTypeId() int16 {
 	return BinaryRegexReplaceFixupGobRegId
+}
+
+func (r RegexReplaceFixup) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Pattern); err != nil {
+		return err
+	}
+
+	if err = gobtools.EncodeString(buf, r.Replacement); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r RegexReplaceFixup) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.RegexReplaceFixup")
+	hasher.WriteInt(2)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Pattern)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Replacement)
+	return nil
+}
+
+func (r *RegexReplaceFixup) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Pattern)
+	if err != nil {
+		return err
+	}
+
+	err = gobtools.DecodeString(buf, &r.Replacement)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var RegexReplaceFixupGobRegId int16
+
+func (r RegexReplaceFixup) GetTypeId() int16 {
+	return RegexReplaceFixupGobRegId
+}
+
+func (r AddLineIfMissingFixup) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {
+	var err error
+
+	if err = gobtools.EncodeString(buf, r.Line); err != nil {
+		return err
+	}
+	return err
+}
+
+func (r AddLineIfMissingFixup) CustomHash(hasher *proptools.Hasher) error {
+	hasher.WriteString(":android.AddLineIfMissingFixup")
+	hasher.WriteInt(1)
+	hasher.WriteString(":.string")
+	hasher.WriteString(r.Line)
+	return nil
+}
+
+func (r *AddLineIfMissingFixup) Decode(ctx gobtools.EncContext, buf *bytes.Reader) error {
+	var err error
+
+	err = gobtools.DecodeString(buf, &r.Line)
+	if err != nil {
+		return err
+	}
+
+	return err
+}
+
+var AddLineIfMissingFixupGobRegId int16
+
+func (r AddLineIfMissingFixup) GetTypeId() int16 {
+	return AddLineIfMissingFixupGobRegId
 }
 
 func (r PublicSourceFileInfo) Encode(ctx gobtools.EncContext, buf *bytes.Buffer) error {

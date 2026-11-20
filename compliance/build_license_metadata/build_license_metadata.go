@@ -82,10 +82,8 @@ func main() {
 	publicSource := flags.String("public_source", "", "file with the binary PublicSource message of the prebuilt files")
 	publicSourceFile := flags.String("public_source_file", "", "prebuilt file found in the public source, besides the files in the message")
 	publicSourcePath := flags.String("public_source_path", "", "path of the public_source_file inside the public source")
-	publicSourceInstalled := flags.String("public_source_installed", "", "file installed from the public_source_file")
+	publicSourceInstalled := flags.String("public_source_installed", "", "file installed from the public_source_file, or from the file of the message that names none")
 	publicSourceSha256 := flags.String("public_source_sha256", "", "SHA-256 of the public_source_file in the public source, when it is declared")
-	publicSourceSize := flags.Int64("public_source_size", -1, "length in bytes of the public_source_file in the public source, when it is declared")
-	publicSourceDelta := flags.String("public_source_delta", "", "delta file of our edit of the public_source_file, when we edited it")
 	outFile := flags.String("o", "", "output file")
 
 	flags.Parse(expandedArgs)
@@ -114,15 +112,11 @@ func main() {
 				Path:      proto.String(*publicSourcePath),
 				Installed: proto.String(*publicSourceInstalled),
 				Sha256:    nonEmpty(*publicSourceSha256),
-				Delta:     nonEmpty(*publicSourceDelta),
-			}
-			if *publicSourceSize >= 0 {
-				file.Size = proto.Int64(*publicSourceSize)
 			}
 			files = append(files, file)
 		}
 		var err error
-		metadata.PublicSource, err = readPublicSource(*publicSource, files)
+		metadata.PublicSource, err = readPublicSource(*publicSource, files, *publicSourceInstalled)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "error: %s\n", err.Error())
 			os.Exit(2)
@@ -218,9 +212,11 @@ func convertDependencies(deps []string) []*license_metadata_proto.AnnotatedDepen
 	return ret
 }
 
-// readPublicSource reads the PublicSource message in file, adds files to it, and adds to each
-// prebuilt file in it the SHA-256 of the file in the source tree and of the installed file.
-func readPublicSource(file string, files []*license_metadata_proto.PublicSourceFile) (*license_metadata_proto.PublicSource, error) {
+// readPublicSource reads the PublicSource message in file, adds files to it, names installed as the
+// installed file of each prebuilt file in it that names none, and adds to each prebuilt file the
+// SHA-256 of the file in the source tree and of the installed file. A file of the message names no
+// installed file when Soong declares it for Make to install, as a public_source_file.
+func readPublicSource(file string, files []*license_metadata_proto.PublicSourceFile, installed string) (*license_metadata_proto.PublicSource, error) {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return nil, fmt.Errorf("could not read the public source %q: %w", file, err)
@@ -232,6 +228,9 @@ func readPublicSource(file string, files []*license_metadata_proto.PublicSourceF
 	source.Files = append(source.Files, files...)
 
 	for _, prebuilt := range source.Files {
+		if prebuilt.Installed == nil {
+			prebuilt.Installed = proto.String(installed)
+		}
 		fileSha256, err := filedigest.SHA256(prebuilt.GetFile())
 		if err != nil {
 			return nil, err

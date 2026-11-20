@@ -5,11 +5,12 @@ package android
 
 import (
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/google/blueprint"
 	"github.com/google/blueprint/proptools"
+
+	"android/soong/compliance/license_metadata_proto"
 )
 
 //go:generate go run ../../blueprint/gobtools/codegen
@@ -67,11 +68,10 @@ type packageFilesMetadata struct {
 // of the source tree.
 type declaredPublicSourceFile struct {
 	src string
-	// The PublicSource message of the source, without files, and the files that
-	// build_license_metadata reads with it.
+	// The PublicSource message of the source with the file, which names no installed file since Make
+	// adds the installed file, and the files that build_license_metadata reads with it.
 	publicSource       Path
 	publicSourceInputs Paths
-	publicSourceFile   PublicSourceFile
 }
 
 type copiedFilesSingleton struct {
@@ -103,15 +103,11 @@ func (s *copiedFilesSingleton) GenerateBuildActions(ctx SingletonContext) {
 	for _, src := range SortedKeys(declaredFiles) {
 		info := declaredFiles[src]
 		message := PathForOutput(ctx, "public_source_files", src+".pb")
-		inputs := writePublicSourceMessage(ctx, message, info.Source, nil)
-		if info.File.Delta != nil {
-			inputs = append(inputs, info.File.Delta)
-		}
+		writePublicSourceFilesMessage(ctx, message, info.Source, []*license_metadata_proto.PublicSourceFile{info.File.message()})
 		s.declaredFiles = append(s.declaredFiles, declaredPublicSourceFile{
 			src:                src,
 			publicSource:       message,
-			publicSourceInputs: inputs,
-			publicSourceFile:   info.File,
+			publicSourceInputs: append(Paths{message}, info.File.inputs()...),
 		})
 	}
 
@@ -190,14 +186,6 @@ func (s *copiedFilesSingleton) MakeVars(ctx MakeVarsContext) {
 	for _, file := range s.declaredFiles {
 		prefix := "PUBLIC_SOURCE_FILE." + file.src + "."
 		writePublicSourceMakeVars(ctx, prefix, file.publicSource, file.publicSourceInputs)
-		ctx.StrictRaw(prefix+"PUBLIC_SOURCE_PATH", file.publicSourceFile.Path)
-		ctx.StrictRaw(prefix+"PUBLIC_SOURCE_SHA256", proptools.String(file.publicSourceFile.Sha256))
-		if size := file.publicSourceFile.Size; size != nil {
-			ctx.StrictRaw(prefix+"PUBLIC_SOURCE_SIZE", strconv.FormatInt(*size, 10))
-		}
-		if delta := file.publicSourceFile.Delta; delta != nil {
-			ctx.StrictRaw(prefix+"PUBLIC_SOURCE_DELTA", delta.String())
-		}
 	}
 
 	dirs := make([]string, 0, len(s.packages))

@@ -133,7 +133,8 @@ type PublicSourceFile struct {
 }
 
 // A PublicSourceFixup is a fixup that extract-utils makes on a stock file: a ReplaceNeededFixup, an
-// AddNeededFixup, a SetSonameFixup or a BinaryRegexReplaceFixup.
+// AddNeededFixup, a SetSonameFixup, a BinaryRegexReplaceFixup, a RegexReplaceFixup or an
+// AddLineIfMissingFixup.
 type PublicSourceFixup interface {
 	message() *license_metadata_proto.Fixup
 }
@@ -142,6 +143,8 @@ var _ PublicSourceFixup = ReplaceNeededFixup{}
 var _ PublicSourceFixup = AddNeededFixup{}
 var _ PublicSourceFixup = SetSonameFixup{}
 var _ PublicSourceFixup = BinaryRegexReplaceFixup{}
+var _ PublicSourceFixup = RegexReplaceFixup{}
+var _ PublicSourceFixup = AddLineIfMissingFixup{}
 
 // ReplaceNeededFixup is the replace_needed method of the blob_fixups of a device tree: the needed
 // library From becomes To.
@@ -195,6 +198,60 @@ func (f BinaryRegexReplaceFixup) message() *license_metadata_proto.Fixup {
 			Replacement: proto.String(f.Replacement),
 		},
 	}}
+}
+
+// RegexReplaceFixup is the regex_replace method of the blob_fixups of a device tree: every match of
+// the Python regular expression Pattern in the text of the file becomes Replacement.
+// @auto-generate: gob
+type RegexReplaceFixup struct {
+	Pattern     string
+	Replacement string
+}
+
+func (f RegexReplaceFixup) message() *license_metadata_proto.Fixup {
+	return &license_metadata_proto.Fixup{Edit: &license_metadata_proto.Fixup_RegexReplace{
+		RegexReplace: &license_metadata_proto.RegexReplacement{
+			Pattern:     proto.String(f.Pattern),
+			Replacement: proto.String(f.Replacement),
+		},
+	}}
+}
+
+// AddLineIfMissingFixup is the add_line_if_missing method of the blob_fixups of a device tree: Line
+// is added at the end of the text of the file unless one of its lines is Line.
+// @auto-generate: gob
+type AddLineIfMissingFixup struct {
+	Line string
+}
+
+func (f AddLineIfMissingFixup) message() *license_metadata_proto.Fixup {
+	return &license_metadata_proto.Fixup{Edit: &license_metadata_proto.Fixup_AddLineIfMissing{AddLineIfMissing: f.Line}}
+}
+
+// message returns the PublicSourceFile message of the license metadata that records f, without the
+// file that the build installs from it.
+func (f PublicSourceFile) message() *license_metadata_proto.PublicSourceFile {
+	message := &license_metadata_proto.PublicSourceFile{
+		File:   proto.String(f.File.String()),
+		Path:   proto.String(f.Path),
+		Sha256: f.Sha256,
+		Size:   f.Size,
+	}
+	if f.Delta != nil {
+		message.Delta = proto.String(f.Delta.String())
+	}
+	for _, fixup := range f.Fixups {
+		message.Fixups = append(message.Fixups, fixup.message())
+	}
+	return message
+}
+
+// inputs returns the files of the source tree that build_license_metadata reads to record f.
+func (f PublicSourceFile) inputs() Paths {
+	if f.Delta != nil {
+		return Paths{f.File, f.Delta}
+	}
+	return Paths{f.File}
 }
 
 // PublicSourceFileInfo is the public copy of one file of the source tree, declared by a
@@ -351,8 +408,7 @@ type PublicSourceFileProperties struct {
 	// sha256 and size.
 	Delta *string `android:"path,arch_variant"`
 	// The fixups of extract-utils, made in order on the file in the public source before the delta.
-	// A file with fixups needs sha256 and size. Only the public_source of a prebuilt module lists
-	// fixups.
+	// A file with fixups needs sha256 and size.
 	Fixups []publicSourceFixupProperties `android:"arch_variant"`
 }
 
@@ -370,13 +426,20 @@ type publicSourceFixupProperties struct {
 	// The Python regular expression of the bytes to replace and the bytes that replace each match,
 	// as the binary_regex_replace method of the blob_fixups of a device tree.
 	Binary_regex_replace []string
+	// The Python regular expression of the text to replace and the text that replaces each match, as
+	// the regex_replace method of the blob_fixups of a device tree.
+	Regex_replace []string
+	// A line that the file gets at the end of its text unless it has the line already, as the
+	// add_line_if_missing method of the blob_fixups of a device tree.
+	Add_line_if_missing *string
 }
 
 // fixup returns the fixup that the properties name, reporting properties that name none or more
 // than one.
 func (p publicSourceFixupProperties) fixup(ctx ModuleContext, property string) (PublicSourceFixup, bool) {
 	edits := 0
-	for _, set := range []bool{p.Replace_needed != nil, p.Add_needed != nil, p.Set_soname != nil, p.Binary_regex_replace != nil} {
+	for _, set := range []bool{p.Replace_needed != nil, p.Add_needed != nil, p.Set_soname != nil, p.Binary_regex_replace != nil,
+		p.Regex_replace != nil, p.Add_line_if_missing != nil} {
 		if set {
 			edits++
 		}
@@ -391,10 +454,14 @@ func (p publicSourceFixupProperties) fixup(ctx ModuleContext, property string) (
 			return SetSonameFixup{Soname: *p.Set_soname}, true
 		case len(p.Binary_regex_replace) == 2:
 			return BinaryRegexReplaceFixup{Pattern: p.Binary_regex_replace[0], Replacement: p.Binary_regex_replace[1]}, true
+		case len(p.Regex_replace) == 2:
+			return RegexReplaceFixup{Pattern: p.Regex_replace[0], Replacement: p.Regex_replace[1]}, true
+		case p.Add_line_if_missing != nil:
+			return AddLineIfMissingFixup{Line: *p.Add_line_if_missing}, true
 		}
 	}
-	ctx.PropertyErrorf(property, "needs either replace_needed with two library names, add_needed, set_soname or "+
-		"binary_regex_replace with a pattern and a replacement")
+	ctx.PropertyErrorf(property, "needs either replace_needed with two library names, add_needed, set_soname, "+
+		"binary_regex_replace or regex_replace with a pattern and a replacement, or add_line_if_missing")
 	return nil, false
 }
 
@@ -526,34 +593,29 @@ func modulePublicSourceFiles(ctx *moduleContext) (PublicSourceInfo, []installedP
 // records files as found in source. It returns the files that build_license_metadata reads with
 // it.
 func writePublicSourceMessage(ctx BuilderContext, file WritablePath, source PublicSourceInfo, files []installedPublicSourceFile) Paths {
-	message := &license_metadata_proto.PublicSource{Name: proto.String(source.Name)}
-	source.Location.setOn(message)
+	messages := make([]*license_metadata_proto.PublicSourceFile, 0, len(files))
 	inputs := Paths{file}
 	for _, f := range files {
-		file := &license_metadata_proto.PublicSourceFile{
-			File:      proto.String(f.File.String()),
-			Path:      proto.String(f.Path),
-			Sha256:    f.Sha256,
-			Size:      f.Size,
-			Installed: proto.String(f.installed.String()),
-		}
-		inputs = append(inputs, f.File, f.installed)
-		if f.Delta != nil {
-			file.Delta = proto.String(f.Delta.String())
-			inputs = append(inputs, f.Delta)
-		}
-		for _, fixup := range f.Fixups {
-			file.Fixups = append(file.Fixups, fixup.message())
-		}
-		message.Files = append(message.Files, file)
+		message := f.message()
+		message.Installed = proto.String(f.installed.String())
+		messages = append(messages, message)
+		inputs = append(inputs, f.inputs()...)
+		inputs = append(inputs, f.installed)
 	}
+	writePublicSourceFilesMessage(ctx, file, source, messages)
+	return inputs
+}
 
+// writePublicSourceFilesMessage writes to file the PublicSource message that records the files of
+// messages as found in source.
+func writePublicSourceFilesMessage(ctx BuilderContext, file WritablePath, source PublicSourceInfo, messages []*license_metadata_proto.PublicSourceFile) {
+	message := &license_metadata_proto.PublicSource{Name: proto.String(source.Name), Files: messages}
+	source.Location.setOn(message)
 	data, err := proto.MarshalOptions{Deterministic: true}.Marshal(message)
 	if err != nil {
 		panic(fmt.Errorf("could not encode the public source %s: %w", source.Name, err))
 	}
 	WriteFileRuleVerbatim(ctx, file, string(data))
-	return inputs
 }
 
 // closestPackageDir returns the directory of the closest package at or above dir. The
@@ -613,11 +675,6 @@ func (m *publicSourceFileModule) GenerateAndroidBuildActions(ctx ModuleContext) 
 	// NamespaceExportedToMake in its variants.
 	if !ctx.Namespace().exportToKati {
 		return
-	}
-	// Make writes the license metadata of a file that PRODUCT_COPY_FILES copies, from variables that
-	// list no fixups.
-	if len(m.fileProperties.Fixups) > 0 {
-		ctx.PropertyErrorf("fixups", "are listed only by the public_source of a prebuilt module")
 	}
 	source, ok := publicSourceDependency(ctx.blueprintBaseModuleContext(), "from")
 	if !ok {
