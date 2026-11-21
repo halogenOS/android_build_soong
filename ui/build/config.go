@@ -2169,7 +2169,7 @@ func (c *configImpl) KatiBin() string {
 // katiTool returns the ckati that the first call chose, and every later call returns the same.
 func (c *configImpl) katiTool() chosenTool {
 	c.katiToolOnce.Do(func() {
-		c.kati = c.chooseTool("ckati", c.PrebuiltBuildTool("ckati"), []string{"--version"}, "kati ", katiJsonLines)
+		c.kati = c.chooseTool(katiBuildTool, c.PrebuiltBuildTool("ckati"))
 	})
 	return c.kati
 }
@@ -2177,6 +2177,13 @@ func (c *configImpl) katiTool() chosenTool {
 // katiJsonLines is the Make functions KATI_json_quote and KATI_file_stream, which Make writes the
 // compliance metadata with.
 var katiJsonLines = toolCapability{"json-lines"}
+
+var katiBuildTool = buildTool{
+	name:          "ckati",
+	versionArgs:   []string{"--version"},
+	versionPrefix: "kati ",
+	required:      katiJsonLines,
+}
 
 func (c *configImpl) NinjaBin() string {
 	binName := "ninja"
@@ -2223,17 +2230,39 @@ func (c *configImpl) SisoBin() string {
 
 func (c *configImpl) sisoTool() chosenTool {
 	c.sisoToolOnce.Do(func() {
-		// -online=false stops a siso installed from CIPD from using the network.
-		c.siso = c.chooseTool("siso", c.prebuiltSisoBin(), []string{"version", "-online=false"}, "siso v",
-			sisoAbsoluteOutputs)
+		c.siso = c.chooseTool(sisoBuildTool, c.prebuiltSisoBin())
 	})
 	return c.siso
 }
 
-// A chosenTool is the build tool that soong_ui runs, with the capabilities of its version answer.
+var sisoBuildTool = buildTool{
+	name: "siso",
+	// -online=false stops a siso installed from CIPD from using the network.
+	versionArgs:   []string{"version", "-online=false"},
+	versionPrefix: "siso v",
+	required:      sisoAbsoluteOutputs,
+}
+
+// A buildTool is a build tool that soong_ui runs from PATH or from the prebuilts.
+type buildTool struct {
+	name string
+	// The arguments that make the tool print its version answer, and the text before the version in
+	// the first line of that answer.
+	versionArgs   []string
+	versionPrefix string
+	// The capability that a tool on PATH needs to run in place of the prebuilt.
+	required toolCapability
+}
+
+// at returns the tool at path, with the capabilities listed in the version answer that it prints.
+func (t buildTool) at(path string) chosenTool {
+	return chosenTool{path: path, capabilities: toolCapabilities(path, t.versionArgs, t.versionPrefix)}
+}
+
+// A chosenTool is the build tool that soong_ui runs, with the capabilities listed in the version
+// answer that the tool prints.
 type chosenTool struct {
-	path string
-	// The capabilities in the version answer of the tool. A prebuilt tool has none.
+	path         string
 	capabilities []string
 }
 
@@ -2242,26 +2271,25 @@ func (t chosenTool) supports(capability toolCapability) bool {
 	return slices.Contains(t.capabilities, capability.name)
 }
 
-// chooseTool returns the tool called name on PATH when its version answer, which it gets by running
-// it with versionArgs, shows the required capability, and prebuilt otherwise.
-func (c *configImpl) chooseTool(name, prebuilt string, versionArgs []string, versionPrefix string,
-	required toolCapability) chosenTool {
-	path, err := exec.LookPath(name)
-	if err != nil && !errors.Is(err, exec.ErrDot) {
-		return chosenTool{path: prebuilt}
-	}
-	if err == nil {
-		tool := chosenTool{path: path, capabilities: toolCapabilities(path, versionArgs, versionPrefix)}
-		if tool.supports(required) {
-			return tool
+// chooseTool returns the tool on PATH when it has the required capability of tool, and prebuilt
+// otherwise.
+func (c *configImpl) chooseTool(tool buildTool, prebuilt string) chosenTool {
+	path, err := exec.LookPath(tool.name)
+	if errors.Is(err, exec.ErrDot) {
+		c.logger.Printf("Skipping %s at %s, which PATH finds relative to the current directory, "+
+			"running the prebuilt %s instead", tool.name, path, prebuilt)
+	} else if err == nil {
+		if onPath := tool.at(path); onPath.supports(tool.required) {
+			return onPath
 		}
+		c.logger.Printf("Skipping %s at %s, whose version answer does not show +%s, running the prebuilt %s "+
+			"instead", tool.name, path, tool.required.name, prebuilt)
 	}
-	c.logger.Printf("Skipping %s at %s, running the prebuilt %s instead", name, path, prebuilt)
-	return chosenTool{path: prebuilt}
+	return tool.at(prebuilt)
 }
 
-// toolCapabilities returns the capabilities in the version answer of the tool at path, which it
-// gets by running the tool with versionArgs. The first line of the answer has the form
+// toolCapabilities returns the capabilities listed in the version answer that the tool at path
+// prints when it runs with versionArgs. The first line of the answer has the form
 // "<prefix><version>+<capability>...", and the result is empty for any other answer.
 func toolCapabilities(path string, versionArgs []string, prefix string) []string {
 	out, err := exec.Command(path, versionArgs...).Output()
