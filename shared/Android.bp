@@ -6,6 +6,7 @@ bootstrap_go_package {
     name: "soong-shared",
     pkgPath: "android/soong/shared",
     srcs: [
+        "compliance_records.go",
         "env.go",
         "paths.go",
         "debug.go",

@@ -12,19 +12,14 @@ import (
 	"strings"
 
 	"github.com/google/blueprint"
+
+	"android/soong/shared"
 )
 
 // The records of the compliance metadata are files of JSON lines, one file for each table of the
 // compliance metadata database. The first line of a file is the header of its table, and each
 // other line is one row, written by a module while it generates its build actions. A path in a row
 // is written relative to its root, so the file does not depend on where the tree and OUT_DIR are.
-
-// The tables whose files soong_build or Kati write.
-const (
-	modulesComplianceTable      = "modules"
-	makeMetadataComplianceTable = "make_metadata"
-	makeModulesComplianceTable  = "make_modules"
-)
 
 // A complianceTableHeader is the first line of the file of a table: its columns in table order,
 // the columns that order its rows and the column that gets the position of each row.
@@ -52,42 +47,18 @@ var (
 	}
 )
 
-// A complianceTable is a table of the compliance metadata database, whose records are the file that
-// complianceTablePath returns.
-type complianceTable struct {
-	name string
-	// ofMake is true for the tables of Make, which Kati writes, and soong_build in a build without
-	// Kati. Make and Soong read their header from the file that makeComplianceHeaderPath returns.
-	ofMake bool
-	// header is the header of a table that only soong_build writes.
-	header complianceTableHeader
-}
-
-// complianceTables returns the tables of the compliance metadata database: the modules, the tables
-// of Make and the table of each unbundled app.
-func complianceTables(config Config) []complianceTable {
-	tables := []complianceTable{
-		{name: modulesComplianceTable, header: modulesComplianceHeader},
-		{name: makeMetadataComplianceTable, ofMake: true},
-		{name: makeModulesComplianceTable, ofMake: true},
+// complianceHeaderLine returns the first line of the records of table. Make and Soong read the
+// header of a table of Make from the file that makeComplianceHeaderPath returns.
+func complianceHeaderLine(config Config, table shared.ComplianceTable) string {
+	switch table.Kind {
+	case shared.ComplianceTableOfMake:
+		return readMakeComplianceHeader(config, table.Name)
+	case shared.ComplianceTableOfModules:
+		return encodeComplianceLine(modulesComplianceHeader)
+	case shared.ComplianceTableOfUnbundledApp:
+		return encodeComplianceLine(unbundledAppComplianceHeader)
 	}
-	for _, app := range FirstUniqueStrings(config.UnbundledBuildApps()) {
-		tables = append(tables, complianceTable{name: app, header: unbundledAppComplianceHeader})
-	}
-	return tables
-}
-
-// writtenBySoong reports whether soong_build writes the records of t in the build of config.
-func (t complianceTable) writtenBySoong(config Config) bool {
-	return !t.ofMake || !config.KatiEnabled()
-}
-
-// headerLine returns the first line of the records of t.
-func (t complianceTable) headerLine(config Config) string {
-	if t.ofMake {
-		return readMakeComplianceHeader(config, t.name)
-	}
-	return encodeComplianceLine(t.header)
+	panic(fmt.Errorf("compliance metadata table %s has no header", table.Name))
 }
 
 // makeComplianceHeaderPath returns the file with the header line of table, a table of Make.
@@ -112,7 +83,7 @@ func readMakeComplianceHeader(config Config, table string) string {
 
 // complianceTablePath returns the file of the records of table in the build of config.
 func complianceTablePath(config Config, table string) OutputPath {
-	return PathForOutput(NullPathContext{config}, "compliance-metadata", config.DeviceProduct(), table+".jsonl")
+	return PathForOutput(NullPathContext{config}, shared.ComplianceTablePath(config.DeviceProduct(), table))
 }
 
 // registerComplianceRecordStreams registers the record streams of the tables that soong_build
@@ -122,10 +93,8 @@ func registerComplianceRecordStreams(ctx *Context) {
 	if !config.HasDeviceProduct() {
 		return
 	}
-	for _, table := range complianceTables(config) {
-		if table.writtenBySoong(config) {
-			ctx.RegisterRecordStream(complianceTablePath(config, table.name).String(), table.headerLine(config))
-		}
+	for _, stream := range shared.ComplianceRecordStreams(config.DeviceProduct(), config.UnbundledBuildApps(), config.KatiEnabled()) {
+		ctx.RegisterRecordStream(PathForOutput(NullPathContext{config}, stream.Path).String(), complianceHeaderLine(config, stream.Table))
 	}
 }
 
@@ -254,7 +223,7 @@ func encodeComplianceLine(value any) string {
 
 // writeModuleComplianceRecord writes the row of the module into the modules table.
 func writeModuleComplianceRecord(ctx *moduleContext, info *ComplianceMetadataInfo) {
-	writeComplianceRecord(ctx.bp, modulesComplianceTable, info.moduleRow(ctx.Config()))
+	writeComplianceRecord(ctx.bp, shared.ModulesComplianceTable, info.moduleRow(ctx.Config()))
 }
 
 // writePackageComplianceRecord writes the row of a package module into the modules table.
@@ -263,7 +232,7 @@ func writePackageComplianceRecord(ctx blueprint.ModuleContext, primaryLicenses [
 	info.SetStringValue(ComplianceMetadataProp.NAME, ctx.ModuleName())
 	info.SetStringValue(ComplianceMetadataProp.MODULE_TYPE, ctx.ModuleType())
 	info.SetListValue(ComplianceMetadataProp.PKG_DEFAULT_APPLICABLE_LICENSES, primaryLicenses)
-	writeComplianceRecord(ctx, modulesComplianceTable, info.moduleRow(ctx.Config().(Config)))
+	writeComplianceRecord(ctx, shared.ModulesComplianceTable, info.moduleRow(ctx.Config().(Config)))
 }
 
 // SetUnbundledAppFiles sets files as the files that the module of ctx, the unbundled app called
@@ -285,7 +254,7 @@ func SetUnbundledAppFiles(ctx ModuleContext, app string, files []UnbundledAppFil
 // Make.
 func WriteProductComplianceRecords(ctx ModuleContext, files *ComplianceFilesInfo) {
 	for _, row := range productInstalledFileRows(ctx, files) {
-		writeComplianceRecord(ctx.BlueprintModuleContext(), makeMetadataComplianceTable, row)
+		writeComplianceRecord(ctx.BlueprintModuleContext(), shared.MakeMetadataComplianceTable, row)
 	}
 }
 

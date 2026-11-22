@@ -146,6 +146,20 @@ func (c BlueprintConfig) ActionSandboxMetrics() *blueprint.SandboxMetrics {
 	return nil
 }
 
+// complianceRecordStreamPaths returns the files with the records of the compliance metadata that
+// soong_build writes in the build of config.
+func complianceRecordStreamPaths(config Config) []string {
+	if config.SkipConfig() {
+		return nil
+	}
+	unbundledApps, _ := config.Environment().Get("TARGET_BUILD_APPS")
+	var paths []string
+	for _, stream := range shared.ComplianceRecordStreams(config.TargetProduct(), strings.Fields(unbundledApps), !config.SkipKati()) {
+		paths = append(paths, filepath.Join(config.SoongOutDir(), stream.Path))
+	}
+	return paths
+}
+
 func environmentArgs(config Config, tag string) []string {
 	return []string{
 		"--available_env", shared.JoinPath(config.SoongOutDir(), availableEnvFile),
@@ -179,12 +193,13 @@ func fileExists(path string) (bool, error) {
 }
 
 type PrimaryBuilderFactory struct {
-	name         string
-	description  string
-	config       Config
-	output       string
-	specificArgs []string
-	debugPort    string
+	name            string
+	description     string
+	config          Config
+	output          string
+	specificArgs    []string
+	debugPort       string
+	implicitOutputs []string
 }
 
 func (pb PrimaryBuilderFactory) primaryBuilderInvocation(config Config) bootstrap.PrimaryBuilderInvocation {
@@ -245,10 +260,11 @@ func (pb PrimaryBuilderFactory) primaryBuilderInvocation(config Config) bootstra
 	allArgs = append(allArgs, "Android.bp")
 
 	return bootstrap.PrimaryBuilderInvocation{
-		Implicits:   []string{pb.output + ".glob_results"},
-		Outputs:     []string{pb.output},
-		Args:        allArgs,
-		Description: pb.description,
+		Implicits:       []string{pb.output + ".glob_results"},
+		Outputs:         []string{pb.output},
+		ImplicitOutputs: append([]string{pb.config.UsedEnvFile(pb.name)}, pb.implicitOutputs...),
+		Args:            allArgs,
+		Description:     pb.description,
 		// NB: Changing the value of this environment variable will not result in a
 		// rebuild. The bootstrap Ninja file will change, but apparently Ninja does
 		// not consider changing the pool specified in a statement a change that's
@@ -342,11 +358,12 @@ func bootstrapBlueprint(ctx Context, config Config) {
 
 	pbfs := []PrimaryBuilderFactory{
 		{
-			name:         soongBuildTag,
-			description:  fmt.Sprintf("analyzing Android.bp files and generating ninja file at %s", config.SoongNinjaFile()),
-			config:       config,
-			output:       config.SoongNinjaFile(),
-			specificArgs: mainSoongBuildExtraArgs,
+			name:            soongBuildTag,
+			description:     fmt.Sprintf("analyzing Android.bp files and generating ninja file at %s", config.SoongNinjaFile()),
+			config:          config,
+			output:          config.SoongNinjaFile(),
+			specificArgs:    mainSoongBuildExtraArgs,
+			implicitOutputs: complianceRecordStreamPaths(config),
 		},
 		{
 			name:        jsonModuleGraphTag,

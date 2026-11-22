@@ -22,6 +22,8 @@ import (
 
 	"github.com/google/blueprint"
 	"github.com/google/blueprint/proptools"
+
+	"android/soong/shared"
 )
 
 //go:generate go run ../../blueprint/gobtools/codegen
@@ -472,11 +474,11 @@ func (c *complianceMetadataSingleton) GenerateBuildActions(ctx SingletonContext)
 		return
 	}
 	var records Paths
-	for _, table := range complianceTables(config) {
-		records = append(records, complianceTablePath(config, table.name))
-		if table.ofMake && table.writtenBySoong(config) {
+	for _, table := range shared.ComplianceTables(config.UnbundledBuildApps()) {
+		records = append(records, complianceTablePath(config, table.Name))
+		if table.Kind == shared.ComplianceTableOfMake && table.WrittenBySoong(config.KatiEnabled()) {
 			// registerComplianceRecordStreams read the header of Make.
-			ctx.AddNinjaFileDeps(makeComplianceHeaderPath(table.name))
+			ctx.AddNinjaFileDeps(makeComplianceHeaderPath(table.Name))
 		}
 	}
 	db := complianceMetadataDb(ctx)

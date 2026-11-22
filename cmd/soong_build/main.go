@@ -299,9 +299,6 @@ func runSoongOnlyBuild(ctx *android.Context) (string, []string) {
 // time soong_ui is run, it checks whether any environment variables that was
 // used had changed and if so, it deletes soong.environment.used to cause a
 // rebuild.
-//
-// The dependency of build.ninja on soong.environment.used is declared in
-// build.ninja.d
 func parseAvailableEnv() map[string]string {
 	if availableEnvFile == "" {
 		fmt.Fprintf(os.Stderr, "--available_env not set\n")
@@ -399,7 +396,6 @@ func main() {
 	finalOutputFile, ninjaDeps := runSoongOnlyBuild(ctx)
 
 	ninjaDeps = append(ninjaDeps, configuration.ProductVariablesFileName)
-	ninjaDeps = append(ninjaDeps, usedEnvFile)
 	if shared.IsDebugging() {
 		// Add a non-existent file to the dependencies so that soong_build will rerun when the debugger is
 		// enabled even if it completed successfully.
@@ -420,12 +416,6 @@ func main() {
 	err = ctx.WriteGlobFile(shared.JoinPath(topDir, finalOutputFile), soongStartTime)
 	ctx.EventHandler.End("writeGlobFile")
 	maybeQuit(err, "")
-
-	// Touch the output file so that it's the newest file created by soong_build.
-	// This is necessary because, if soong_build generated any files which
-	// are ninja inputs to the main output file, then ninja would superfluously
-	// rebuild this output file on the next build invocation.
-	touch(shared.JoinPath(topDir, finalOutputFile))
 }
 
 func writeUsedEnvironmentFile(configuration android.Config) {
@@ -439,17 +429,6 @@ func writeUsedEnvironmentFile(configuration android.Config) {
 
 	err = pathtools.WriteFileIfChanged(path, data, 0666)
 	maybeQuit(err, "error writing used environment file '%s'", usedEnvFile)
-}
-
-func touch(path string) {
-	f, err := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0666)
-	maybeQuit(err, "Error touching '%s'", path)
-	err = f.Close()
-	maybeQuit(err, "Error touching '%s'", path)
-
-	currentTime := time.Now().Local()
-	err = os.Chtimes(path, currentTime, currentTime)
-	maybeQuit(err, "error touching '%s'", path)
 }
 
 func maybeQuit(err error, format string, args ...interface{}) {

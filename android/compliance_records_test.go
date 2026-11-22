@@ -9,6 +9,8 @@ import (
 	"slices"
 	"strings"
 	"testing"
+
+	"android/soong/shared"
 )
 
 // readComplianceRows returns the lines of the records of table after the header, sorted.
@@ -77,7 +79,7 @@ func TestComplianceRecords(t *testing.T) {
 	`)
 
 	rows := map[string]complianceModuleTestRow{}
-	for _, line := range readComplianceRows(t, result, modulesComplianceTable) {
+	for _, line := range readComplianceRows(t, result, shared.ModulesComplianceTable) {
 		var row complianceModuleTestRow
 		if err := json.Unmarshal([]byte(line), &row); err != nil {
 			t.Fatalf("could not read the row %q: %s", line, err)
@@ -92,7 +94,7 @@ func TestComplianceRecords(t *testing.T) {
 		rows["//."])
 
 	AssertDeepEquals(t, "installed files of Make without a main device", []string{},
-		readComplianceRows(t, result, makeMetadataComplianceTable))
+		readComplianceRows(t, result, shared.MakeMetadataComplianceTable))
 
 	db := result.SingletonForTests(t, "compliance_metadata_singleton").Rule("importComplianceMetadata")
 	AssertPathsRelativeToTopEquals(t, "records", []string{
@@ -139,7 +141,7 @@ func TestProductComplianceRecords(t *testing.T) {
 		installed + `generated.txt"]},"is_platform_generated":"Y","license_text":{"src":["build/soong/licenses/LICENSE"]}}`,
 		installed + `kernel_module.ko"]},"kernel_module_copy_files":"ANDROID-GEN::out/target/product/test_device/system/etc/kernel_module.ko"}`,
 		installed + `module.txt"]},"is_soong_module":"Y"}`,
-	}, StringsRelativeToTop(result.Config, readComplianceRows(t, result, makeMetadataComplianceTable)))
+	}, StringsRelativeToTop(result.Config, readComplianceRows(t, result, shared.MakeMetadataComplianceTable)))
 }
 
 func TestUnbundledAppComplianceRecords(t *testing.T) {

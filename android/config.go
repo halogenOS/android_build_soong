@@ -1011,7 +1011,7 @@ func (c *config) mockFileSystem(bp string, fs map[string][]byte) {
 	}
 
 	// A build without Kati reads the header lines of the tables of Make.
-	for _, table := range []string{makeMetadataComplianceTable, makeModulesComplianceTable} {
+	for _, table := range []string{shared.MakeMetadataComplianceTable, shared.MakeModulesComplianceTable} {
 		if _, exists := mockFS[makeComplianceHeaderPath(table)]; !exists {
 			mockFS[makeComplianceHeaderPath(table)] = []byte(`{"columns":["installed_file"],"sort":[]}` + "\n")
 		}
