@@ -138,10 +138,17 @@ func (s *copiedFilesSingleton) GenerateBuildActions(ctx SingletonContext) {
 		}
 	}
 
-	// A file outside every package with a default_public_source has no public source, so only these
-	// packages and the packages below them are written.
+	// Make looks up the licenses of a file it installs itself in the closest package above the file.
+	// Only a file with a public source needs them: a file of a package with a default_public_source,
+	// of a package below one, or of a package holding a public_source_file.
+	holdsDeclaredFile := make(map[string]bool)
+	for src := range declaredFiles {
+		if dir, inPackage := closestPackageDir(ctx.Config(), filepath.Dir(src)); inPackage {
+			holdsDeclaredFile[dir] = true
+		}
+	}
 	for _, dir := range SortedKeys(packages) {
-		if !isBelowDefaultPublicSource(packages, dir) {
+		if !isBelowDefaultPublicSource(packages, dir) && !holdsDeclaredFile[dir] {
 			continue
 		}
 		pkg := packages[dir]
