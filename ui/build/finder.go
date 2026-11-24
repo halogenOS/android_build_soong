@@ -51,10 +51,12 @@ func NewSourceFinder(ctx Context, config Config) (f *finder.Finder) {
 
 	// .out-dir and .find-ignore are markers for Finder to ignore siblings and
 	// subdirectories of the directory Finder finds them in, hence stopping the
-	// search recursively down those branches. It's possible that these files
-	// are in the root directory, and if they are, then the subsequent error
-	// messages are very confusing, so check for that here.
-	pruneFiles := []string{".out-dir", ".find-ignore"}
+	// search recursively down those branches. CACHEDIR.TAG marks a cache
+	// directory (https://bford.info/cachedir/), such as the target directory
+	// of cargo. It's possible that these files are in the root directory, and
+	// if they are, then the subsequent error messages are very confusing, so
+	// check for that here.
+	pruneFiles := []string{".out-dir", ".find-ignore", "CACHEDIR.TAG"}
 	for _, name := range pruneFiles {
 		prunePath := filepath.Join(dir, name)
 		_, statErr := filesystem.Lstat(prunePath)
