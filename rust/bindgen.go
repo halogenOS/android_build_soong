@@ -187,6 +187,7 @@ func (b *bindgenDecorator) GenerateSource(ctx ModuleContext, deps PathDeps) andr
 	}
 
 	implicits = append(implicits, deps.depGeneratedHeaders...)
+	implicits = append(implicits, deps.depTriggerDeps...)
 
 	// Default clang flags
 	cflags = append(cflags, "${cc_config.CommonGlobalCflags}")

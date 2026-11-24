@@ -559,6 +559,7 @@ type PathDeps struct {
 	depClangFlags         []string
 	depIncludePaths       android.Paths
 	depGeneratedHeaders   android.Paths
+	depTriggerDeps        android.Paths
 	depSystemIncludePaths android.Paths
 
 	CrtBegin android.Paths
@@ -1872,6 +1873,7 @@ func (mod *Module) depsToPaths(ctx android.ModuleContext) (PathDeps, []string) {
 				depPaths.depSystemIncludePaths = append(depPaths.depSystemIncludePaths, exportedInfo.SystemIncludeDirs...)
 				depPaths.depClangFlags = append(depPaths.depClangFlags, exportedInfo.Flags...)
 				depPaths.depGeneratedHeaders = append(depPaths.depGeneratedHeaders, exportedInfo.GeneratedHeaders...)
+				depPaths.depTriggerDeps = append(depPaths.depTriggerDeps, exportedInfo.TriggerDeps...)
 
 				if !mod.Rlib() {
 					// rlibs don't need to build the generated static library, so they don't need to track these.
@@ -1920,6 +1922,7 @@ func (mod *Module) depsToPaths(ctx android.ModuleContext) (PathDeps, []string) {
 				depPaths.depSystemIncludePaths = append(depPaths.depSystemIncludePaths, exportedInfo.SystemIncludeDirs...)
 				depPaths.depClangFlags = append(depPaths.depClangFlags, exportedInfo.Flags...)
 				depPaths.depGeneratedHeaders = append(depPaths.depGeneratedHeaders, exportedInfo.GeneratedHeaders...)
+				depPaths.depTriggerDeps = append(depPaths.depTriggerDeps, exportedInfo.TriggerDeps...)
 				directSharedLibDeps = append(directSharedLibDeps, sharedLibraryInfo)
 
 				// Record baseLibName for snapshots.
@@ -1932,6 +1935,7 @@ func (mod *Module) depsToPaths(ctx android.ModuleContext) (PathDeps, []string) {
 				depPaths.depIncludePaths = append(depPaths.depIncludePaths, exportedInfo.IncludeDirs...)
 				depPaths.depSystemIncludePaths = append(depPaths.depSystemIncludePaths, exportedInfo.SystemIncludeDirs...)
 				depPaths.depGeneratedHeaders = append(depPaths.depGeneratedHeaders, exportedInfo.GeneratedHeaders...)
+				depPaths.depTriggerDeps = append(depPaths.depTriggerDeps, exportedInfo.TriggerDeps...)
 				mod.Properties.AndroidMkHeaderLibs = append(mod.Properties.AndroidMkHeaderLibs, makeLibName)
 			case depTag == cc.CrtBeginDepTag:
 				depPaths.CrtBegin = append(depPaths.CrtBegin, ccLibPath.Path())
